@@ -23,6 +23,13 @@ class RealsenseStoragePaths(StoragePaths):
         os.makedirs(self.depth, exist_ok=True)
         os.makedirs(self.timestamp, exist_ok=True)
 
+def str2bool(v):
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
 
 def get_parser():
     parser = argparse.ArgumentParser(description='Run RealSense devices.')
@@ -47,10 +54,11 @@ def get_parser():
                         default=0,
                         help='scale for displaying realsense raw images.')
     parser.add_argument('--rs-save-data',
+                        type=str2bool,
                         default=True,
                         help='if true, saves realsense frames.')
     parser.add_argument('--rs-use-one-dev-only',
-                        type=bool,
+                        type=str2bool,
                         default=False,
                         help='use 1 rs device only.')
     return parser

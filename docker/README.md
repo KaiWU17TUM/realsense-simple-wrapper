@@ -1,5 +1,5 @@
 _user:
--> add user to a docker image
+- add user to a docker image
 
 realsense:
--> build docker image for realsense
+- build docker image for realsense

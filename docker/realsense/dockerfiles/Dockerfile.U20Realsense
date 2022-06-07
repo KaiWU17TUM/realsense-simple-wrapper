@@ -100,6 +100,10 @@ COPY --from=librealsense-builder /usr/src/librealsense/config/99-realsense-libus
 ENV PYTHONPATH=$PYTHONPATH:/usr/local/lib
 
 RUN pip install pyrealsense2
+RUN pip install opencv-python
+RUN pip install numpy
+
+RUN apt-get install -y libopencv-dev
 
 WORKDIR /code
 
