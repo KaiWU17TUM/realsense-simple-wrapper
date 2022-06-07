@@ -144,7 +144,7 @@ class RealsenseWrapper:
         Args:
             power (int, optional): IR power. Defaults to 300.
         """
-        for _, dev in self.enabled_devices:
+        for _, dev in self.enabled_devices.items():
             sensor = dev.pipeline_profile.get_device().first_depth_sensor()
             if sensor.supports(rs.option.emitter_enabled):
                 ir_range = sensor.get_option_range(rs.option.laser_power)
@@ -182,7 +182,7 @@ class RealsenseWrapper:
                 if frameset.size() == len(streams):
                     frames[dev_sn] = {}
 
-                    frames[dev_sn]['calib'] = self.calib_data[dev_sn]
+                    frames[dev_sn]['calib'] = self.calib_data.get(dev_sn, {})
 
                     timestamp = frameset.get_frame_metadata(
                         rs.frame_metadata_value.sensor_timestamp)
