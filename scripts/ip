@@ -1,0 +1,10 @@
+# static ip
+nano /etc/dhcpcd.conf
+cat /etc/resolv.conf
+
+# wireless config
+sudo nano /etc/wpa_supplicant/wpa_supplicant.conf
+
+# change order of wext, known error with wpa-eap
+sudo nano /lib/dhcpcd/dhcpcd-hooks/10-wpa_supplicant
+sudo nano /etc/wpa_supplicant/functions.sh
