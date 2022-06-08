@@ -21,7 +21,7 @@ The code in [realsense](realsense) folder uses the [pyrealsense2](https://pypi.o
 
 - The official guide includes an open source ethernet networking [guide](https://dev.intelrealsense.com/docs/open-source-ethernet-networking-for-intel-realsense-depth-cameras) to stream RS over a network. It contains an image for (kernel-patched) Raspberrypi-OS built with RS-SDK-V2.34 . 
 
-- The SDK can be upgraded by following the steps shown [here](https://github.com/datasith/Ai_Demos_RPi/wiki/Raspberry-Pi-4-and-Intel-RealSense-D435). Once pre-installation steps are done, this [script](scripts/install_realsense.sh) can be used to run the installation steps (except OpenGL and VNC).
+- The SDK can be upgraded by following the steps shown [here](https://github.com/datasith/Ai_Demos_RPi/wiki/Raspberry-Pi-4-and-Intel-RealSense-D435). Once swap size is updated, this [script](scripts/install_realsense.sh) can be used to run the installation (except OpenGL and VNC).
 
 -  Kernel patch for Raspberrypi
 This [guide](https://github.com/NobuoTsukamoto/realsense_examples/blob/master/doc/installation_raspberry_pi_64.md) shows how to build/patch/compile linux for raspberrypi for RS.

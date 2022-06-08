@@ -55,6 +55,6 @@ cmake ../ \
 	-DBUILD_NETWORK_DEVICE=ON \
 	-DBUILD_PYTHON_BINDINGS:bool=true \
 	-DPYTHON_EXECUTABLE=/usr/bin/python3.7
-make -j4
+make -j$(($(nproc)-1))
 sudo make install
 echo -e "\e[92m\n\e[1mLibrealsense script completed.\n\e[0m"
