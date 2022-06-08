@@ -4,7 +4,7 @@ import numpy as np
 import os
 
 try:
-    import pyrealsense2 as rs
+    from pyrealsense2 import pyrealsense2 as rs
 except ImportError as e:
     print('Error: OpenPose library could not be found.')
     raise e

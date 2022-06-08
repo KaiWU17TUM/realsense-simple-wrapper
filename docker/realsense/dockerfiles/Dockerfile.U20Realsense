@@ -90,20 +90,19 @@ RUN apt-get update \
     ca-certificates \
     curl \
     software-properties-common \
+    libopencv-dev \  
     && rm -rf /var/lib/apt/lists/*
 
 # ------------------------------------------------------------------------------
 # Copy binaries from builder stage
 COPY --from=librealsense-builder /opt/librealsense /usr/local/
-# COPY --from=librealsense-builder /usr/lib/python3/dist-packages/pyrealsense2 /usr/lib/python3/dist-packages/pyrealsense2
+COPY --from=librealsense-builder /usr/lib/python3/dist-packages/pyrealsense2 /usr/lib/python3/dist-packages/pyrealsense2
 COPY --from=librealsense-builder /usr/src/librealsense/config/99-realsense-libusb.rules /etc/udev/rules.d/
-ENV PYTHONPATH=$PYTHONPATH:/usr/local/lib
+ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
 
-RUN pip install pyrealsense2
-RUN pip install opencv-python
 RUN pip install numpy
-
-RUN apt-get install -y libopencv-dev
+RUN pip install opencv-python
+# RUN pip install pyrealsense2
 
 WORKDIR /code
 
