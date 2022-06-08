@@ -71,9 +71,8 @@ sudo make install
 cd python
 export LD_LIBRARY_PATH=../src/.libs
 python3 setup.py build --cpp_implementation
+# The test might fail.
 python3 setup.py test --cpp_implementation
-# The test will return a failed one.
-# Fixed in v3.21 : https://github.com/protocolbuffers/protobuf/issues/6205
 if [ ! -d "/usr/local/lib/python3.7/dist-packages" ]; then
   sudo mkdir -p /usr/local/lib/python3.7/dist-packages
 fi
@@ -107,7 +106,8 @@ cmake .. \
   -DPYTHON_EXECUTABLE=$(which python3) \
   -DBUILD_SHARED_LIBS:BOOL=ON \
   -DFORCE_RSUSB_BACKEND=ON
-make -j$(($(nproc) - 2))
+# make -j$(($(nproc) - 2))
+make -j1
 # sudo make install
 
 # export PYTHONPATH=$PYTHONPATH:/home/realsense/librealsense/build
