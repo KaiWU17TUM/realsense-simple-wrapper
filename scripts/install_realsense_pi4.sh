@@ -47,7 +47,7 @@ echo "--------------------------------------------------------------------------
 
 cd ~/
 sudo rm -rf ./librealsense
-git clone https://github.com/IntelRealSense/librealsense.git
+git clone --depth=1 -b v2.50.0 https://github.com/IntelRealSense/librealsense.git
 sudo cp librealsense/config/99-realsense-libusb.rules /etc/udev/rules.d/
 
 # Update udev rule
@@ -97,6 +97,14 @@ echo "Compile librealsense"
 echo "--------------------------------------------------------------------------------\n"
 
 cd ~/librealsense
+
+# fixing python module import error
+sed -i '217s/.*/    pybind11_add_module(pyrealsense2_net SHARED pyrs_net.cpp)/' wrappers/python/CMakeLists.txt
+sed -i '218s/.*/    target_link_libraries(pyrealsense2_net PRIVATE realsense2-net)/' wrappers/python/CMakeLists.txt
+sed -i '219s/.*/    set_target_properties(pyrealsense2_net PROPERTIES FOLDER Wrappers/python)/' wrappers/python/CMakeLists.txt
+sed -i '220s/.*/    set_target_properties(pyrealsense2_net PROPERTIES/' wrappers/python/CMakeLists.txt
+sed -i '225s/.*/    install(TARGETS pyrealsense2_net/' wrappers/python/CMakeLists.txt
+
 mkdir build && cd build
 # cmake .. -DBUILD_EXAMPLES=true -DCMAKE_BUILD_TYPE=Release -DFORCE_LIBUVC=true
 cmake .. \
