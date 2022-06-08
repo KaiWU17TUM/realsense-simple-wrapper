@@ -21,7 +21,16 @@ echo "\n------------------------------------------------------------------------
 echo "Update packages"
 echo "--------------------------------------------------------------------------------\n"
 
-sudo apt-get update && sudo apt-get dist-upgrade -y
+sudo apt-get update --allow-releaseinfo-change && sudo apt-get dist-upgrade -y
+
+MAJOR_VERSION=$(uname -r | awk -F '.' '{print $1}')
+MINOR_VERSION=$(uname -r | awk -F '.' '{print $2}')
+if [ $MAJOR_VERSION -ge 5 ] && [ $MINOR_VERSION -ge 10 ] || [ $MAJOR_VERSION -ge 6 ]; then
+  echo "$(uname -r) is >= than 5.10"
+else
+  sudo reboot
+fi
+
 sudo apt-get install -y \
   automake \
   libtool \
@@ -57,12 +66,17 @@ git clone --depth=1 -b v3.10.0 https://github.com/google/protobuf.git
 cd protobuf
 ./autogen.sh
 ./configure
-make -j$(($(nproc) - 1))
+make -j$(($(nproc) - 2))
 sudo make install
 cd python
 export LD_LIBRARY_PATH=../src/.libs
 python3 setup.py build --cpp_implementation
 python3 setup.py test --cpp_implementation
+# The test will return a failed one.
+# Fixed in v3.21 : https://github.com/protocolbuffers/protobuf/issues/6205
+if [ ! -d "/usr/local/lib/python3.7/dist-packages" ]; then
+  sudo mkdir -p /usr/local/lib/python3.7/dist-packages
+fi
 sudo python3 setup.py install --cpp_implementation
 export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=cpp
 export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION_VERSION=3
@@ -93,7 +107,7 @@ cmake .. \
   -DPYTHON_EXECUTABLE=$(which python3) \
   -DBUILD_SHARED_LIBS:BOOL=ON \
   -DFORCE_RSUSB_BACKEND=ON
-make -j$(($(nproc) - 1))
+make -j$(($(nproc) - 2))
 # sudo make install
 
 # export PYTHONPATH=$PYTHONPATH:/home/realsense/librealsense/build
