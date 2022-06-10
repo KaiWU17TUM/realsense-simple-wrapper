@@ -8,6 +8,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
+#include <cstdlib>
 #include <fstream>  // File IO
 #include <iostream> // Terminal IO
 #include <sstream>  // Stringstreams
@@ -17,7 +18,7 @@
 #include "stb_image_write.h"
 
 // Starting pipeline
-rs2::pipeline start_pipeline(int argc, char *argv[]);
+rs2::pipeline start_pipeline(const int &argc, char *argv[], const rs2::config &cfg);
 
 // Helper function for writing metadata to disk as a csv file
 void metadata_to_csv(const rs2::frame &frm, const std::string &filename);
@@ -28,29 +29,33 @@ int main(int argc, char *argv[])
 try
 {
 
-    rs2::pipeline pipe = start_pipeline(argc, argv);
-    return 1;
-
     if (argc != 5 && argc != 6)
     {
         printf("Please enter fps, height, width, save path, {ipaddress}\n");
         throw std::invalid_argument("There should be 4 or 5 arguments");
     }
 
-    mkdir(argv[5], S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+    int FPS = atoi(argv[1]);
+    int HEIGHT = atoi(argv[2]);
+    int WIDTH = atoi(argv[3]);
+    char *SAVE_PATH = argv[4];
+
+    mkdir(SAVE_PATH, S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
 
     // Declare depth colorizer for pretty visualization of depth data
     rs2::colorizer color_map;
 
     // // Declare RealSense pipeline, encapsulating the actual device and sensors
     // // Start streaming with default recommended configuration
-    // start_pipeline(argv);
+    rs2::config cfg;
+    cfg.enable_stream(RS2_STREAM_DEPTH, WIDTH, HEIGHT, RS2_FORMAT_Z16, FPS);
+    cfg.enable_stream(RS2_STREAM_COLOR, WIDTH, HEIGHT, RS2_FORMAT_RGB8, FPS);
+    auto pipe = start_pipeline(argc, argv, cfg);
 
     // Capture 30 frames to give autoexposure, etc. a chance to settle
     for (auto i = 0; i < 30; ++i)
         pipe.wait_for_frames();
 
-    auto FPS = *argv[2];
     for (auto i = 0; i < FPS * 10; ++i)
     {
         std::size_t num_zeros = 6;
@@ -100,16 +105,8 @@ catch (const std::exception &e)
     return EXIT_FAILURE;
 }
 
-rs2::pipeline start_pipeline(int argc, char *argv[])
+rs2::pipeline start_pipeline(const int &argc, char *argv[], const rs2::config &cfg)
 {
-    char *IP = argv[5];
-    int FPS = (int)*argv[2];
-    int HEIGHT = (int)*argv[3];
-    int WIDTH = (int)*argv[4];
-
-    rs2::config cfg;
-    cfg.enable_stream(RS2_STREAM_DEPTH, WIDTH, HEIGHT, RS2_FORMAT_Z16, FPS);
-    cfg.enable_stream(RS2_STREAM_COLOR, WIDTH, HEIGHT, RS2_FORMAT_RGB8, FPS);
 
     if (argc == 5)
     {
@@ -120,6 +117,7 @@ rs2::pipeline start_pipeline(int argc, char *argv[])
     }
     else if (argc == 6)
     {
+        std::string IP = argv[5];
         rs2::net_device dev(IP);
         std::cout << "IP Found" << std::endl;
         rs2::context ctx;
