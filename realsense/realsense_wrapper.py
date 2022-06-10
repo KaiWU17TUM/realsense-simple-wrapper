@@ -6,7 +6,7 @@ import os
 try:
     from pyrealsense2 import pyrealsense2 as rs
 except ImportError as e:
-    print('Error: OpenPose library could not be found.')
+    print('Error: pyrealsense2 library could not be found.')
     raise e
 
 from typing import Optional, Type

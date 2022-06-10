@@ -23,6 +23,7 @@ class RealsenseStoragePaths(StoragePaths):
         os.makedirs(self.depth, exist_ok=True)
         os.makedirs(self.timestamp, exist_ok=True)
 
+
 def str2bool(v):
     if v.lower() in ('yes', 'true', 't', 'y', '1'):
         return True
@@ -30,6 +31,7 @@ def str2bool(v):
         return False
     else:
         raise argparse.ArgumentTypeError('Boolean value expected.')
+
 
 def get_parser():
     parser = argparse.ArgumentParser(description='Run RealSense devices.')
@@ -55,7 +57,7 @@ def get_parser():
                         help='scale for displaying realsense raw images.')
     parser.add_argument('--rs-save-data',
                         type=str2bool,
-                        default=True,
+                        default=False,
                         help='if true, saves realsense frames.')
     parser.add_argument('--rs-use-one-dev-only',
                         type=str2bool,
@@ -84,15 +86,25 @@ def initialize_rs_devices(
 if __name__ == "__main__":
     arg = get_parser().parse_args()
     rsw = initialize_rs_devices(arg)
+
     print("Starting frame capture loop...")
+    c = 1
     try:
         while True:
-            print("Running...")
             frames = rsw.run(display=arg.rs_display_frame)
             if not len(frames) > 0:
+                print("Empty...")
                 continue
+            else:
+                print("Running...")
+            if c > 10:
+                break
+            else:
+                c += 1
+
     except:  # noqa
         print("Stopping RealSense devices...")
         rsw.stop()
+
     finally:
         rsw.stop()
