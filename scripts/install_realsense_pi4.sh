@@ -1,6 +1,21 @@
 #!/bin/sh
 # Based on : https://github.com/datasith/Ai_Demos_RPi/wiki/Raspberry-Pi-4-and-Intel-RealSense-D435
 
+GREEN='\033[1;32m'
+BLUE='\033[0;36m'
+NC='\033[0m'
+
+printf "\n${GREEN}================================================================================\n"
+printf "Installing librealsense in RaspberrypPI4\n"
+printf "================================================================================${NC}\n"
+
+if [ $# -eq 1 ]; then
+  INSTALLATION_DIR=${1}
+else
+  INSTALLATION_DIR=~
+fi
+printf "Installing librealsense in : ${INSTALLATION_DIR}\n"
+
 # Locally suppress stderr to avoid raising not relevant messages
 exec 3>&2
 exec 2>/dev/null
@@ -8,18 +23,18 @@ con_dev=$(ls /dev/video* | wc -l)
 exec 2>&3
 
 if [ $con_dev -ne 0 ]; then
-  echo -e "\e[32m"
+  printf "\n{GREEN}"
   read -p "Remove all RealSense cameras attached. Hit any key when ready"
-  echo -e "\e[0m"
+  printf "\n{NC}"
 fi
 
 # Checks
 lsb_release -a
-echo "Kernel version $(uname -r)"
+printf "Kernel version $(uname -r)\n"
 
-echo "\n--------------------------------------------------------------------------------"
-echo "Update packages"
-echo "--------------------------------------------------------------------------------\n"
+printf "\n${GREEN}================================================================================\n"
+printf "Update packages\n"
+printf "================================================================================${NC}\n"
 
 sudo apt-get update --allow-releaseinfo-change && sudo apt-get dist-upgrade -y
 
@@ -41,27 +56,27 @@ sudo apt-get install -y \
   libglu1-mesa-dev
 # vim \
 
-echo "\n--------------------------------------------------------------------------------"
-echo "Get librealsense source code"
-echo "--------------------------------------------------------------------------------\n"
+printf "\n${GREEN}================================================================================\n"
+printf "Get librealsense source code\n"
+printf "================================================================================${NC}\n"
 
-cd ~/
+cd ${INSTALLATION_DIR}
 sudo rm -rf ./librealsense
 git clone --depth=1 -b v2.50.0 https://github.com/IntelRealSense/librealsense.git
-sudo cp librealsense/config/99-realsense-libusb.rules /etc/udev/rules.d/
+sudo cp ${INSTALLATION_DIR}/librealsense/config/99-realsense-libusb.rules /etc/udev/rules.d/
 
 # Update udev rule
-sudo bash ~/realsense-wrapper-python/scripts/install_realsense_pi4_udev.sh
+sudo bash ${PWD}/install_realsense_pi4_udev.sh
 
 # Update library paths
 export LD_LIBRARY_PATH=/usr/local/lib:$LD_LIBRARY_PATH
 . ~/.bashrc
 
-echo "\n--------------------------------------------------------------------------------"
-echo "Compile protobuff"
-echo "--------------------------------------------------------------------------------\n"
+printf "\n${GREEN}================================================================================\n"
+printf "Compile protobuff\n"
+printf "================================================================================${NC}\n"
 # TODO: may not be needed if examples are not built.
-cd ~
+cd ${INSTALLATION_DIR}
 git clone --depth=1 -b v3.10.0 https://github.com/google/protobuf.git
 cd protobuf
 ./autogen.sh
@@ -73,8 +88,9 @@ export LD_LIBRARY_PATH=../src/.libs
 python3 setup.py build --cpp_implementation
 # The test might fail.
 python3 setup.py test --cpp_implementation
-if [ ! -d "/usr/local/lib/python3.7/dist-packages" ]; then
-  sudo mkdir -p /usr/local/lib/python3.7/dist-packages
+PYV=$(python -c 'import platform; major, minor, patch = platform.python_version_tuple(); print(f"{major}.{minor}")')
+if [ ! -d "/usr/local/lib/python${PYV}/dist-packages" ]; then
+  sudo mkdir -p "/usr/local/lib/python${PYV}/dist-packages"
 fi
 sudo python3 setup.py install --cpp_implementation
 export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=cpp
@@ -82,23 +98,23 @@ export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION_VERSION=3
 sudo ldconfig
 protoc --version
 
-echo "\n--------------------------------------------------------------------------------"
-echo "Install libtbb package"
-echo "--------------------------------------------------------------------------------\n"
+printf "\n${GREEN}================================================================================\n"
+printf "Install libtbb package\n"
+printf "================================================================================${NC}\n"
 
-cd ~
+cd ${INSTALLATION_DIR}
 wget https://github.com/PINTO0309/TBBonARMv7/raw/master/libtbb-dev_2018U2_armhf.deb
-sudo dpkg -i ~/libtbb-dev_2018U2_armhf.deb
+sudo dpkg -i ${INSTALLATION_DIR}/libtbb-dev_2018U2_armhf.deb
 sudo ldconfig
 rm libtbb-dev_2018U2_armhf.deb
 
-echo "\n--------------------------------------------------------------------------------"
-echo "Compile librealsense"
-echo "--------------------------------------------------------------------------------\n"
+printf "\n${GREEN}================================================================================\n"
+printf "Compile librealsense\n"
+printf "================================================================================${NC}\n"
 
-cd ~/librealsense
+cd ${INSTALLATION_DIR}/librealsense
 
-# fixing python module import error
+# fixing python module import error for V2.50.0
 sed -i '217s/.*/    pybind11_add_module(pyrealsense2_net SHARED pyrs_net.cpp)/' wrappers/python/CMakeLists.txt
 sed -i '218s/.*/    target_link_libraries(pyrealsense2_net PRIVATE realsense2-net)/' wrappers/python/CMakeLists.txt
 sed -i '219s/.*/    set_target_properties(pyrealsense2_net PROPERTIES FOLDER Wrappers\/python)/' wrappers/python/CMakeLists.txt
@@ -118,11 +134,9 @@ cmake .. \
 make -j1
 # sudo make install
 
-# export PYTHONPATH=$PYTHONPATH:/home/realsense/librealsense/build
-
-echo "\n--------------------------------------------------------------------------------"
-echo "OpenCV and Numpy"
-echo "--------------------------------------------------------------------------------\n"
+printf "\n${GREEN}================================================================================\n"
+printf "OpenCV and Numpy\n"
+printf "================================================================================${NC}\n"
 
 cd ~
 . ~/.bashrc
@@ -134,3 +148,7 @@ sudo apt-get install -y \
 
 pip3 install opencv-python
 pip3 install -U numpy
+
+printf "\n${GREEN}================================================================================\n"
+printf "Installed librealsense in RaspberrypPI4\n"
+printf "================================================================================${NC}\n"
