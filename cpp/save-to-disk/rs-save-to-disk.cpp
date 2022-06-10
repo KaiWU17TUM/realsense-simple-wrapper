@@ -5,6 +5,9 @@
 #include <librealsense2-net/rs_net.hpp>
 #include <librealsense2/h/rs_pipeline.h>
 
+#include <sys/types.h>
+#include <sys/stat.h>
+
 #include <fstream>  // File IO
 #include <iostream> // Terminal IO
 #include <sstream>  // Stringstreams
@@ -12,6 +15,9 @@
 // 3rd party header for writing png files
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
+
+// Starting pipeline
+rs2::pipeline start_pipeline(int argc, char *argv[]);
 
 // Helper function for writing metadata to disk as a csv file
 void metadata_to_csv(const rs2::frame &frm, const std::string &filename);
@@ -22,47 +28,34 @@ int main(int argc, char *argv[])
 try
 {
 
-    int FPS = 6;
-    int HEIGHT = 480;
-    int WIDTH = 640;
+    rs2::pipeline pipe = start_pipeline(argc, argv);
+    return 1;
 
-    if (argc != 2)
+    if (argc != 5 && argc != 6)
     {
-        printf("Please enter ipaddress.\n");
-        return 1;
+        printf("Please enter fps, height, width, save path, {ipaddress}\n");
+        throw std::invalid_argument("There should be 4 or 5 arguments");
     }
+
+    mkdir(argv[5], S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
 
     // Declare depth colorizer for pretty visualization of depth data
     rs2::colorizer color_map;
 
     // // Declare RealSense pipeline, encapsulating the actual device and sensors
-    // rs2::pipeline pipe;
     // // Start streaming with default recommended configuration
-    // pipe.start();
-
-    rs2::net_device dev(argv[1]);
-    std::cout << "IP Found" << std::endl;
-    rs2::context ctx;
-    dev.add_to(ctx);
-    rs2::pipeline pipe(ctx);
-    rs2::config cfg;
-    cfg.enable_stream(RS2_STREAM_DEPTH, WIDTH, HEIGHT, RS2_FORMAT_Z16, FPS);
-    cfg.enable_stream(RS2_STREAM_COLOR, WIDTH, HEIGHT, RS2_FORMAT_RGB8, FPS);
-    auto profile = pipe.start(cfg);
-    std::cout << "started" << std::endl;
-
-    // rs2::pipeline pipe2(ctx);
-    // auto profile2 = pipe2.start(cfg);
-    // std::cout << "started" << std::endl;
+    // start_pipeline(argv);
 
     // Capture 30 frames to give autoexposure, etc. a chance to settle
     for (auto i = 0; i < 30; ++i)
         pipe.wait_for_frames();
 
+    auto FPS = *argv[2];
     for (auto i = 0; i < FPS * 10; ++i)
     {
+        std::size_t num_zeros = 6;
         std::string old_str = std::to_string(i);
-        std::string i_str = std::string(6 - std::min(n_zero, old_str.length()), '0') + old_str;
+        std::string i_str = std::string(num_zeros - std::min(num_zeros, old_str.length()), '0') + old_str;
 
         // Wait for the next set of frames from the camera. Now that autoexposure, etc.
         // has settled, we will write these to disk
@@ -105,6 +98,41 @@ catch (const std::exception &e)
 {
     std::cerr << e.what() << std::endl;
     return EXIT_FAILURE;
+}
+
+rs2::pipeline start_pipeline(int argc, char *argv[])
+{
+    char *IP = argv[5];
+    int FPS = (int)*argv[2];
+    int HEIGHT = (int)*argv[3];
+    int WIDTH = (int)*argv[4];
+
+    rs2::config cfg;
+    cfg.enable_stream(RS2_STREAM_DEPTH, WIDTH, HEIGHT, RS2_FORMAT_Z16, FPS);
+    cfg.enable_stream(RS2_STREAM_COLOR, WIDTH, HEIGHT, RS2_FORMAT_RGB8, FPS);
+
+    if (argc == 5)
+    {
+        rs2::pipeline pipe;
+        auto profile = pipe.start(cfg);
+        std::cout << "started" << std::endl;
+        return pipe;
+    }
+    else if (argc == 6)
+    {
+        rs2::net_device dev(IP);
+        std::cout << "IP Found" << std::endl;
+        rs2::context ctx;
+        dev.add_to(ctx);
+        rs2::pipeline pipe(ctx);
+        auto profile = pipe.start(cfg);
+        std::cout << "started" << std::endl;
+        return pipe;
+    }
+    else
+    {
+        throw std::invalid_argument("There should be 4 or 5 arguments");
+    }
 }
 
 void metadata_to_csv(const rs2::frame &frm, const std::string &filename)
