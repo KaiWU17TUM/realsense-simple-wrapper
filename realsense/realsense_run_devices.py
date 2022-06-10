@@ -2,6 +2,7 @@ import argparse
 import os
 
 from datetime import datetime
+from functools import partial
 from typing import Type, Optional
 
 from realsense import RealsenseWrapper
@@ -9,9 +10,8 @@ from realsense import StoragePaths
 
 
 class RealsenseStoragePaths(StoragePaths):
-    def __init__(self, device_sn: str = ''):
+    def __init__(self, device_sn: str = '', base_path: str = '/data/realsense'):
         super().__init__()
-        base_path = '/data/realsense'
         date_time = datetime.now().strftime("%y%m%d%H%M%S")
         self.calib = f'{base_path}/calib/{date_time}_dev{device_sn}'
         self.color = f'{base_path}/color/{date_time}_dev{device_sn}'
@@ -59,6 +59,10 @@ def get_parser():
                         type=str2bool,
                         default=False,
                         help='if true, saves realsense frames.')
+    parser.add_argument('--rs-save-path',
+                        type=str,
+                        default='/data/realsense',
+                        help='path to save realsense frames if --rs-save-data=True.')  # noqa
     parser.add_argument('--rs-use-one-dev-only',
                         type=str2bool,
                         default=False,
@@ -70,7 +74,8 @@ def initialize_rs_devices(
         arg: argparse.Namespace,
         storage_paths: Optional[Type[StoragePaths]] = RealsenseStoragePaths
 ) -> RealsenseWrapper:
-    rsw = RealsenseWrapper(storage_paths if arg.rs_save_data else None)
+    storage_paths_fn = partial(storage_paths, base_path=arg.rs_save_path)
+    rsw = RealsenseWrapper(storage_paths_fn if arg.rs_save_data else None)
     rsw.stream_config.fps = arg.rs_fps
     rsw.stream_config.height = arg.rs_image_height
     rsw.stream_config.width = arg.rs_image_width
@@ -86,6 +91,7 @@ def initialize_rs_devices(
 if __name__ == "__main__":
     arg = get_parser().parse_args()
     rsw = initialize_rs_devices(arg)
+    rsw.dummy_capture()
 
     print("Starting frame capture loop...")
     try:
