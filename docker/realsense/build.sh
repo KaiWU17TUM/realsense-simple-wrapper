@@ -6,11 +6,13 @@ IMAGE_NAME="librealsense"
 if [ $# -eq 1 ] || [ $# -eq 2 ]; then
 
     if [ "$1" = "ubuntu18" ]; then
-        DOCKER_FILE="dockerfiles/Dockerfile.U18Realsense"
+        DOCKER_FILE="dockerfiles/Dockerfile.Ubuntu18"
     elif [ "$1" = "ubuntu20" ]; then
-        DOCKER_FILE="dockerfiles/Dockerfile.U20Realsense"
+        DOCKER_FILE="dockerfiles/Dockerfile.Ubuntu20"
+    elif [ "$1" = "ubuntu20full" ]; then
+        DOCKER_FILE="dockerfiles/Dockerfile.Ubuntu20Full"
     else
-        echo "Unknown argument, should be {ubuntu18/ubuntu20}"
+        echo "Unknown argument, should be {ubuntu18/ubuntu20/ubuntu20full}"
         exit 1
     fi
 
@@ -20,6 +22,8 @@ if [ $# -eq 1 ] || [ $# -eq 2 ]; then
             IMAGE_NAME="${IMAGE_NAME}:ubuntu18.04-v${LIBRS_VERSION}"
         elif [ "$1" = "ubuntu20" ]; then
             IMAGE_NAME="${IMAGE_NAME}:ubuntu20.04-v${LIBRS_VERSION}"
+        elif [ "$1" = "ubuntu20full" ]; then
+            IMAGE_NAME="${IMAGE_NAME}-full:ubuntu20.04-v${LIBRS_VERSION}"
         fi
 
         echo "Building image : ${IMAGE_NAME}"
@@ -37,6 +41,8 @@ if [ $# -eq 1 ] || [ $# -eq 2 ]; then
             IMAGE_NAME="${2%:*}-${IMAGE_NAME}:${2#*:}-v${LIBRS_VERSION}"
         elif [ "$1" = "ubuntu20" ]; then
             IMAGE_NAME="${2%:*}-${IMAGE_NAME}:${2#*:}-v${LIBRS_VERSION}"
+        elif [ "$1" = "ubuntu20full" ]; then
+            IMAGE_NAME="${2%:*}-${IMAGE_NAME}-full:${2#*:}-v${LIBRS_VERSION}"
         fi
 
         echo "Building image : ${IMAGE_NAME}"
@@ -53,7 +59,7 @@ if [ $# -eq 1 ] || [ $# -eq 2 ]; then
 
 else
 
-    echo "1 or 2 arguments are expected : {ubuntu18/ubuntu20}, {BASE_IMAGE}"
+    echo "1 or 2 arguments are expected : {ubuntu18/ubuntu20/ubuntu20full}, {BASE_IMAGE}"
     exit 1
 
 fi

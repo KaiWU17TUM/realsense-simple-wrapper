@@ -36,10 +36,18 @@ RUN apt-get update \
 
 # Download sources
 WORKDIR /usr/src
-RUN curl https://codeload.github.com/IntelRealSense/librealsense/tar.gz/refs/tags/v$LIBRS_VERSION -o librealsense.tar.gz 
-RUN tar -zxf librealsense.tar.gz \
-    && rm librealsense.tar.gz 
-RUN ln -s /usr/src/librealsense-$LIBRS_VERSION /usr/src/librealsense
+RUN git clone --depth=1 -b v2.50.0 https://github.com/IntelRealSense/librealsense.git
+# RUN curl https://codeload.github.com/IntelRealSense/librealsense/tar.gz/refs/tags/v$LIBRS_VERSION -o librealsense.tar.gz 
+# RUN tar -zxf librealsense.tar.gz \
+#     && rm librealsense.tar.gz 
+# RUN ln -s /usr/src/librealsense-$LIBRS_VERSION /usr/src/librealsense
+
+# fixing python module import error
+RUN sed -i '217s/.*/    pybind11_add_module(pyrealsense2_net SHARED pyrs_net.cpp)/' /usr/src/librealsense/wrappers/python/CMakeLists.txt
+RUN sed -i '218s/.*/    target_link_libraries(pyrealsense2_net PRIVATE realsense2-net)/' /usr/src/librealsense/wrappers/python/CMakeLists.txt
+RUN sed -i '219s/.*/    set_target_properties(pyrealsense2_net PROPERTIES FOLDER Wrappers\/python)/' /usr/src/librealsense/wrappers/python/CMakeLists.txt
+RUN sed -i '220s/.*/    set_target_properties(pyrealsense2_net PROPERTIES/' /usr/src/librealsense/wrappers/python/CMakeLists.txt
+RUN sed -i '225s/.*/    install(TARGETS pyrealsense2_net/' /usr/src/librealsense/wrappers/python/CMakeLists.txt
 
 # Build and install
 RUN cd /usr/src/librealsense \
@@ -48,9 +56,14 @@ RUN cd /usr/src/librealsense \
     -DCMAKE_C_FLAGS_RELEASE="${CMAKE_C_FLAGS_RELEASE} -s" \
     -DCMAKE_CXX_FLAGS_RELEASE="${CMAKE_CXX_FLAGS_RELEASE} -s" \
     -DCMAKE_INSTALL_PREFIX=/opt/librealsense \    
+    -DBUILD_EXAMPLES=OFF \
     -DBUILD_GRAPHICAL_EXAMPLES=OFF \
     -DBUILD_PYTHON_BINDINGS:bool=true \
+    -DPYTHON_EXECUTABLE=$(which python3) \
     -DCMAKE_BUILD_TYPE=Release ../ \
+    -DBUILD_SHARED_LIBS:BOOL=ON \
+    -DBUILD_NETWORK_DEVICE=ON \
+    -DFORCE_RSUSB_BACKEND=ON \
     && make -j$(($(nproc)-1)) all \
     && make install 
 
@@ -98,6 +111,7 @@ RUN apt-get update \
 COPY --from=librealsense-builder /opt/librealsense /usr/local/
 COPY --from=librealsense-builder /usr/lib/python3/dist-packages/pyrealsense2 /usr/lib/python3/dist-packages/pyrealsense2
 COPY --from=librealsense-builder /usr/src/librealsense/config/99-realsense-libusb.rules /etc/udev/rules.d/
+COPY --from=librealsense-builder /usr/src/librealsense/wrappers/python/pyrealsense2/__init__.py /usr/lib/python3/dist-packages/pyrealsense2
 ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
 
 RUN pip install numpy
