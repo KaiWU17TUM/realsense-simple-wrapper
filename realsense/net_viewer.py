@@ -46,7 +46,7 @@ def get_parser():
                         help='ip address')
     parser.add_argument('--rsnet-fps',
                         type=int,
-                        default=30,
+                        default=6,
                         help='fps')
     parser.add_argument('--rsnet-image-width',
                         type=int,
@@ -63,6 +63,10 @@ def get_parser():
     parser.add_argument('--rsnet-stream-depth',
                         type=str2bool,
                         default=False,
+                        help='enable depth stream')
+    parser.add_argument('--rsnet-save-path',
+                        type=str,
+                        default='/code/realsense-wrapper-python/output',
                         help='enable depth stream')
     return parser
 
@@ -90,13 +94,13 @@ if __name__ == "__main__":
     if arg.rsnet_stream_depth:
         cfg.enable_stream(stream_type=rs.stream.depth,
                           format=rs.format.z16,
-                          framerate=6,
+                          framerate=arg.rsnet_fps,
                           width=arg.rsnet_image_width,
                           height=arg.rsnet_image_height)
     if arg.rsnet_stream_color:
         cfg.enable_stream(stream_type=rs.stream.color,
                           format=rs.format.rgb8,
-                          framerate=6,
+                          framerate=arg.rsnet_fps,
                           width=arg.rsnet_image_width,
                           height=arg.rsnet_image_height)
     check = cfg.can_resolve(pipeline)
@@ -105,17 +109,13 @@ if __name__ == "__main__":
     time.sleep(10)
 
     print(f"[INFO] : Generate 'save_dir'")
-    save_dir = f'/code/realsense-wrapper-python/output/{time.time()}'
+    save_dir = f'{arg.rsnet_save_path}/{time.time()}'
     os.makedirs(save_dir, exist_ok=True)
 
     print(f"[INFO] : Starting frame capture loop...")
     try:
-        c = 1
+        c = 0
         while True:
-
-            c += 1
-            if c > 10:
-                break
 
             # Wait for a coherent pair of frames: depth and color
             frames = pipeline.wait_for_frames()
@@ -139,7 +139,6 @@ if __name__ == "__main__":
 
             if arg.rsnet_stream_depth:
                 depth_image = np.asanyarray(depth_frame.get_data())
-
                 # Apply colormap on depth image
                 # (image must be converted to 8-bit per pixel first)
                 depth_colormap = cv2.applyColorMap(
@@ -149,7 +148,6 @@ if __name__ == "__main__":
                 depth_colormap_dim = depth_colormap.shape
 
             if arg.rsnet_stream_color and arg.rsnet_stream_depth:
-
                 # If depth and color resolutions are different,
                 # resize color image to match depth image for display
                 if depth_colormap_dim != color_colormap_dim:
@@ -184,6 +182,10 @@ if __name__ == "__main__":
             # if k == 27:    # Escape
             #     cv2.destroyAllWindows()
             #     break
+
+            c += 1
+            if c > arg.rsnet_fps * 10:
+                break
 
     # except:  # noqa
     #     print("[WARN] : Stopping RealSense devices...")

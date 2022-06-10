@@ -21,6 +21,17 @@ void metadata_to_csv(const rs2::frame &frm, const std::string &filename);
 int main(int argc, char *argv[])
 try
 {
+
+    int FPS = 6;
+    int HEIGHT = 480;
+    int WIDTH = 640;
+
+    if (argc != 2)
+    {
+        printf("Please enter ipaddress.\n");
+        return 1;
+    }
+
     // Declare depth colorizer for pretty visualization of depth data
     rs2::colorizer color_map;
 
@@ -29,14 +40,14 @@ try
     // // Start streaming with default recommended configuration
     // pipe.start();
 
-    rs2::net_device dev("192.168.1.216");
+    rs2::net_device dev(argv[1]);
     std::cout << "IP Found" << std::endl;
     rs2::context ctx;
     dev.add_to(ctx);
     rs2::pipeline pipe(ctx);
     rs2::config cfg;
-    cfg.enable_stream(RS2_STREAM_DEPTH, 640, 480, RS2_FORMAT_Z16, 30);
-    cfg.enable_stream(RS2_STREAM_COLOR, 640, 480, RS2_FORMAT_RGB8, 30);
+    cfg.enable_stream(RS2_STREAM_DEPTH, WIDTH, HEIGHT, RS2_FORMAT_Z16, FPS);
+    cfg.enable_stream(RS2_STREAM_COLOR, WIDTH, HEIGHT, RS2_FORMAT_RGB8, FPS);
     auto profile = pipe.start(cfg);
     std::cout << "started" << std::endl;
 
@@ -48,33 +59,41 @@ try
     for (auto i = 0; i < 30; ++i)
         pipe.wait_for_frames();
 
-    // Wait for the next set of frames from the camera. Now that autoexposure, etc.
-    // has settled, we will write these to disk
-    for (auto &&frame : pipe.wait_for_frames())
+    for (auto i = 0; i < FPS * 10; ++i)
     {
-        // We can only save video frames as pngs, so we skip the rest
-        if (auto vf = frame.as<rs2::video_frame>())
+        std::string old_str = std::to_string(i);
+        std::string i_str = std::string(6 - std::min(n_zero, old_str.length()), '0') + old_str;
+
+        // Wait for the next set of frames from the camera. Now that autoexposure, etc.
+        // has settled, we will write these to disk
+        for (auto &&frame : pipe.wait_for_frames())
         {
-            auto stream = frame.get_profile().stream_type();
-            // Use the colorizer to get an rgb image for the depth stream
-            if (vf.is<rs2::depth_frame>())
-                vf = color_map.process(frame);
+            // We can only save video frames as pngs, so we skip the rest
+            if (auto vf = frame.as<rs2::video_frame>())
+            {
+                auto stream = frame.get_profile().stream_type();
+                // Use the colorizer to get an rgb image for the depth stream
+                if (vf.is<rs2::depth_frame>())
+                    vf = color_map.process(frame);
 
-            // Write images to disk
-            std::stringstream png_file;
-            png_file << "rs-save-to-disk-output-" << vf.get_profile().stream_name() << ".png";
-            stbi_write_png(png_file.str().c_str(), vf.get_width(), vf.get_height(),
-                           vf.get_bytes_per_pixel(), vf.get_data(), vf.get_stride_in_bytes());
-            std::cout << "Saved " << png_file.str() << std::endl;
+                // Write images to disk
+                std::stringstream png_file;
+                png_file << "rs-save-to-disk-output-"
+                         << vf.get_profile().stream_name()
+                         << ".png";
+                stbi_write_png(png_file.str().c_str(), vf.get_width(), vf.get_height(),
+                               vf.get_bytes_per_pixel(), vf.get_data(), vf.get_stride_in_bytes());
+                std::cout << "Saved " << png_file.str() << std::endl;
 
-            // Record per-frame metadata for UVC streams
-            std::stringstream csv_file;
-            csv_file << "rs-save-to-disk-output-" << vf.get_profile().stream_name()
-                     << "-metadata.csv";
-            metadata_to_csv(vf, csv_file.str());
+                // Record per-frame metadata for UVC streams
+                std::stringstream csv_file;
+                csv_file << "rs-save-to-disk-output-"
+                         << vf.get_profile().stream_name()
+                         << "-metadata.csv";
+                metadata_to_csv(vf, csv_file.str());
+            }
         }
     }
-
     return EXIT_SUCCESS;
 }
 catch (const rs2::error &e)
