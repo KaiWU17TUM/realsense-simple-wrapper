@@ -19,12 +19,13 @@ The code in [realsense](realsense) folder uses the [pyrealsense2](https://pypi.o
 
 ## Running RS in RaspberryPi-4B
 
-- The official guide includes an open source ethernet networking [guide](https://dev.intelrealsense.com/docs/open-source-ethernet-networking-for-intel-realsense-depth-cameras) to stream RS over a network. It contains an image for (kernel-patched) Raspberrypi-OS built with RS-SDK-V2.34 . 
+To run RS in raspberrypi 3/4, the linux kernel needs to be patched. This can be done either:
 
-- The SDK can be upgraded by following the steps shown [here](https://github.com/datasith/Ai_Demos_RPi/wiki/Raspberry-Pi-4-and-Intel-RealSense-D435). Once swap size is updated, this [script](scripts/install_realsense.sh) can be used to run the installation (except OpenGL and VNC).
+1. Compile from source : The official github repo contains [scripts](https://github.com/IntelRealSense/librealsense/tree/master/scripts) to do so, but they are not raspberrypi specific. A raspberrypi-4 speific instructions for patching can be found in this [guide](https://github.com/NobuoTsukamoto/realsense_examples/blob/master/doc/installation_raspberry_pi_64.md).
 
--  Kernel patch for Raspberrypi
-This [guide](https://github.com/NobuoTsukamoto/realsense_examples/blob/master/doc/installation_raspberry_pi_64.md) shows how to build/patch/compile linux for raspberrypi for RS.
+2. Flash a pre-build image : In one of he official [guide](https://dev.intelrealsense.com/docs/open-source-ethernet-networking-for-intel-realsense-depth-cameras) there is an image for (kernel-patched) Raspberrypi-OS built with RS-SDK-V2.34 . 
+
+Once kernel patching is done, the RS SDK can be installed/upgraded by following the steps shown in this [guide](https://github.com/datasith/Ai_Demos_RPi/wiki/Raspberry-Pi-4-and-Intel-RealSense-D435). This [script](scripts/install_realsense_pi4.sh) follows the steps and performs the installation (except OpenGL and VNC). **BUT, the swapsize needs to be done manually first according to the [guide](https://github.com/datasith/Ai_Demos_RPi/wiki/Raspberry-Pi-4-and-Intel-RealSense-D435).**
 
 ## Good to know
 
@@ -41,6 +42,27 @@ The realsense can be syncroized using an external sync cable so that the cameras
 The command `rs-server` needs to be run on the host connected to a RS to stream frames from the RS. The RS library on the host server needs to be compiled with `-DBUILD_NETWORK_DEVICE=ON` [flag](https://github.com/IntelRealSense/librealsense/issues/7123) in order for the `rs-server` to work.
 
 Once the `rs-server` on the host is running `realsense-viewer` can be used to view the stream on a client that is connected to the host in the same network. Currently there is a [bug](https://github.com/IntelRealSense/librealsense/issues/9971) with SDK-V2.5 where the depth values are not streamed properly and stream settings in the realsense-viewer GUI cannot be changed (keeps crashing). [SDK-V2.47](https://github.com/IntelRealSense/librealsense/releases/tag/v2.47.0https://github.com/IntelRealSense/librealsense/releases/tag/v2.47.0) can be used instead.
+
+There is an official [guide](https://dev.intelrealsense.com/docs/open-source-ethernet-networking-for-intel-realsense-depth-cameras) on open source ethernet networking to stream RS over a network. The following service (taken from the raspberrypi image in the guide) enables rs-server to run constantly.
+
+```
+# /lib/systemd/system/rs-server.service
+
+[Unit]
+Description=Intel RealSense Camera Service
+After=network-online.target
+
+[Service]
+ExecStart=/bin/bash /home/realsense/run-server.sh
+WorkingDirectory=/home/realsense/librealsense/build
+StandardOutput=inherit
+StandardError=inherit
+Restart=always
+User=realsense
+
+[Install]
+WantedBy=multi-user.target
+```
 
 ### 4. `-DFORCE_LIBUVC=true` vs `-DFORCE_RSUSB_BACKEND=true`
 The former is an old flag of the latter one [link](https://github.com/IntelRealSense/librealsense/issues/7144).
