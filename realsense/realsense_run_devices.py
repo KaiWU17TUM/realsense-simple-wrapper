@@ -88,8 +88,8 @@ if __name__ == "__main__":
     rsw = initialize_rs_devices(arg)
 
     print("Starting frame capture loop...")
-    c = 1
     try:
+        c = 0
         while True:
             frames = rsw.run(display=arg.rs_display_frame)
             if not len(frames) > 0:
@@ -97,10 +97,9 @@ if __name__ == "__main__":
                 continue
             else:
                 print("Running...")
-            if c > 10:
+            c += 1
+            if c > arg.rsnet_fps * 10:
                 break
-            else:
-                c += 1
 
     except:  # noqa
         print("Stopping RealSense devices...")

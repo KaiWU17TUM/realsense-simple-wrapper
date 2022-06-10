@@ -1,10 +1,15 @@
 # RealSense in Python
 
-This is a repository to run realsense camera devices (RS) using python.
+This is a repository to run realsense camera devices (RS) using [Realsense SDK](https://github.com/IntelRealSense/librealsense).
 
-## Installing RS with python wrapper
+## Installing RS SDK in linux
 
-The python wrapper/package to run RS can be obtained through [pip](https://pypi.org/project/pyrealsense/) or compiled from [source](https://github.com/IntelRealSense/librealsense). Once installed the python wrapper can be called using `import pyrealsense` .
+The librealsense SDK can be obtained by either:
+1. compiling from [source](https://github.com/IntelRealSense/librealsense/blob/master/doc/installation.md). Specific flags are needed to install the python wrappers and network cpability (refer [here](docker/realsense/dockerfiles/Dockerfile.Ubuntu20)).
+
+2. installing the python wrapper/package to run RS can be obtained through [pip](https://pypi.org/project/pyrealsense/).
+
+3. installing the [pre-build packages](https://github.com/IntelRealSense/librealsense/blob/master/doc/distribution_linux.md).
 
 ## Running RS in python
 
@@ -69,3 +74,11 @@ The former is an old flag of the latter one [link](https://github.com/IntelRealS
 
 ### 5. Metadata extraction
 The extraction of metadata is supported in windows but requires kernel patching for linux OS. See [here](https://github.com/IntelRealSense/librealsense/blob/master/doc/frame_metadata.md#os-support) and [here](https://github.com/IntelRealSense/librealsense/issues/7039).
+
+### 6. Data transmission testing
+
+| Setting                      | FPS  | Status                                 |
+| :--------------------------- | :--- | :------------------------------------- |
+| pyrealsense2_net C+D 640x480 | 6    | OK                                     |
+| pyrealsense2_net C+D 640x480 | 15   | OK                                     |
+| pyrealsense2_net C+D 640x480 | 30   | Fail, randomly jitters between 5-15fps |

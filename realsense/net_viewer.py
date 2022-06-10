@@ -114,6 +114,11 @@ if __name__ == "__main__":
 
     print(f"[INFO] : Starting frame capture loop...")
     try:
+
+        # Capture 30 frames to give autoexposure, etc. a chance to settle
+        for _ in range(30):
+            pipeline.wait_for_frames()
+
         c = 0
         while True:
 

@@ -9,7 +9,7 @@ except ImportError as e:
     print('Error: pyrealsense2 library could not be found.')
     raise e
 
-from typing import Optional, Type
+from typing import Optional, Type, Union, Tuple
 
 from realsense.realsense_device_manager import Device
 from realsense.realsense_device_manager import enumerate_connected_devices
@@ -153,6 +153,75 @@ class RealsenseWrapper:
                 else:
                     sensor.set_option(rs.option.laser_power, power + 10)
 
+    def get_color_stream(self,
+                         frameset: rs.composite_frame,
+                         frame_dict: dict,
+                         storage_paths: Optional[StoragePaths] = None,
+                         timestamp: Union[int, float] = 0
+                         ) -> Tuple[dict, np.ndarray]:
+        """Get color stream data.
+
+        Args:
+            frameset (rs.composite_frame): frameset from pipeline.
+            frame_dict (dict): dict to save the data from frameset.
+            storage_paths (Optional[StoragePaths], optional): If not None,
+                data from frameset will be stored. Defaults to None.
+            timestamp (Union[int, float], optional): Used as the name
+                of the saved file. Defaults to 0.
+
+        Returns:
+            Tuple[dict, np.ndarray]: updated frame_dict and data from framset.
+        """
+        frame = frameset.first_or_default(rs.stream.color)
+        frame_data = np.asanyarray(frame.get_data())
+        frame_dict['color'] = frame_data
+        if storage_paths is not None:
+            filepath = storage_paths.color
+            if filepath is not None:
+                np.save(os.path.join(filepath, f'{timestamp}'), frame_data)
+        return frame_dict, frame_data
+
+    def get_depth_stream(self,
+                         frameset: rs.composite_frame,
+                         frame_dict: dict,
+                         storage_paths: Optional[StoragePaths] = None,
+                         timestamp: Union[int, float] = 0
+                         ) -> Tuple[dict, np.ndarray]:
+        """Get depth stream data.
+
+        Args:
+            frameset (rs.composite_frame): frameset from pipeline.
+            frame_dict (dict): dict to save the data from frameset.
+            storage_paths (Optional[StoragePaths], optional): If not None,
+                data from frameset will be stored. Defaults to None.
+            timestamp (Union[int, float], optional): Used as the name
+                of the saved file. Defaults to 0.
+
+        Returns:
+            Tuple[dict, np.ndarray]: updated frame_dict and data from framset.
+        """
+        frame = frameset.first_or_default(rs.stream.depth)
+        frame = post_process_depth_frame(frame)
+        frame_data = np.asanyarray(frame.get_data())
+        frame_dict['depth'] = frame_data
+        if storage_paths is not None:
+            filepath = storage_paths.depth
+            if filepath is not None:
+                np.save(os.path.join(filepath, f'{timestamp}'), frame_data)
+        return frame_dict, frame_data
+
+    def dummy_capture(self) -> None:
+        """Dummy capture 30 frames to give autoexposure, etc. a chance to settle
+        """
+        frames = {}
+        while len(frames) < len(self.enabled_devices.items()):
+            for _ in range(30):
+                for dev_sn, dev in self.enabled_devices.items():
+                    streams = dev.pipeline_profile.get_streams()
+                    frameset = dev.pipeline.poll_for_frames()
+                    if frameset.size() == len(streams):
+                        frames[dev_sn] = {}
+
     def run(self, display: int = 0) -> dict:
         """Gets the frames streamed from the enabled rs devices.
 
@@ -180,13 +249,13 @@ class RealsenseWrapper:
                 frameset = dev.pipeline.poll_for_frames()
 
                 if frameset.size() == len(streams):
-                    frames[dev_sn] = {}
+                    frame_dict = {}
 
-                    frames[dev_sn]['calib'] = self.calib_data.get(dev_sn, {})
+                    frame_dict['calib'] = self.calib_data.get(dev_sn, {})
 
                     timestamp = frameset.get_frame_metadata(
                         rs.frame_metadata_value.sensor_timestamp)
-                    frames[dev_sn]['timestamp'] = timestamp
+                    frame_dict['timestamp'] = timestamp
 
                     if storage_paths is not None:
                         ts_file = storage_paths.timestamp_file
@@ -204,34 +273,29 @@ class RealsenseWrapper:
                         #             stream.stream_index())
                         # frame = aligned_frameset.first_or_default(st)
                         # frame_data = frame.get_data()
-                        # frames[dev_sn][st] = frame_data
+                        # frame_dict[st] = frame_data
                         if st == rs.stream.color:
-                            frame = aligned_frameset.first_or_default(st)
-                            frame_data = np.asanyarray(frame.get_data())
-                            frames[dev_sn]['color'] = frame_data
-                            if storage_paths is not None:
-                                filepath = storage_paths.color
-                                if filepath is not None:
-                                    np.save(
-                                        os.path.join(filepath, f'{timestamp}'),
-                                        frame_data)
+                            self.get_color_stream(
+                                frameset=aligned_frameset,
+                                frame_dict=frame_dict,
+                                storage_paths=storage_paths,
+                                timestamp=timestamp
+                            )
                         elif st == rs.stream.depth:
-                            frame = aligned_frameset.first_or_default(st)
-                            frame = post_process_depth_frame(frame)
-                            frame_data = np.asanyarray(frame.get_data())
-                            frames[dev_sn]['depth'] = frame_data
-                            if storage_paths is not None:
-                                filepath = storage_paths.depth
-                                if filepath is not None:
-                                    np.save(
-                                        os.path.join(filepath, f'{timestamp}'),
-                                        frame_data)
+                            self.get_depth_stream(
+                                frameset=aligned_frameset,
+                                frame_dict=frame_dict,
+                                storage_paths=storage_paths,
+                                timestamp=timestamp
+                            )
 
-            if display > 0:
-                if self._display_rs_data(frames, display):
-                    return {}
+                    frames[dev_sn] = frame_dict
 
-            return frames
+        if display > 0:
+            if self._display_rs_data(frames, display):
+                return {}
+
+        return frames
 
     def stop(self) -> None:
         """Stops the devices. """
