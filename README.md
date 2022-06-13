@@ -82,3 +82,5 @@ The extraction of metadata is supported in windows but requires kernel patching 
 | pyrealsense2_net C+D 640x480 | 6    | OK                                     |
 | pyrealsense2_net C+D 640x480 | 15   | OK                                     |
 | pyrealsense2_net C+D 640x480 | 30   | Fail, randomly jitters between 5-15fps |
+| usbip C+D 640x480            | 6    | Fail, randomly drops 1-2 frames        |
+| usbip C+D 640x480            | 15   | Fail, randomly jitters between 2-6fps  |
