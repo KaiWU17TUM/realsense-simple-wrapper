@@ -36,7 +36,7 @@ public:
     int width() { return atoi(_argv[3]); }
     const char *save_path() { return _argv[4]; }
     std::string ip() { return (std::string)_argv[5]; }
-    bool local()
+    bool network()
     {
         if (_argc == 5)
             return true;
@@ -59,7 +59,7 @@ public:
                rs2::context ctx = rs2::context()) : rs2args(argc, argv)
     {
         // Add network device context
-        if (not local())
+        if (network())
         {
             rs2::net_device dev(ip());
             printf("IP address found...");
