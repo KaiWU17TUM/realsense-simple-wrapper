@@ -77,10 +77,13 @@ The extraction of metadata is supported in windows but requires kernel patching 
 
 ### 6. Data transmission testing
 
-| Setting                      | FPS  | Status                                 |
-| :--------------------------- | :--- | :------------------------------------- |
-| pyrealsense2_net C+D 640x480 | 6    | OK                                     |
-| pyrealsense2_net C+D 640x480 | 15   | OK                                     |
-| pyrealsense2_net C+D 640x480 | 30   | Fail, randomly jitters between 5-15fps |
-| usbip C+D 640x480            | 6    | Fail, randomly drops 1-2 frames        |
-| usbip C+D 640x480            | 15   | Fail, randomly jitters between 2-6fps  |
+| Setting                    | C Read | C Write | D Read | D Write |  FPS  | Status                                 |
+| :------------------------- | :----: | :-----: | :----- | :-----: | :---: | :------------------------------------- |
+| pyrealsense2_net 640x480   |   Y    |    Y    | Y      |    N    |   6   | OK                                     |
+| pyrealsense2_net 640x480   |   Y    |    Y    | Y      |    N    |  15   | OK                                     |
+| pyrealsense2_net 640x480   |   Y    |    Y    | Y      |    N    |  30   | Fail, randomly jitters between 5-15fps |
+| realsense2-net c++ 640x480 |   Y    |    Y    | Y      |    Y    |   6   | OK                                     |
+| realsense2-net c++ 640x480 |   Y    |    Y    | Y      |    Y    |  15   | Fail, randomly jitters between 5fps    |
+| realsense2-net c++ 640x480 |   Y    |    Y    | Y      |    Y    |  30   | Fail, randomly jitters between 5fps    |
+| usbip 640x480              |   Y    |    Y    | Y      |    N    |   6   | Fail, randomly drops 1-2 frames        |
+| usbip 640x480              |   Y    |    Y    | Y      |    N    |  15   | Fail, randomly jitters between 2-6fps  |

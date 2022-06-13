@@ -17,25 +17,86 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
-// Helper function for writing metadata to disk as a csv file
+/**
+ * @brief Saves the metadata from rs2::frame into a csv file.
+ *
+ * @param frm An instance of rs2::frame .
+ * @param filename name of file to save to.
+ */
 void metadata_to_csv(const rs2::frame &frm, const std::string &filename);
 
+/**
+ * @brief Class that contains the arguments for the rs2wrapper class.
+ *
+ */
 class rs2args
 {
     int _argc;
     char **_argv;
 
 public:
+    /**
+     * @brief Construct a new rs2args object
+     *
+     * @param argc Number of arguments.
+     * @param argv Arguments in an array of char*.
+     */
     rs2args(int argc, char *argv[])
     {
         _argc = argc;
         _argv = argv;
     }
-    int fps() { return atoi(_argv[1]); }
-    int height() { return atoi(_argv[2]); }
-    int width() { return atoi(_argv[3]); }
-    const char *save_path() { return _argv[4]; }
-    std::string ip() { return (std::string)_argv[5]; }
+    /**
+     * @brief FPS of the realsense device.
+     *
+     * @return int
+     */
+    int fps()
+    {
+        return atoi(_argv[1]);
+    }
+    /**
+     * @brief Height of the realsense frames.
+     *
+     * @return int
+     */
+    int height()
+    {
+        return atoi(_argv[2]);
+    }
+    /**
+     * @brief Width of the realsense frames.
+     *
+     * @return int
+     */
+    int width()
+    {
+        return atoi(_argv[3]);
+    }
+    /**
+     * @brief Path to save the frames.
+     *
+     * @return const char*
+     */
+    const char *save_path()
+    {
+        return _argv[4];
+    }
+    /**
+     * @brief IP address of the remote realsense device (optional).
+     *
+     * @return std::string
+     */
+    std::string ip()
+    {
+        return (std::string)_argv[5];
+    }
+    /**
+     * @brief Checks whether the realsense device is connected over the network.
+     *
+     * @return true
+     * @return false
+     */
     bool network()
     {
         if (_argc == 6)
@@ -43,8 +104,28 @@ public:
         else
             return false;
     }
+    /**
+     * @brief Prints out the arguments from 'rs2args' class that is used for the 'rs2wrapper' class.
+     *
+     */
+    void info()
+    {
+        std::cout << "========================================" << std::endl;
+        std::cout << ">>>>> rs2args <<<<<" << std::endl;
+        std::cout << "========================================" << std::endl;
+        std::cout << "FPS        : " << fps() << std::endl;
+        std::cout << "Height     : " << height() << std::endl;
+        std::cout << "Width      : " << width() << std::endl;
+        std::cout << "Save Path  : " << save_path() << std::endl;
+        std::cout << "IP Address : " << ip() << std::endl;
+        std::cout << "========================================" << std::endl;
+    }
 };
 
+/**
+ * @brief Wrapper class for the librealsense library to run a realsense device.
+ *
+ */
 class rs2wrapper : public rs2args
 {
 
@@ -54,10 +135,19 @@ class rs2wrapper : public rs2args
     rs2::colorizer color_map;
 
 public:
+    /**
+     * @brief Construct a new rs2wrapper object
+     *
+     * @param argc Number of arguments.
+     * @param argv Arguments in an array of char*.
+     * @param ctx An insstance of rs2::context .
+     */
     rs2wrapper(int argc,
                char *argv[],
                rs2::context ctx = rs2::context()) : rs2args(argc, argv)
     {
+        // prints out info
+        info();
         // Create save directory
         mkdir(save_path(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
         // Add network device context
@@ -76,16 +166,26 @@ public:
         std::cout << "Pipeline started..." << std::endl;
         std::cout << "Initialized realsense device..." << std::endl;
     }
-
-    void initial_flush()
+    /**
+     * @brief Flushes N initial frames o give autoexposure, etc. a chance to settle.
+     *
+     */
+    void initial_flush(int num_frames = 30)
     {
-        // Capture 30 frames to give autoexposure, etc. a chance to settle
-        for (auto i = 0; i < 30; ++i)
+        for (auto i = 0; i < num_frames; ++i)
             pipe.wait_for_frames();
         std::cout << "Flushed 30 initial frames..." << std::endl;
     }
-
-    void step(const std::string &file_idx_str)
+    /**
+     * @brief Collects a set of frames and postprocesses them.
+     *
+     * Currently this function polls for a set of frames and
+     * saves the color & depth (as colormap) images as png,
+     * and their metadata as csv.
+     *
+     * @param save_file_prefix Prefix for the save file.
+     */
+    void step(const std::string &save_file_prefix)
     {
         // Loop through the set of frames from the camera.
         for (auto &&frame : pipe.wait_for_frames())
@@ -102,7 +202,7 @@ public:
                 std::stringstream png_file;
                 png_file << save_path()
                          << "/"
-                         << file_idx_str
+                         << save_file_prefix
                          << "-rs-save-to-disk-output-"
                          << vf.get_profile().stream_name()
                          << ".png";
@@ -118,7 +218,7 @@ public:
                 std::stringstream csv_file;
                 csv_file << save_path()
                          << "/"
-                         << file_idx_str
+                         << save_file_prefix
                          << "-rs-save-to-disk-output-"
                          << vf.get_profile().stream_name()
                          << "-metadata.csv";
