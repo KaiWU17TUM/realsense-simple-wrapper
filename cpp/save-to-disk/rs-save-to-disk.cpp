@@ -58,24 +58,23 @@ public:
                char *argv[],
                rs2::context ctx = rs2::context()) : rs2args(argc, argv)
     {
+        // Create save directory
+        mkdir(save_path(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
         // Add network device context
         if (network())
         {
             rs2::net_device dev(ip());
-            printf("IP address found...");
+            std::cout << "IP address found..." << std::endl;
             dev.add_to(ctx);
         }
-
-        pipe = rs2::pipeline(ctx);
-
         // Configure pipeline config
+        // Start pipeline
+        pipe = rs2::pipeline(ctx);
         cfg.enable_stream(RS2_STREAM_COLOR, width(), height(), RS2_FORMAT_RGB8, fps());
         cfg.enable_stream(RS2_STREAM_DEPTH, width(), height(), RS2_FORMAT_Z16, fps());
-        // Start pipeline
         rs2::pipeline_profile profile = pipe.start(cfg);
-        printf("Pipeline started...");
-        // Create save directory
-        mkdir(save_path(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+        std::cout << "Pipeline started..." << std::endl;
+        std::cout << "Initialized realsense device..." << std::endl;
     }
 
     void initial_flush()
@@ -83,6 +82,7 @@ public:
         // Capture 30 frames to give autoexposure, etc. a chance to settle
         for (auto i = 0; i < 30; ++i)
             pipe.wait_for_frames();
+        std::cout << "Flushed 30 initial frames..." << std::endl;
     }
 
     void step(const std::string &file_idx_str)
@@ -136,7 +136,7 @@ try
 
     if (argc != 5 && argc != 6)
     {
-        printf("Please enter fps, height, width, save path, {ipaddress}\n");
+        std::cout << "Please enter fps, height, width, save path, {ipaddress}" << std::endl;
         throw std::invalid_argument("There should be 4 or 5 arguments");
     }
 
@@ -145,9 +145,7 @@ try
     // Start streaming with args defined configuration
     rs2::context ctx;
     rs2wrapper rs2_dev(argc, argv, ctx);
-    printf("Initialized realsense device\n");
     rs2_dev.initial_flush();
-    printf("Flushing initial frames\n");
 
     for (auto i = 0; i < rs2_dev.fps() * 10; ++i)
     {
