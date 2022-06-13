@@ -100,8 +100,10 @@ public:
 
                 // Write images to disk
                 std::stringstream png_file;
-                png_file << file_idx_str
-                         << "rs-save-to-disk-output-"
+                png_file << save_path()
+                         << "/"
+                         << file_idx_str
+                         << "-rs-save-to-disk-output-"
                          << vf.get_profile().stream_name()
                          << ".png";
                 stbi_write_png(png_file.str().c_str(),
@@ -114,8 +116,10 @@ public:
 
                 // Record per-frame metadata for UVC streams
                 std::stringstream csv_file;
-                csv_file << file_idx_str
-                         << "rs-save-to-disk-output-"
+                csv_file << save_path()
+                         << "/"
+                         << file_idx_str
+                         << "-rs-save-to-disk-output-"
                          << vf.get_profile().stream_name()
                          << "-metadata.csv";
                 metadata_to_csv(vf, csv_file.str());
