@@ -36,9 +36,9 @@ public:
     int width() { return atoi(_argv[3]); }
     const char *save_path() { return _argv[4]; }
     std::string ip() { return (std::string)_argv[5]; }
-    bool local()
+    bool network()
     {
-        if (_argc == 5)
+        if (_argc == 6)
             return true;
         else
             return false;
@@ -59,7 +59,7 @@ public:
                rs2::context ctx = rs2::context()) : rs2args(argc, argv)
     {
         // Add network device context
-        if (not local())
+        if (network())
         {
             rs2::net_device dev(ip());
             printf("IP address found...");
@@ -141,7 +141,9 @@ try
     // Start streaming with args defined configuration
     rs2::context ctx;
     rs2wrapper rs2_dev(argc, argv, ctx);
+    printf("Initialized realsense device\n");
     rs2_dev.initial_flush();
+    printf("Flushing initial frames\n");
 
     for (auto i = 0; i < rs2_dev.fps() * 10; ++i)
     {
