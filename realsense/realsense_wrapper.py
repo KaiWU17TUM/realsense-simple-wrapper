@@ -92,8 +92,8 @@ class RealsenseWrapper:
 
         # configurations
         self._rs_cfg = {}
-        self.stream_config_color = None
-        self.stream_config_depth = None
+        self.stream_config_color = StreamConfig()
+        self.stream_config_depth = StreamConfig()
         self.timestamp_mode = None
         if storage_paths_fn is not None:
             self.storage_paths_per_dev = {sn: storage_paths_fn(sn)
