@@ -74,7 +74,8 @@ class RealsenseWrapper:
         if ip is not None:
             self.network = True
             dev = rsnet.net_device(ip)
-            self.available_devices = [(dev, None)]
+            self.available_devices = [
+                (dev.get_info(rs.camera_info.serial_number), None)]
             dev.add_to(self.ctx)
             print(f'[INFO] : Network mode')
             print(f'[INFO] : Connected to {ip}')
@@ -92,8 +93,8 @@ class RealsenseWrapper:
 
         # configurations
         self._rs_cfg = {}
-        self.stream_config_color = None
-        self.stream_config_depth = None
+        self.stream_config_color = StreamConfig()
+        self.stream_config_depth = StreamConfig()
         self.timestamp_mode = None
         if storage_paths_fn is not None:
             self.storage_paths_per_dev = {sn: storage_paths_fn(sn)
@@ -114,10 +115,10 @@ class RealsenseWrapper:
             cfg = rs.config()
             cfg.enable_stream(stream_type=rs.stream.depth,
                               format=rs.format.z16,
-                              **self.stream_config.data)
+                              **self.stream_config_depth.data)
             cfg.enable_stream(stream_type=rs.stream.color,
                               format=rs.format.bgr8,
-                              **self.stream_config.data)
+                              **self.stream_config_color.data)
             self._rs_cfg[device_sn] = cfg
 
     def initialize(self, enable_ir_emitter: bool = True) -> None:
@@ -519,7 +520,7 @@ def get_parser():
                         help='image height in px')
     parser.add_argument('--rs-laser-power',
                         type=int,
-                        default=150,
+                        default=140,
                         help='laser power')
     parser.add_argument('--rs-stream-color',
                         type=str2bool,
