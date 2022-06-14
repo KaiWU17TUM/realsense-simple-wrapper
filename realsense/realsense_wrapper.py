@@ -1,3 +1,4 @@
+import argparse
 import cv2
 import json
 import numpy as np
@@ -8,39 +9,35 @@ try:
 except ImportError as e:
     print('Error: pyrealsense2 library could not be found.')
     raise e
+try:
+    from pyrealsense2 import pyrealsense2_net as rsnet
+except ImportError as e:
+    print('Error: pyrealsense2_net could not be found.')
+    raise e
 
-from typing import Optional, Type, Union, Tuple
+from datetime import datetime
+from functools import partial
+from typing import Optional, Type, Tuple
 
 from realsense.realsense_device_manager import Device
 from realsense.realsense_device_manager import enumerate_connected_devices
 from realsense.realsense_device_manager import post_process_depth_frame
 
 
-def read_realsense_calibration(file_path: str):
-
-    class RealsenseConfig:
-        def __init__(self, json_data: dict):
-            self.width = json_data['color'][0]['width']
-            self.height = json_data['color'][0]['height']
-            self.color_intrinsics = np.array(json_data['color'][0]['intrinsic_mat']).reshape(3, 3)  # noqa
-            self.depth_intrinsics = np.array(json_data['depth'][0]['intrinsic_mat']).reshape(3, 3)  # noqa
-            self.depth_scale = json_data['depth'][0]['depth_scale']
-            self.T_color_depth = np.eye(4)
-            self.T_color_depth[:3, :3] = np.array(json_data['T_color_depth'][0]['rotation']).reshape(3, 3)  # noqa
-            self.T_color_depth[:3, 3] = json_data['T_color_depth'][0]['translation']  # noqa
-
-    with open(file_path) as calib_file:
-        calib = json.load(calib_file)
-    return RealsenseConfig(calib)
-
-
 class StoragePaths:
-    def __init__(self):
-        self.calib = None
-        self.color = None
-        self.depth = None
-        self.timestamp = None
-        self.timestamp_file = None
+    def __init__(self, device_sn: str = '', base_path: str = '/data/realsense'):
+        super().__init__()
+        date_time = datetime.now().strftime("%y%m%d%H%M%S")
+        self.calib = f'{base_path}/calib/{date_time}_dev{device_sn}'
+        self.color = f'{base_path}/color/{date_time}_dev{device_sn}'
+        self.depth = f'{base_path}/depth/{date_time}_dev{device_sn}'
+        self.timestamp = f'{base_path}/timestamp/{date_time}_dev{device_sn}'
+        self.timestamp_file = os.path.join(self.timestamp, 'timestamp.txt')
+        os.makedirs(self.calib, exist_ok=True)
+        os.makedirs(self.color, exist_ok=True)
+        os.makedirs(self.depth, exist_ok=True)
+        os.makedirs(self.timestamp, exist_ok=True)
+        print(f"[INFO] : Prepared storage paths...")
 
 
 class StreamConfig:
@@ -68,17 +65,36 @@ class RealsenseWrapper:
     """
 
     def __init__(self,
-                 storage_paths_fn: Optional[Type[StoragePaths]] = None) -> None:
+                 storage_paths_fn: Optional[Type[StoragePaths]] = None,
+                 ip: Optional[str] = None) -> None:
         super().__init__()
+
         # device data
-        self.available_devices = enumerate_connected_devices(rs.context())
-        self.enabled_devices = {}  # serial numbers of enabled devices
+        self.ctx = rs.context()
+        if ip is not None:
+            self.network = True
+            dev = rsnet.net_device(ip)
+            self.available_devices = [(dev, None)]
+            dev.add_to(self.ctx)
+            print(f'[INFO] : Network mode')
+            print(f'[INFO] : Connected to {ip}')
+        else:
+            self.network = False
+            self.available_devices = enumerate_connected_devices(self.ctx)
+            print(f'[INFO] : Local mode')
+
+        # serial numbers of enabled devices
+        self.enabled_devices = {}
         self.calib_data = {}
+
         # rs align method
         self._align = rs.align(rs.stream.color)  # align depth to color frame
+
         # configurations
         self._rs_cfg = {}
-        self.stream_config = StreamConfig()
+        self.stream_config_color = None
+        self.stream_config_depth = None
+        self.timestamp_mode = None
         if storage_paths_fn is not None:
             self.storage_paths_per_dev = {sn: storage_paths_fn(sn)
                                           for sn, _ in self.available_devices}
@@ -115,11 +131,21 @@ class RealsenseWrapper:
             self.configure_stream('default')
 
         for device_serial, product_line in self.available_devices:
+
             # Pipeline
-            pipeline = rs.pipeline()
+            if self.network:
+                pipeline = rs.pipeline(self.ctx)
+            else:
+                pipeline = rs.pipeline()
+
             cfg = self._rs_cfg.get(device_serial, self._rs_cfg['default'])
-            cfg.enable_device(device_serial)
+            if not self.network:
+                cfg.enable_device(device_serial)
+            check = cfg.can_resolve(pipeline)
+            print(f"[INFO] : 'cfg' usable with 'pipeline' : {check}")
+
             pipeline_profile = pipeline.start(cfg)
+
             # IR for depth
             depth_sensor = pipeline_profile.get_device().first_depth_sensor()
             if enable_ir_emitter:
@@ -127,9 +153,26 @@ class RealsenseWrapper:
                     depth_sensor.set_option(rs.option.emitter_enabled,
                                             1 if enable_ir_emitter else 0)
                     # depth_sensor.set_option(rs.option.laser_power, 330)
+
             # Stored the enabled devices
             self.enabled_devices[device_serial] = (
                 Device(pipeline, pipeline_profile, product_line))
+            print(f'[INFO] : Enabled device with SN : {device_serial}')
+
+            # Check which timestamp is available.
+            if len(self.storage_paths_per_dev) > 0:
+                frameset = pipeline.wait_for_frames()
+                fmv = rs.frame_metadata_value
+                if frameset.supports_frame_metadata(fmv.sensor_timestamp):
+                    self.timestamp_mode = fmv.sensor_timestamp
+                    print(f'[INFO] : sensor_timestamp is being used...')
+                elif frameset.supports_frame_metadata(fmv.frame_timestamp):
+                    self.timestamp_mode = fmv.frame_timestamp
+                    print(f'[INFO] : frame_timestamp is being used...')
+                else:
+                    self.storage_paths_per_dev.pop(device_serial)
+                    print('[WARN] : Both sensor_timestamp/frame_timestamp '
+                          'are not available. No data will be saved...')
 
     def set_storage_paths(self, paths: StoragePaths) -> None:
         self.storage_paths_per_dev = {sn: paths(sn)
@@ -153,6 +196,12 @@ class RealsenseWrapper:
                 else:
                     sensor.set_option(rs.option.laser_power, power + 10)
 
+    def get_timestamp(self, frame: rs.frame):
+        if self.timestamp_mode is None:
+            return -1
+        else:
+            return frame.get_frame_metadata(self.timestamp_mode)
+
     def get_color_stream(self,
                          frameset: rs.composite_frame,
                          frame_dict: dict,
@@ -170,8 +219,7 @@ class RealsenseWrapper:
             Tuple[dict, np.ndarray]: updated frame_dict and data from framset.
         """
         frame = frameset.first_or_default(rs.stream.color)
-        timestamp = frame.get_frame_metadata(
-            rs.frame_metadata_value.sensor_timestamp)
+        timestamp = self.get_timestamp(frame)
         frame_dict['timestamp_color'] = timestamp
         frame_data = np.asanyarray(frame.get_data())
         frame_dict['color'] = frame_data
@@ -185,6 +233,7 @@ class RealsenseWrapper:
                          frameset: rs.composite_frame,
                          frame_dict: dict,
                          storage_paths: Optional[StoragePaths] = None,
+                         save_colormap: bool = False
                          ) -> Tuple[dict, np.ndarray]:
         """Get depth stream data.
 
@@ -193,14 +242,15 @@ class RealsenseWrapper:
             frame_dict (dict): dict to save the data from frameset.
             storage_paths (Optional[StoragePaths], optional): If not None,
                 data from frameset will be stored. Defaults to None.
+            save_colormap (bool): Whether to save depth image as colormap.
+                Defaults to False.
 
         Returns:
             Tuple[dict, np.ndarray]: updated frame_dict and data from framset.
         """
         frame = frameset.first_or_default(rs.stream.depth)
         frame = post_process_depth_frame(frame)
-        timestamp = frame.get_frame_metadata(
-            rs.frame_metadata_value.sensor_timestamp)
+        timestamp = self.get_timestamp(frame)
         frame_dict['timestamp_depth'] = timestamp
         frame_data = np.asanyarray(frame.get_data())
         frame_dict['depth'] = frame_data
@@ -208,6 +258,15 @@ class RealsenseWrapper:
             filepath = storage_paths.depth
             if filepath is not None:
                 np.save(os.path.join(filepath, f'{timestamp}'), frame_data)
+            if save_colormap:
+                # Apply colormap on depth image
+                # (image must be converted to 8-bit per pixel first)
+                image = cv2.applyColorMap(
+                    cv2.convertScaleAbs(frame_data, alpha=0.03),
+                    cv2.COLORMAP_JET
+                )
+                image_name = os.path.join(filepath, f'{timestamp}.jpg')
+                cv2.imwrite(image_name, image)
         return frame_dict, frame_data
 
     def dummy_capture(self, num_frames: int = 30) -> None:
@@ -226,14 +285,9 @@ class RealsenseWrapper:
                     frameset = dev.pipeline.poll_for_frames()
                     if frameset.size() == len(streams):
                         frames[dev_sn] = {}
-                        # frame = frameset.first_or_default(rs.stream.color)
-                        # print(
-                        #     frame.supports_frame_metadata(
-                        #         rs.frame_metadata_value.sensor_timestamp)
-                        # )
         print("Finished capturing dummy frames...")
 
-    def run(self, display: int = 0) -> dict:
+    def step(self, display: int = 0, save_depth_colormap: bool = False) -> dict:
         """Gets the frames streamed from the enabled rs devices.
 
         Args:
@@ -286,6 +340,7 @@ class RealsenseWrapper:
                                 frameset=aligned_frameset,
                                 frame_dict=frame_dict,
                                 storage_paths=storage_paths,
+                                save_colormap=save_depth_colormap
                             )
 
                     if storage_paths is not None:
@@ -419,3 +474,115 @@ class RealsenseWrapper:
                 path = os.path.join(storage_paths.calib, filename)
                 with open(path, 'w') as outfile:
                     json.dump(calib_data, outfile, indent=4)
+
+
+def read_realsense_calibration(file_path: str):
+
+    class RealsenseConfig:
+        def __init__(self, json_data: dict):
+            self.width = json_data['color'][0]['width']
+            self.height = json_data['color'][0]['height']
+            self.color_intrinsics = np.array(json_data['color'][0]['intrinsic_mat']).reshape(3, 3)  # noqa
+            self.depth_intrinsics = np.array(json_data['depth'][0]['intrinsic_mat']).reshape(3, 3)  # noqa
+            self.depth_scale = json_data['depth'][0]['depth_scale']
+            self.T_color_depth = np.eye(4)
+            self.T_color_depth[:3, :3] = np.array(json_data['T_color_depth'][0]['rotation']).reshape(3, 3)  # noqa
+            self.T_color_depth[:3, 3] = json_data['T_color_depth'][0]['translation']  # noqa
+
+    with open(file_path) as calib_file:
+        calib = json.load(calib_file)
+    return RealsenseConfig(calib)
+
+
+def str2bool(v):
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
+
+
+def get_parser():
+    parser = argparse.ArgumentParser(description='Run RealSense devices.')
+    parser.add_argument('--rs-fps',
+                        type=int,
+                        default=6,
+                        help='fps')
+    parser.add_argument('--rs-image-width',
+                        type=int,
+                        default=640,
+                        help='image width in px')
+    parser.add_argument('--rs-image-height',
+                        type=int,
+                        default=480,
+                        help='image height in px')
+    parser.add_argument('--rs-laser-power',
+                        type=int,
+                        default=150,
+                        help='laser power')
+    parser.add_argument('--rs-stream-color',
+                        type=str2bool,
+                        default=True,
+                        help='enable color stream')
+    parser.add_argument('--rs-stream-depth',
+                        type=str2bool,
+                        default=True,
+                        help='enable depth stream')
+    parser.add_argument('--rs-display-frame',
+                        type=int,
+                        default=0,
+                        help='scale for displaying realsense raw images.')
+    parser.add_argument('--rs-save-data',
+                        type=str2bool,
+                        default=False,
+                        help='if true, saves realsense frames.')
+    parser.add_argument('--rs-save-path',
+                        type=str,
+                        default='/data/realsense',
+                        help='path to save realsense frames if --rs-save-data=True.')  # noqa
+    parser.add_argument('--rs-use-one-dev-only',
+                        type=str2bool,
+                        default=False,
+                        help='use 1 rs device only.')
+    parser.add_argument('--rs-ip',
+                        type=str,
+                        # default='192.168.100.39',  # 101 LAN
+                        # default='192.168.1.216',  # 101 WLAN
+                        # default='192.168.1.11',  # 102 WLAN
+                        help='ip address')
+    return parser
+
+
+def initialize_rs_devices(arg: argparse.Namespace) -> RealsenseWrapper:
+
+    if arg.rs_save_path is not None:
+        storage_paths_fn = partial(StoragePaths, base_path=arg.rs_save_path)
+    else:
+        storage_paths_fn = StoragePaths
+
+    rsw = RealsenseWrapper(storage_paths_fn if arg.rs_save_data else None,
+                           arg.rs_ip)
+
+    if arg.rs_stream_color:
+        rsw.stream_config_color.fps = arg.rs_fps
+        rsw.stream_config_color.height = arg.rs_image_height
+        rsw.stream_config_color.width = arg.rs_image_width
+    else:
+        rsw.stream_config_color = None
+
+    if arg.rs_stream_depth:
+        rsw.stream_config_depth.fps = arg.rs_fps
+        rsw.stream_config_depth.height = arg.rs_image_height
+        rsw.stream_config_depth.width = arg.rs_image_width
+    else:
+        rsw.stream_config_depth = None
+
+    if arg.rs_use_one_dev_only:
+        rsw.available_devices = rsw.available_devices[0:1]
+
+    rsw.initialize()
+    rsw.set_ir_laser_power(arg.rs_laser_power)
+    rsw.save_calibration()
+    print("Initialized RealSense devices...")
+    return rsw
