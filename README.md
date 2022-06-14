@@ -1,4 +1,4 @@
-# RealSense in Python
+# RealSense Wrapper
 
 This is a repository to run realsense camera devices (RS) using [Realsense SDK](https://github.com/IntelRealSense/librealsense).
 
@@ -17,9 +17,9 @@ The code in [realsense](realsense) folder uses the [pyrealsense2](https://pypi.o
 
 | File                                                                 | Details                                                                                             |
 | :------------------------------------------------------------------- | :-------------------------------------------------------------------------------------------------- |
-| [realsense_run_devices.py](realsense/realsense_run_devices.py)       | Runs X realsense devices that are connected to the PC.                                              |
-| [realsense_wrapper.py](realsense/realsense_wrapper.py)               | Contains the _RealsenseWrapper_ class that contains all the functions to run the realsense devices. |
-| [realsense_device_manager.py](realsense/realsense_device_manager.py) | Helper functions from the official realsense repo.                                                  |
+| [realsense_run_devices.py](rs_py/realsense_run_devices.py)       | Runs X realsense devices that are connected to the PC.                                              |
+| [realsense_wrapper.py](rs_py/realsense_wrapper.py)               | Contains the _RealsenseWrapper_ class that contains all the functions to run the realsense devices. |
+| [realsense_device_manager.py](rs_py/realsense_device_manager.py) | Helper functions from the official realsense repo.                                                  |
 |                                                                      |                                                                                                     |
 
 ## Running RS in RaspberryPi-4B
@@ -79,9 +79,9 @@ The extraction of metadata is supported in windows but requires kernel patching 
 
 | Setting                    | C Read | C Write | D Read |   D Write    |  FPS  | Status                                 |
 | :------------------------- | :----: | :-----: | :----- | :----------: | :---: | :------------------------------------- |
-| pyrealsense2_net 640x480   |   Y    |    Y    | Y      |      N       |   6   | OK                                     |
-| pyrealsense2_net 640x480   |   Y    |    Y    | Y      |      N       |  15   | OK                                     |
-| pyrealsense2_net 640x480   |   Y    |    Y    | Y      |      N       |  30   | Fail, randomly jitters between 5-15fps |
+| pyrealsense2_net 640x480   |   Y    |    Y    | Y      |      Y       |   6   | OK                                     |
+| pyrealsense2_net 640x480   |   Y    |    Y    | Y      |      Y       |  15   | OK                                     |
+| pyrealsense2_net 640x480   |   Y    |    Y    | Y      |      Y       |  30   | Fail, randomly jitters between 5-15fps |
 | realsense2-net c++ 640x480 |   Y    |    Y    | Y      | Y (colormap) |   6   | OK                                     |
 | realsense2-net c++ 640x480 |   Y    |    Y    | Y      | Y (colormap) |  15   | Fail, randomly jitters between 5fps    |
 | realsense2-net c++ 640x480 |   Y    |    Y    | Y      | Y (colormap) |  30   | Fail, randomly jitters between 5fps    |
