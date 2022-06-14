@@ -37,11 +37,11 @@ def get_parser():
     parser = argparse.ArgumentParser(description='Run RealSense devices.')
     parser.add_argument('--rs-fps',
                         type=int,
-                        default=30,
+                        default=6,
                         help='fps')
     parser.add_argument('--rs-image-width',
                         type=int,
-                        default=848,
+                        default=640,
                         help='image width in px')
     parser.add_argument('--rs-image-height',
                         type=int,
@@ -91,9 +91,21 @@ def initialize_rs_devices(
 if __name__ == "__main__":
     arg = get_parser().parse_args()
     rsw = initialize_rs_devices(arg)
-    rsw.dummy_capture()
+    rsw.dummy_capture(1)
+    exit()
 
     print("Starting frame capture loop...")
+    c = 0
+    while True:
+        frames = rsw.run(display=arg.rs_display_frame)
+        if not len(frames) > 0:
+            print("Empty...")
+            continue
+        else:
+            print("Running...")
+        c += 1
+        if c > arg.rs_fps * 10:
+            break
     try:
         c = 0
         while True:
@@ -104,7 +116,7 @@ if __name__ == "__main__":
             else:
                 print("Running...")
             c += 1
-            if c > arg.rsnet_fps * 10:
+            if c > arg.rs_fps * 10:
                 break
 
     except:  # noqa
