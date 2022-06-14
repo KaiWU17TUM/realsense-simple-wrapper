@@ -19,20 +19,58 @@ from datetime import datetime
 from functools import partial
 from typing import Optional, Type, Tuple
 
-from realsense.realsense_device_manager import Device
-from realsense.realsense_device_manager import enumerate_connected_devices
-from realsense.realsense_device_manager import post_process_depth_frame
+from rs_py.realsense_device_manager import Device
+from rs_py.realsense_device_manager import enumerate_connected_devices
+from rs_py.realsense_device_manager import post_process_depth_frame
+
+METADATA_VALUE_LIST = [
+    rs.frame_metadata_value.actual_exposure,
+    rs.frame_metadata_value.actual_fps,
+    rs.frame_metadata_value.auto_exposure,
+    rs.frame_metadata_value.auto_white_balance_temperature,
+    rs.frame_metadata_value.backend_timestamp,
+    rs.frame_metadata_value.backlight_compensation,
+    rs.frame_metadata_value.brightness,
+    rs.frame_metadata_value.contrast,
+    rs.frame_metadata_value.exposure_priority,
+    rs.frame_metadata_value.exposure_roi_bottom,
+    rs.frame_metadata_value.exposure_roi_left,
+    rs.frame_metadata_value.exposure_roi_right,
+    rs.frame_metadata_value.exposure_roi_top,
+    rs.frame_metadata_value.frame_counter,
+    rs.frame_metadata_value.frame_emitter_mode,
+    rs.frame_metadata_value.frame_laser_power,
+    rs.frame_metadata_value.frame_laser_power_mode,
+    rs.frame_metadata_value.frame_led_power,
+    rs.frame_metadata_value.frame_timestamp,
+    rs.frame_metadata_value.gain_level,
+    rs.frame_metadata_value.gamma,
+    rs.frame_metadata_value.hue,
+    rs.frame_metadata_value.low_light_compensation,
+    rs.frame_metadata_value.manual_white_balance,
+    rs.frame_metadata_value.power_line_frequency,
+    rs.frame_metadata_value.raw_frame_size,
+    rs.frame_metadata_value.saturation,
+    rs.frame_metadata_value.sensor_timestamp,
+    rs.frame_metadata_value.sharpness,
+    rs.frame_metadata_value.temperature,
+    rs.frame_metadata_value.time_of_arrival,
+    rs.frame_metadata_value.white_balance,
+]
 
 
 class StoragePaths:
     def __init__(self, device_sn: str = '', base_path: str = '/data/realsense'):
         super().__init__()
         date_time = datetime.now().strftime("%y%m%d%H%M%S")
+        self.meta_color = f'{base_path}/meta_color/{date_time}_dev{device_sn}'
+        self.meta_depth = f'{base_path}/meta_depth/{date_time}_dev{device_sn}'
         self.calib = f'{base_path}/calib/{date_time}_dev{device_sn}'
         self.color = f'{base_path}/color/{date_time}_dev{device_sn}'
         self.depth = f'{base_path}/depth/{date_time}_dev{device_sn}'
         self.timestamp = f'{base_path}/timestamp/{date_time}_dev{device_sn}'
         self.timestamp_file = os.path.join(self.timestamp, 'timestamp.txt')
+        os.makedirs(self.meta, exist_ok=True)
         os.makedirs(self.calib, exist_ok=True)
         os.makedirs(self.color, exist_ok=True)
         os.makedirs(self.depth, exist_ok=True)
@@ -233,6 +271,11 @@ class RealsenseWrapper:
             filepath = storage_paths.color
             if filepath is not None:
                 np.save(os.path.join(filepath, f'{timestamp}'), frame_data)
+            filepath = storage_paths.meta_color
+            if filepath is not None:
+                path = os.path.join(filepath, f'{timestamp}.json')
+                with open(path, 'w') as json_f:
+                    json.dump(read_metadata(frame), json_f, indent=4)
         return frame_dict, frame_data
 
     def get_depth_stream(self,
@@ -273,6 +316,11 @@ class RealsenseWrapper:
                 )
                 image_name = os.path.join(filepath, f'{timestamp}.jpg')
                 cv2.imwrite(image_name, image)
+            filepath = storage_paths.meta_depth
+            if filepath is not None:
+                path = os.path.join(filepath, f'{timestamp}.json')
+                with open(path, 'w') as json_f:
+                    json.dump(read_metadata(frame), json_f, indent=4)
         return frame_dict, frame_data
 
     def dummy_capture(self, num_frames: int = 30) -> None:
@@ -498,6 +546,14 @@ def read_realsense_calibration(file_path: str):
     with open(file_path) as calib_file:
         calib = json.load(calib_file)
     return RealsenseConfig(calib)
+
+
+def read_metadata(frame: rs.frame):
+    output = {}
+    for i in METADATA_VALUE_LIST:
+        if frame.supports_frame_metadata(i):
+            output[i.name] = frame.get_frame_metadata(i)
+    return output
 
 
 def str2bool(v):

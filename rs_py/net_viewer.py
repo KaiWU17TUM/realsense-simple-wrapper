@@ -11,8 +11,8 @@
 # https://github.com/IntelRealSense/librealsense/blob/master/wrappers/python/examples/net_viewer.py
 
 
-from realsense import get_rs_parser
-from realsense import initialize_rs_devices
+from rs_py import get_rs_parser
+from rs_py import initialize_rs_devices
 
 
 if __name__ == "__main__":
