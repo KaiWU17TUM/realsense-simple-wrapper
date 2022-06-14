@@ -74,7 +74,8 @@ class RealsenseWrapper:
         if ip is not None:
             self.network = True
             dev = rsnet.net_device(ip)
-            self.available_devices = [(dev, None)]
+            self.available_devices = [
+                (dev.get_info(rs.camera_info.serial_number), None)]
             dev.add_to(self.ctx)
             print(f'[INFO] : Network mode')
             print(f'[INFO] : Connected to {ip}')
@@ -519,7 +520,7 @@ def get_parser():
                         help='image height in px')
     parser.add_argument('--rs-laser-power',
                         type=int,
-                        default=150,
+                        default=140,
                         help='laser power')
     parser.add_argument('--rs-stream-color',
                         type=str2bool,
