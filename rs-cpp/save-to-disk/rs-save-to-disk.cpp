@@ -18,6 +18,18 @@
 #include "stb_image_write.h"
 
 /**
+ * @brief Save raw frame data into a binary file.
+ *
+ * Taken from : https://github.com/IntelRealSense/librealsense/issues/1485
+ *
+ * @param filename
+ * @param frame
+ * @return true
+ * @return false
+ */
+bool save_raw_frame_data(const std::string &filename, rs2::frame frame);
+
+/**
  * @brief Saves the metadata from rs2::frame into a csv file.
  *
  * @param frm An instance of rs2::frame .
@@ -206,12 +218,13 @@ public:
                          << "-rs-save-to-disk-output-"
                          << vf.get_profile().stream_name()
                          << ".png";
-                stbi_write_png(png_file.str().c_str(),
-                               vf.get_width(),
-                               vf.get_height(),
-                               vf.get_bytes_per_pixel(),
-                               vf.get_data(),
-                               vf.get_stride_in_bytes());
+                save_raw_frame_data(png_file.str(), frame);
+                // stbi_write_png(png_file.str().c_str(),
+                //                vf.get_width(),
+                //                vf.get_height(),
+                //                vf.get_bytes_per_pixel(),
+                //                vf.get_data(),
+                //                vf.get_stride_in_bytes());
                 std::cout << "Saved " << png_file.str() << std::endl;
 
                 // Record per-frame metadata for UVC streams
@@ -287,4 +300,19 @@ void metadata_to_csv(const rs2::frame &frm, const std::string &filename)
     }
 
     csv.close();
+}
+
+bool save_raw_frame_data(const std::string &filename, rs2::frame frame)
+{
+    bool ret = false;
+    auto image = frame.as<rs2::video_frame>();
+    if (image)
+    {
+        std::ofstream outfile(filename.data(), std::ofstream::binary);
+        outfile.write(static_cast<const char *>(image.get_data()),
+                      image.get_height() * image.get_stride_in_bytes());
+        outfile.close();
+        ret = true;
+    }
+    return ret;
 }
