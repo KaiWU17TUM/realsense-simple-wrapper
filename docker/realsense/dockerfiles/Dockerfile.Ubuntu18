@@ -76,7 +76,7 @@ ENV LANG en_US.UTF-8
 # ------------------------------------------------------------------------------
 # Main apts 
 RUN apt-get update -y
-RUN apt-get install -y sudo nano unzip wget curl git 
+RUN apt-get install -y sudo nano unzip wget curl git cmake
 
 ENV TZ=Europe/Berlin
 RUN DEBIAN_FRONTEND="noninteractive" apt-get -y install tzdata
