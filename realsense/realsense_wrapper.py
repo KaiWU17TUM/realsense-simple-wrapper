@@ -162,7 +162,12 @@ class RealsenseWrapper:
 
             # Check which timestamp is available.
             if len(self.storage_paths_per_dev) > 0:
-                frameset = pipeline.wait_for_frames()
+                wait_flag = True
+                while wait_flag:
+                    streams = pipeline_profile.get_streams()
+                    frameset = pipeline.poll_for_frames()
+                    if frameset.size() == len(streams):
+                        wait_flag = False
                 fmv = rs.frame_metadata_value
                 if frameset.supports_frame_metadata(fmv.sensor_timestamp):
                     self.timestamp_mode = fmv.sensor_timestamp
@@ -279,8 +284,8 @@ class RealsenseWrapper:
         """
         print("Capturing dummy frames...")
         frames = {}
-        while len(frames) < len(self.enabled_devices.items()):
-            for _ in range(num_frames):
+        for _ in range(num_frames):
+            while len(frames) < len(self.enabled_devices.items()):
                 for dev_sn, dev in self.enabled_devices.items():
                     streams = dev.pipeline_profile.get_streams()
                     frameset = dev.pipeline.poll_for_frames()
