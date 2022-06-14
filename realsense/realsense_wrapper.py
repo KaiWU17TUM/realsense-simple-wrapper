@@ -114,10 +114,10 @@ class RealsenseWrapper:
             cfg = rs.config()
             cfg.enable_stream(stream_type=rs.stream.depth,
                               format=rs.format.z16,
-                              **self.stream_config.data)
+                              **self.stream_config_depth.data)
             cfg.enable_stream(stream_type=rs.stream.color,
                               format=rs.format.bgr8,
-                              **self.stream_config.data)
+                              **self.stream_config_color.data)
             self._rs_cfg[device_sn] = cfg
 
     def initialize(self, enable_ir_emitter: bool = True) -> None:
