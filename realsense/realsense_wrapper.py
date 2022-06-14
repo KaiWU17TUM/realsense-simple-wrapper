@@ -157,7 +157,6 @@ class RealsenseWrapper:
                          frameset: rs.composite_frame,
                          frame_dict: dict,
                          storage_paths: Optional[StoragePaths] = None,
-                         timestamp: Union[int, float] = 0
                          ) -> Tuple[dict, np.ndarray]:
         """Get color stream data.
 
@@ -166,13 +165,14 @@ class RealsenseWrapper:
             frame_dict (dict): dict to save the data from frameset.
             storage_paths (Optional[StoragePaths], optional): If not None,
                 data from frameset will be stored. Defaults to None.
-            timestamp (Union[int, float], optional): Used as the name
-                of the saved file. Defaults to 0.
 
         Returns:
             Tuple[dict, np.ndarray]: updated frame_dict and data from framset.
         """
         frame = frameset.first_or_default(rs.stream.color)
+        timestamp = frame.get_frame_metadata(
+            rs.frame_metadata_value.sensor_timestamp)
+        frame_dict['timestamp_color'] = timestamp
         frame_data = np.asanyarray(frame.get_data())
         frame_dict['color'] = frame_data
         if storage_paths is not None:
@@ -185,7 +185,6 @@ class RealsenseWrapper:
                          frameset: rs.composite_frame,
                          frame_dict: dict,
                          storage_paths: Optional[StoragePaths] = None,
-                         timestamp: Union[int, float] = 0
                          ) -> Tuple[dict, np.ndarray]:
         """Get depth stream data.
 
@@ -194,14 +193,15 @@ class RealsenseWrapper:
             frame_dict (dict): dict to save the data from frameset.
             storage_paths (Optional[StoragePaths], optional): If not None,
                 data from frameset will be stored. Defaults to None.
-            timestamp (Union[int, float], optional): Used as the name
-                of the saved file. Defaults to 0.
 
         Returns:
             Tuple[dict, np.ndarray]: updated frame_dict and data from framset.
         """
         frame = frameset.first_or_default(rs.stream.depth)
         frame = post_process_depth_frame(frame)
+        timestamp = frame.get_frame_metadata(
+            rs.frame_metadata_value.sensor_timestamp)
+        frame_dict['timestamp_depth'] = timestamp
         frame_data = np.asanyarray(frame.get_data())
         frame_dict['depth'] = frame_data
         if storage_paths is not None:
@@ -210,17 +210,28 @@ class RealsenseWrapper:
                 np.save(os.path.join(filepath, f'{timestamp}'), frame_data)
         return frame_dict, frame_data
 
-    def dummy_capture(self) -> None:
-        """Dummy capture 30 frames to give autoexposure, etc. a chance to settle
+    def dummy_capture(self, num_frames: int = 30) -> None:
+        """Dummy capture 'num_frames' frames to give
+        autoexposure, etc. a chance to settle.
+
+        Args:
+            num_frames (int): Number of dummy frames to skip. Defaults to 30.
         """
+        print("Capturing dummy frames...")
         frames = {}
         while len(frames) < len(self.enabled_devices.items()):
-            for _ in range(30):
+            for _ in range(num_frames):
                 for dev_sn, dev in self.enabled_devices.items():
                     streams = dev.pipeline_profile.get_streams()
                     frameset = dev.pipeline.poll_for_frames()
                     if frameset.size() == len(streams):
                         frames[dev_sn] = {}
+                        # frame = frameset.first_or_default(rs.stream.color)
+                        # print(
+                        #     frame.supports_frame_metadata(
+                        #         rs.frame_metadata_value.sensor_timestamp)
+                        # )
+        print("Finished capturing dummy frames...")
 
     def run(self, display: int = 0) -> dict:
         """Gets the frames streamed from the enabled rs devices.
@@ -253,16 +264,6 @@ class RealsenseWrapper:
 
                     frame_dict['calib'] = self.calib_data.get(dev_sn, {})
 
-                    timestamp = frameset.get_frame_metadata(
-                        rs.frame_metadata_value.sensor_timestamp)
-                    frame_dict['timestamp'] = timestamp
-
-                    if storage_paths is not None:
-                        ts_file = storage_paths.timestamp_file
-                        if ts_file is not None:
-                            with open(ts_file, 'a+') as f:
-                                f.write(f'{timestamp}\n')
-
                     aligned_frameset = self._align.process(frameset)
                     for stream in streams:
                         st = stream.stream_type()
@@ -275,19 +276,23 @@ class RealsenseWrapper:
                         # frame_data = frame.get_data()
                         # frame_dict[st] = frame_data
                         if st == rs.stream.color:
-                            self.get_color_stream(
+                            frame_dict, frame_data = self.get_color_stream(
                                 frameset=aligned_frameset,
                                 frame_dict=frame_dict,
                                 storage_paths=storage_paths,
-                                timestamp=timestamp
                             )
                         elif st == rs.stream.depth:
-                            self.get_depth_stream(
+                            frame_dict, frame_data = self.get_depth_stream(
                                 frameset=aligned_frameset,
                                 frame_dict=frame_dict,
                                 storage_paths=storage_paths,
-                                timestamp=timestamp
                             )
+
+                    if storage_paths is not None:
+                        ts_file = storage_paths.timestamp_file
+                        if ts_file is not None:
+                            with open(ts_file, 'a+') as f:
+                                f.write(f"{frame_dict['timestamp_color']}::{frame_dict['timestamp_depth']}\n")  # noqa
 
                     frames[dev_sn] = frame_dict
 

@@ -162,8 +162,7 @@ if __name__ == "__main__":
                                depth_colormap_dim[0]),
                         interpolation=cv2.INTER_AREA
                     )
-                    image = np.hstack(
-                        (resized_color_image, depth_colormap))
+                    image = np.hstack((resized_color_image, depth_colormap))
                 else:
                     image = np.hstack((color_image, depth_colormap))
 

@@ -1,13 +1,13 @@
-#! /bin/sh
++#! /bin/sh
 
 LIBRS_VERSION="2.50.0"
 
-if [ $# -eq 1 ]; then
+if [ $# -eq 2 ]; then
 
     if [ "$1" = "ubuntu18" ]; then
-        TARGET_TAG="librealsense:v${LIBRS_VERSION}-ubuntu18.04"
+        TARGET_TAG="librealsense-full-user:ubuntu18.04-v${LIBRS_VERSION}"
     elif [ "$1" = "ubuntu20" ]; then
-        TARGET_TAG="librealsense:v${LIBRS_VERSION}-ubuntu20.04"
+        TARGET_TAG="librealsense-full-user:ubuntu20.04-v${LIBRS_VERSION}"
     else
         echo "Unknown argument, should be {ubuntu18/ubuntu20}"
         exit 1
