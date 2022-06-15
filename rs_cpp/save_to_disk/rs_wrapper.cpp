@@ -40,7 +40,7 @@ void rs2wrapper::initialize()
     }
     catch (const rs2::error &e)
     {
-        std::cout << "Firmware      : not available " << e.what() << std::endl;
+        std::cout << "not available, " << e.what() << std::endl;
     }
     std::cout << "========================================" << std::endl;
 }

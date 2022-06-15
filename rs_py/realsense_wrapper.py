@@ -237,11 +237,11 @@ class RealsenseWrapper:
             print(f'Serial Number : {pipeline_profile.get_device().get_info(rs.camera_info.serial_number)}')  # noqa
             try:
                 print(f'Product Line  : {pipeline_profile.get_device().get_info(rs.camera_info.product_line)}')  # noqa
-            except e:
+            except Exception as e:
                 print(f'Product Line  : not available', e)
             try:
                 print(f'Firmware      : {pipeline_profile.get_device().get_info(rs.camera_info.firmware_version)}')  # noqa
-            except e:
+            except Exception as e:
                 print(f'Firmware      : not available', e)  # noqa
             print("========================================")
 
@@ -264,6 +264,8 @@ class RealsenseWrapper:
                     self.storage_paths_per_dev.pop(device_serial)
                     print('[WARN] : Both sensor_timestamp/frame_timestamp '
                           'are not available. No data will be saved...')
+
+        print("[INFO] : Initialized RealSense devices...")
 
     def set_storage_paths(self, paths: StoragePaths) -> None:
         self.storage_paths_per_dev = {sn: paths(sn)

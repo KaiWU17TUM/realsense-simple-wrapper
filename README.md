@@ -15,12 +15,12 @@ The librealsense SDK can be obtained by either:
 
 The code in [realsense](realsense) folder uses the [pyrealsense2](https://pypi.org/project/pyrealsense/) python package to stream images/frames from realsense devices.
 
-| File                                                                 | Details                                                                                             |
-| :------------------------------------------------------------------- | :-------------------------------------------------------------------------------------------------- |
+| File                                                             | Details                                                                                             |
+| :--------------------------------------------------------------- | :-------------------------------------------------------------------------------------------------- |
 | [realsense_run_devices.py](rs_py/realsense_run_devices.py)       | Runs X realsense devices that are connected to the PC.                                              |
 | [realsense_wrapper.py](rs_py/realsense_wrapper.py)               | Contains the _RealsenseWrapper_ class that contains all the functions to run the realsense devices. |
 | [realsense_device_manager.py](rs_py/realsense_device_manager.py) | Helper functions from the official realsense repo.                                                  |
-|                                                                      |                                                                                                     |
+|                                                                  |                                                                                                     |
 
 ## Running RS in RaspberryPi-4B
 
@@ -31,6 +31,22 @@ To run RS in raspberrypi 3/4, the linux kernel needs to be patched. This can be 
 2. Flash a pre-build image : In one of he official [guide](https://dev.intelrealsense.com/docs/open-source-ethernet-networking-for-intel-realsense-depth-cameras) there is an image for (kernel-patched) Raspberrypi-OS built with RS-SDK-V2.34 . 
 
 Once kernel patching is done, the RS SDK can be installed/upgraded by following the steps shown in this [guide](https://github.com/datasith/Ai_Demos_RPi/wiki/Raspberry-Pi-4-and-Intel-RealSense-D435). This [script](scripts/install_realsense_pi4.sh) follows the steps and performs the installation (except OpenGL and VNC). **BUT, the swapsize needs to be done manually first according to the [guide](https://github.com/datasith/Ai_Demos_RPi/wiki/Raspberry-Pi-4-and-Intel-RealSense-D435).**
+
+## Data transmission testing
+
+| Setting                    | C Read | C Write | D Read |   D Write    |  FPS  | Status                                 |
+| :------------------------- | :----: | :-----: | :----- | :----------: | :---: | :------------------------------------- |
+| pyrealsense2_net 640x480   |   Y    |    Y    | Y      |      Y       |   6   | OK                                     |
+| pyrealsense2_net 640x480   |   Y    |    Y    | Y      |      Y       |  15   | OK                                     |
+| pyrealsense2_net 640x480   |   Y    |    Y    | Y      |      Y       |  30   | Fail, randomly jitters between 5-15fps |
+| realsense2-net c++ 640x480 |   Y    |    Y    | Y      | Y (colormap) |   6   | OK                                     |
+| realsense2-net c++ 640x480 |   Y    |    Y    | Y      | Y (colormap) |  15   | Fail, randomly jitters between 5fps    |
+| realsense2-net c++ 640x480 |   Y    |    Y    | Y      | Y (colormap) |  30   | Fail, randomly jitters between 5fps    |
+| realsense2-net c++ 640x480 |   Y    |    Y    | Y      |      Y       |   6   | OK                                     |
+| realsense2-net c++ 640x480 |   Y    |    Y    | Y      |      Y       |  15   | OK                                     |
+| realsense2-net c++ 640x480 |   Y    |    Y    | Y      |      Y       |  30   | Fail, randomly jitters between 5-15fps |
+| usbip 640x480              |   Y    |    Y    | Y      |      N       |   6   | Fail, randomly drops 1-2 frames        |
+| usbip 640x480              |   Y    |    Y    | Y      |      N       |  15   | Fail, randomly jitters between 2-6fps  |
 
 ## Good to know
 
@@ -75,15 +91,5 @@ The former is an old flag of the latter one [link](https://github.com/IntelRealS
 ### 5. Metadata extraction
 The extraction of metadata is supported in windows but requires kernel patching for linux OS. See [here](https://github.com/IntelRealSense/librealsense/blob/master/doc/frame_metadata.md#os-support) and [here](https://github.com/IntelRealSense/librealsense/issues/7039).
 
-### 6. Data transmission testing
-
-| Setting                    | C Read | C Write | D Read |   D Write    |  FPS  | Status                                 |
-| :------------------------- | :----: | :-----: | :----- | :----------: | :---: | :------------------------------------- |
-| pyrealsense2_net 640x480   |   Y    |    Y    | Y      |      Y       |   6   | OK                                     |
-| pyrealsense2_net 640x480   |   Y    |    Y    | Y      |      Y       |  15   | OK                                     |
-| pyrealsense2_net 640x480   |   Y    |    Y    | Y      |      Y       |  30   | Fail, randomly jitters between 5-15fps |
-| realsense2-net c++ 640x480 |   Y    |    Y    | Y      | Y (colormap) |   6   | OK                                     |
-| realsense2-net c++ 640x480 |   Y    |    Y    | Y      | Y (colormap) |  15   | Fail, randomly jitters between 5fps    |
-| realsense2-net c++ 640x480 |   Y    |    Y    | Y      | Y (colormap) |  30   | Fail, randomly jitters between 5fps    |
-| usbip 640x480              |   Y    |    Y    | Y      |      N       |   6   | Fail, randomly drops 1-2 frames        |
-| usbip 640x480              |   Y    |    Y    | Y      |      N       |  15   | Fail, randomly jitters between 2-6fps  |
+### 6. bug in align for python with rs_net
+When align is used with rs_net device, the resulting depth images is all zeros.
