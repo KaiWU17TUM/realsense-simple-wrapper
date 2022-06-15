@@ -9,7 +9,7 @@ rs2wrapper::rs2wrapper(int argc,
     // prints out info
     info();
     // Create save directory
-    mkdir(save_path(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+    create_directories();
     // Add network device context
     if (network())
     {
@@ -22,9 +22,33 @@ rs2wrapper::rs2wrapper(int argc,
     pipe = rs2::pipeline(ctx);
     cfg.enable_stream(RS2_STREAM_COLOR, width(), height(), RS2_FORMAT_RGB8, fps());
     cfg.enable_stream(RS2_STREAM_DEPTH, width(), height(), RS2_FORMAT_Z16, fps());
-    rs2::pipeline_profile profile = pipe.start(cfg);
+    profile = pipe.start(cfg);
     std::cout << "Pipeline started..." << std::endl;
     std::cout << "Initialized realsense device..." << std::endl;
+}
+
+void rs2wrapper::create_directories()
+{
+    // Base
+    mkdir(save_path(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+    // System time
+    time_t current_time;
+    time(&current_time);
+    auto path = (std::string)save_path() + "/" + std::to_string(current_time);
+    mkdir(path.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+    // Calib
+    path_map["Calib"] = path + "/Calib";
+    mkdir(path_map["Calib"].c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+    // Color
+    path_map["Color"] = path + "/Color";
+    mkdir(path_map["Color"].c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+    path_map["MetaColor"] = path + "/MetaColor";
+    mkdir(path_map["MetaColor"].c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+    // Depth
+    path_map["Depth"] = path + "/Depth";
+    mkdir(path_map["Depth"].c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+    path_map["MetaDepth"] = path + "/MetaDepth";
+    mkdir(path_map["MetaDepth"].c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
 }
 
 void rs2wrapper::initial_flush(const int &num_frames)
@@ -45,22 +69,72 @@ void rs2wrapper::step(const std::string &save_file_prefix)
             std::string prefix = filename_prefix_with_timestamp(
                 vf, save_file_prefix, num_zeros_to_pad);
 
+            rs2::stream_profile vfsp = vf.get_profile();
+            std::string stream_name = vfsp.stream_name();
+
             // Record per-frame metadata for UVC streams
-            std::string csv_file = (std::string)save_path() + "/" +
-                                   prefix +
-                                   vf.get_profile().stream_name() +
-                                   "-metadata.csv";
+            std::string csv_file = path_map["Meta" + stream_name] + "/" +
+                                   prefix + "-metadata.csv";
             metadata_to_csv(vf, csv_file);
 
             // Write images to disk
-            std::string png_file = (std::string)save_path() + "/" +
-                                   prefix +
-                                   vf.get_profile().stream_name() +
-                                   ".bin";
+            std::string png_file = path_map[stream_name] + "/" +
+                                   prefix + ".bin";
             framedata_to_bin(frame, png_file);
             std::cout << "Saved " << png_file << std::endl;
+
+            rs2_intrinsics intrinsics = vfsp.as<rs2::video_stream_profile>().get_intrinsics();
+            rs2_extrinsics extrinsics = vfsp.get_extrinsics_to(vfsp);
         }
     }
+}
+
+void rs2wrapper::save_calib()
+{
+    std::string csv_file = path_map["Calib"] + "/calib.csv";
+    std::ofstream csv;
+    csv.open(csv_file);
+
+    // Intrinsics of color & depth frames
+    rs2::stream_profile profile_color = profile.get_stream(RS2_STREAM_COLOR);
+    rs2_intrinsics intr_color = profile_color.as<rs2::video_stream_profile>().get_intrinsics();
+    // Fetch stream profile for depth stream
+    // Downcast to video_stream_profile and fetch intrinsics
+    rs2::stream_profile profile_depth = profile.get_stream(RS2_STREAM_DEPTH);
+    rs2_intrinsics intr_depth = profile_depth.as<rs2::video_stream_profile>().get_intrinsics();
+
+    // Extrinsic matrix from color sensor to Depth sensor
+    rs2_extrinsics extr = profile_color.as<rs2::video_stream_profile>().get_extrinsics_to(profile_depth);
+
+    // Write calibration data to json file
+    csv << intr_color.width << ","
+        << intr_color.height << ","
+        << intr_color.ppx << ","
+        << intr_color.ppy << ","
+        << intr_color.fx << ","
+        << intr_color.fy << ","
+        << rs2_distortion_to_string(intr_color.model) << ",";
+    for (auto &&value : intr_color.coeffs)
+        csv << value << ",";
+    csv << intr_depth.width << ","
+        << intr_depth.height << ","
+        << intr_depth.ppx << ","
+        << intr_depth.ppy << ","
+        << intr_depth.fx << ","
+        << intr_depth.fy << ","
+        << rs2_distortion_to_string(intr_depth.model) << ",";
+    for (auto &&value : intr_depth.coeffs)
+        csv << value << ",";
+    for (auto &&value : extr.rotation)
+        csv << value << ",";
+    for (auto &&value : extr.translation)
+        csv << value << ",";
+
+    auto sensors = profile.get_device().query_sensors();
+    for (auto &&value : sensors)
+        std::cout << value << std::endl;
+
+    std::cout << "Save camera calibration data..." << std::endl;
 }
 
 std::string pad_zeros(const std::string &in_str, const size_t &num_zeros)
