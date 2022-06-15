@@ -5,6 +5,8 @@ from rs_py import RealsenseWrapper
 if __name__ == "__main__":
     arg = get_rs_parser().parse_args()
     print("========================================")
+    print(">>>>> args <<<<<")
+    print("========================================")
     for k, v in vars(arg).items():
         print(f"{k} : {v}")
     print("========================================")

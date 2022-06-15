@@ -34,7 +34,14 @@ void rs2wrapper::initialize()
     std::cout << "========================================" << std::endl;
     std::cout << "Name          : " << profile.get_device().get_info(RS2_CAMERA_INFO_NAME) << std::endl;
     std::cout << "Serial Number : " << profile.get_device().get_info(RS2_CAMERA_INFO_SERIAL_NUMBER) << std::endl;
-    std::cout << "Firmware      : " << profile.get_device().get_info(RS2_CAMERA_INFO_FIRMWARE_VERSION) << std::endl;
+    try
+    {
+        std::cout << "Firmware      : " << profile.get_device().get_info(RS2_CAMERA_INFO_FIRMWARE_VERSION) << std::endl;
+    }
+    catch (const rs2::error &e)
+    {
+        std::cout << "Firmware      : not available " << e.what() << std::endl;
+    }
     std::cout << "========================================" << std::endl;
 }
 
