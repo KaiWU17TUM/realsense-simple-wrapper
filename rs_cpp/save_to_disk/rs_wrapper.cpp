@@ -2,24 +2,26 @@
 
 int num_zeros_to_pad = NUM_ZEROS_TO_PAD;
 
-rs2wrapper::rs2wrapper(int argc,
-                       char *argv[],
-                       rs2::context ctx) : rs2args(argc, argv)
+rs2wrapper::rs2wrapper(int argc, char *argv[]) : rs2args(argc, argv)
 {
     // prints out info
     info();
     // Create save directory
     create_directories();
+}
+
+void rs2wrapper::initialize()
+{
     // Add network device context
     if (network())
     {
+        rs2::context ctx;
         rs2::net_device dev(ip());
         std::cout << "IP address found..." << std::endl;
         dev.add_to(ctx);
+        pipe = rs2::pipeline(ctx);
     }
     // Configure pipeline config
-    // Start pipeline
-    pipe = rs2::pipeline(ctx);
     cfg.enable_stream(RS2_STREAM_COLOR, width(), height(), RS2_FORMAT_RGB8, fps());
     cfg.enable_stream(RS2_STREAM_DEPTH, width(), height(), RS2_FORMAT_Z16, fps());
     profile = pipe.start(cfg);
@@ -64,7 +66,7 @@ void rs2wrapper::step(const std::string &save_file_prefix)
     for (auto &&frame : pipe.wait_for_frames())
     {
         // We can only save video frames as pngs, so we skip the rest
-        if (rs2::video_frame vf = frame.as<rs2::video_frame>())
+        if (auto vf = frame.as<rs2::video_frame>())
         {
             std::string prefix = filename_prefix_with_timestamp(
                 vf, save_file_prefix, num_zeros_to_pad);
@@ -116,6 +118,8 @@ void rs2wrapper::save_calib()
         << rs2_distortion_to_string(intr_color.model) << ",";
     for (auto &&value : intr_color.coeffs)
         csv << value << ",";
+    csv << "\n";
+
     csv << intr_depth.width << ","
         << intr_depth.height << ","
         << intr_depth.ppx << ","
@@ -125,14 +129,23 @@ void rs2wrapper::save_calib()
         << rs2_distortion_to_string(intr_depth.model) << ",";
     for (auto &&value : intr_depth.coeffs)
         csv << value << ",";
+    csv << "\n";
+
     for (auto &&value : extr.rotation)
         csv << value << ",";
     for (auto &&value : extr.translation)
         csv << value << ",";
+    csv << "\n";
 
-    auto sensors = profile.get_device().query_sensors();
-    for (auto &&value : sensors)
-        std::cout << value << std::endl;
+    std::vector<rs2::sensor> sensors = profile.get_device().query_sensors();
+    for (auto &&sensor : sensors)
+    {
+        if (auto dss = sensor.as<rs2::depth_stereo_sensor>())
+        {
+            csv << dss.get_depth_scale() << ","
+                << dss.get_stereo_baseline() << ",\n";
+        }
+    }
 
     std::cout << "Save camera calibration data..." << std::endl;
 }

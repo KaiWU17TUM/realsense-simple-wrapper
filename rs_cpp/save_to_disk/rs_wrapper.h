@@ -187,14 +187,18 @@ public:
      *
      * @param argc Number of arguments.
      * @param argv Arguments in an array of char*.
-     * @param ctx An insstance of rs2::context .
      */
-    rs2wrapper(int argc, char *argv[], rs2::context ctx = rs2::context());
+    rs2wrapper(int argc, char *argv[]);
     /**
      * @brief Creates the required directories to save data
      *
      */
     void create_directories();
+    /**
+     * @brief Initialize the realsense devices.
+     * 
+     */
+    void initialize();
     /**
      * @brief Flushes N initial frames o give autoexposure, etc. a chance to settle.
      *
