@@ -30,7 +30,6 @@ try
     // Intialize the wrapper
     // Declare RealSense pipeline, encapsulating the actual device and sensors
     // Start streaming with args defined configuration
-    rs2::context ctx;
     rs2wrapper rs2_dev(argc, argv);
     rs2_dev.initialize();
     rs2_dev.save_calib();
