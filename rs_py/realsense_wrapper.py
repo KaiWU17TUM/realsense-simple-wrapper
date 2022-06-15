@@ -103,25 +103,26 @@ class RealsenseWrapper:
 
     """
 
-    def __init__(self,
-                 storage_paths_fn: Optional[Type[StoragePaths]] = None,
-                 ip: Optional[str] = None) -> None:
+    def __init__(self, arg: argparse.Namespace) -> None:
         super().__init__()
 
         # device data
         self.ctx = rs.context()
-        if ip is not None:
+        if arg.rs_ip is not None:
             self.network = True
-            dev = rsnet.net_device(ip)
+            dev = rsnet.net_device(arg.rs_ip)
             self.available_devices = [
                 (dev.get_info(rs.camera_info.serial_number), None)]
             dev.add_to(self.ctx)
             print(f'[INFO] : Network mode')
-            print(f'[INFO] : Connected to {ip}')
+            print(f'[INFO] : Connected to {arg.rs_ip}')
         else:
             self.network = False
             self.available_devices = enumerate_connected_devices(self.ctx)
             print(f'[INFO] : Local mode')
+
+        if arg.rs_use_one_dev_only:
+            self.available_devices = self.available_devices[0:1]
 
         # serial numbers of enabled devices
         self.enabled_devices = {}
@@ -134,14 +135,38 @@ class RealsenseWrapper:
         self._rs_cfg = {}
         self.stream_config_color = StreamConfig()
         self.stream_config_depth = StreamConfig()
+
+        if arg.rs_stream_color:
+            self.stream_config_color.fps = arg.rs_fps
+            self.stream_config_color.height = arg.rs_image_height
+            self.stream_config_color.width = arg.rs_image_width
+        else:
+            self.stream_config_color = None
+
+        if arg.rs_stream_depth:
+            self.stream_config_depth.fps = arg.rs_fps
+            self.stream_config_depth.height = arg.rs_image_height
+            self.stream_config_depth.width = arg.rs_image_width
+        else:
+            self.stream_config_depth = None
+
+        # Save paths
         self.timestamp_mode = None
-        if storage_paths_fn is not None:
+        self.storage_paths_per_dev = {}
+        if arg.rs_save_data:
+            if arg.rs_save_path is not None:
+                storage_paths_fn = partial(
+                    StoragePaths, base_path=arg.rs_save_path)
+            else:
+                storage_paths_fn = StoragePaths
             self.storage_paths_per_dev = {sn: storage_paths_fn(sn)
                                           for sn, _ in self.available_devices}
-        else:
-            self.storage_paths_per_dev = {}
 
-    def configure_stream(self, device_sn: Optional[str] = None) -> None:
+    def configure_stream(
+            self,
+            device_sn: str,
+            stream_config_depth: Optional[StreamConfig] = None,
+            stream_config_color: Optional[StreamConfig] = None) -> None:
         """Defines per device stream configurations.
 
         device('001622070408')
@@ -152,12 +177,14 @@ class RealsenseWrapper:
         """
         if device_sn is not None:
             cfg = rs.config()
-            cfg.enable_stream(stream_type=rs.stream.depth,
-                              format=rs.format.z16,
-                              **self.stream_config_depth.data)
-            cfg.enable_stream(stream_type=rs.stream.color,
-                              format=rs.format.bgr8,
-                              **self.stream_config_color.data)
+            if stream_config_depth is not None:
+                cfg.enable_stream(stream_type=rs.stream.depth,
+                                  format=rs.format.z16,
+                                  **stream_config_depth.data)
+            if stream_config_color is not None:
+                cfg.enable_stream(stream_type=rs.stream.color,
+                                  format=rs.format.bgr8,
+                                  **stream_config_color.data)
             self._rs_cfg[device_sn] = cfg
 
     def initialize(self, enable_ir_emitter: bool = True) -> None:
@@ -168,7 +195,9 @@ class RealsenseWrapper:
                 depth quality. Defaults to True.
         """
         if len(self._rs_cfg) == 0:
-            self.configure_stream('default')
+            self.configure_stream('default',
+                                  self.stream_config_depth,
+                                  self.stream_config_color)
 
         for device_serial, product_line in self.available_devices:
 
@@ -615,37 +644,3 @@ def get_parser():
                         # default='192.168.1.11',  # 102 WLAN
                         help='ip address')
     return parser
-
-
-def initialize_rs_devices(arg: argparse.Namespace) -> RealsenseWrapper:
-
-    if arg.rs_save_path is not None:
-        storage_paths_fn = partial(StoragePaths, base_path=arg.rs_save_path)
-    else:
-        storage_paths_fn = StoragePaths
-
-    rsw = RealsenseWrapper(storage_paths_fn if arg.rs_save_data else None,
-                           arg.rs_ip)
-
-    if arg.rs_stream_color:
-        rsw.stream_config_color.fps = arg.rs_fps
-        rsw.stream_config_color.height = arg.rs_image_height
-        rsw.stream_config_color.width = arg.rs_image_width
-    else:
-        rsw.stream_config_color = None
-
-    if arg.rs_stream_depth:
-        rsw.stream_config_depth.fps = arg.rs_fps
-        rsw.stream_config_depth.height = arg.rs_image_height
-        rsw.stream_config_depth.width = arg.rs_image_width
-    else:
-        rsw.stream_config_depth = None
-
-    if arg.rs_use_one_dev_only:
-        rsw.available_devices = rsw.available_devices[0:1]
-
-    rsw.initialize()
-    rsw.set_ir_laser_power(arg.rs_laser_power)
-    rsw.save_calibration()
-    print("Initialized RealSense devices...")
-    return rsw

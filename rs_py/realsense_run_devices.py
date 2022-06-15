@@ -1,5 +1,5 @@
 from rs_py import get_rs_parser
-from rs_py import initialize_rs_devices
+from rs_py import RealsenseWrapper
 
 
 if __name__ == "__main__":
@@ -9,7 +9,12 @@ if __name__ == "__main__":
         print(f"{k} : {v}")
     print("========================================")
 
-    rsw = initialize_rs_devices(arg)
+    rsw = RealsenseWrapper(arg)
+    rsw.initialize()
+    rsw.set_ir_laser_power(arg.rs_laser_power)
+    rsw.save_calibration()
+    print("Initialized RealSense devices...")
+
     rsw.dummy_capture(30)
 
     print("Starting frame capture loop...")
