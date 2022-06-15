@@ -147,7 +147,7 @@ void rs2wrapper::save_calib()
         }
     }
 
-    std::cout << "Save camera calibration data..." << std::endl;
+    std::cout << "Saved camera calibration data..." << std::endl;
 }
 
 std::string pad_zeros(const std::string &in_str, const size_t &num_zeros)

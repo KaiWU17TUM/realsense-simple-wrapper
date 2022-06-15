@@ -1,3 +1,6 @@
+# Network part is based on :
+# https://github.com/IntelRealSense/librealsense/blob/master/wrappers/python/examples/net_viewer.py
+
 import argparse
 import cv2
 import json
@@ -559,6 +562,8 @@ class RealsenseWrapper:
                 path = os.path.join(storage_paths.calib, filename)
                 with open(path, 'w') as outfile:
                     json.dump(calib_data, outfile, indent=4)
+
+        print("Saved camera calibration data...")
 
 
 def read_realsense_calibration(file_path: str):

@@ -37,3 +37,5 @@ if __name__ == "__main__":
 
     finally:
         rsw.stop()
+
+    print("Finished")
