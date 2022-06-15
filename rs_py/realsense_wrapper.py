@@ -70,7 +70,8 @@ class StoragePaths:
         self.depth = f'{base_path}/depth/{date_time}_dev{device_sn}'
         self.timestamp = f'{base_path}/timestamp/{date_time}_dev{device_sn}'
         self.timestamp_file = os.path.join(self.timestamp, 'timestamp.txt')
-        os.makedirs(self.meta, exist_ok=True)
+        os.makedirs(self.meta_color, exist_ok=True)
+        os.makedirs(self.meta_depth, exist_ok=True)
         os.makedirs(self.calib, exist_ok=True)
         os.makedirs(self.color, exist_ok=True)
         os.makedirs(self.depth, exist_ok=True)
