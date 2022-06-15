@@ -229,7 +229,21 @@ class RealsenseWrapper:
             # Stored the enabled devices
             self.enabled_devices[device_serial] = (
                 Device(pipeline, pipeline_profile, product_line))
-            print(f'[INFO] : Enabled device with SN : {device_serial}')
+
+            print("========================================")
+            print(">>>>> camera info <<<<<")
+            print("========================================")
+            print(f'Name          : {pipeline_profile.get_device().get_info(rs.camera_info.name)}')  # noqa
+            print(f'Serial Number : {pipeline_profile.get_device().get_info(rs.camera_info.serial_number)}')  # noqa
+            try:
+                print(f'Product Line  : {pipeline_profile.get_device().get_info(rs.camera_info.product_line)}')  # noqa
+            except e:
+                print(f'Product Line  : not available', e)
+            try:
+                print(f'Firmware      : {pipeline_profile.get_device().get_info(rs.camera_info.firmware_version)}')  # noqa
+            except e:
+                print(f'Firmware      : not available', e)  # noqa
+            print("========================================")
 
             # Check which timestamp is available.
             if len(self.storage_paths_per_dev) > 0:
