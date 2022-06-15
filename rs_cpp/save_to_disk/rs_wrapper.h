@@ -10,6 +10,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
+#include <map>
+#include <time.h>
 #include <cstdlib>
 #include <fstream>  // File IO
 #include <iostream> // Terminal IO
@@ -166,8 +168,18 @@ class rs2wrapper : public rs2args
 
     rs2::config cfg;
     rs2::pipeline pipe;
+    rs2::pipeline_profile profile;
+
     // Declare depth colorizer for pretty visualization of depth data
     rs2::colorizer color_map;
+
+    // Paths for saving data
+    std::map<std::string, std::string> path_map{
+        {"Color", ""},
+        {"Depth", ""},
+        {"MetaColor", ""},
+        {"MetaDepth", ""},
+        {"Calib", ""}};
 
 public:
     /**
@@ -178,6 +190,11 @@ public:
      * @param ctx An insstance of rs2::context .
      */
     rs2wrapper(int argc, char *argv[], rs2::context ctx = rs2::context());
+    /**
+     * @brief Creates the required directories to save data
+     *
+     */
+    void create_directories();
     /**
      * @brief Flushes N initial frames o give autoexposure, etc. a chance to settle.
      *
@@ -193,4 +210,6 @@ public:
      * @param save_file_prefix Prefix for the save file.
      */
     void step(const std::string &save_file_prefix);
+
+    void save_calib();
 };
