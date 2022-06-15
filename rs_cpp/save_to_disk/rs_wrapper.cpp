@@ -17,7 +17,7 @@ void rs2wrapper::initialize()
     {
         rs2::context ctx;
         rs2::net_device dev(ip());
-        std::cout << "IP address found..." << std::endl;
+        std::cout << "[INFO] : IP address found..." << std::endl;
         dev.add_to(ctx);
         pipe = rs2::pipeline(ctx);
     }
@@ -25,8 +25,17 @@ void rs2wrapper::initialize()
     cfg.enable_stream(RS2_STREAM_COLOR, width(), height(), RS2_FORMAT_RGB8, fps());
     cfg.enable_stream(RS2_STREAM_DEPTH, width(), height(), RS2_FORMAT_Z16, fps());
     profile = pipe.start(cfg);
-    std::cout << "Pipeline started..." << std::endl;
-    std::cout << "Initialized realsense device..." << std::endl;
+
+    std::cout << "[INFO] : Pipeline started..." << std::endl;
+    std::cout << "[INFO] : Initialized realsense device..." << std::endl;
+
+    std::cout << "========================================" << std::endl;
+    std::cout << ">>>>> RS2_CAMERA_INFO <<<<<" << std::endl;
+    std::cout << "========================================" << std::endl;
+    std::cout << "Name          : " << profile.get_device().get_info(RS2_CAMERA_INFO_NAME) << std::endl;
+    std::cout << "Serial Number : " << profile.get_device().get_info(RS2_CAMERA_INFO_SERIAL_NUMBER) << std::endl;
+    std::cout << "Firmware      : " << profile.get_device().get_info(RS2_CAMERA_INFO_FIRMWARE_VERSION) << std::endl;
+    std::cout << "========================================" << std::endl;
 }
 
 void rs2wrapper::create_directories()
@@ -57,7 +66,7 @@ void rs2wrapper::initial_flush(const int &num_frames)
 {
     for (auto i = 0; i < num_frames; ++i)
         pipe.wait_for_frames();
-    std::cout << "Flushed 30 initial frames..." << std::endl;
+    std::cout << "[INFO] : Flushed 30 initial frames..." << std::endl;
 }
 
 void rs2wrapper::step(const std::string &save_file_prefix)
@@ -83,7 +92,7 @@ void rs2wrapper::step(const std::string &save_file_prefix)
             std::string png_file = path_map[stream_name] + "/" +
                                    prefix + ".bin";
             framedata_to_bin(frame, png_file);
-            std::cout << "Saved " << png_file << std::endl;
+            std::cout << "[INFO] : Saved " << png_file << std::endl;
 
             rs2_intrinsics intrinsics = vfsp.as<rs2::video_stream_profile>().get_intrinsics();
             rs2_extrinsics extrinsics = vfsp.get_extrinsics_to(vfsp);
@@ -147,7 +156,7 @@ void rs2wrapper::save_calib()
         }
     }
 
-    std::cout << "Saved camera calibration data..." << std::endl;
+    std::cout << "[INFO] : Saved camera calibration data..." << std::endl;
 }
 
 std::string pad_zeros(const std::string &in_str, const size_t &num_zeros)

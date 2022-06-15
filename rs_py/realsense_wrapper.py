@@ -363,7 +363,7 @@ class RealsenseWrapper:
         Args:
             num_frames (int): Number of dummy frames to skip. Defaults to 30.
         """
-        print("Capturing dummy frames...")
+        print("[INFO] : Capturing dummy frames...")
         frames = {}
         for _ in range(num_frames):
             while len(frames) < len(self.enabled_devices.items()):
@@ -372,7 +372,7 @@ class RealsenseWrapper:
                     frameset = dev.pipeline.poll_for_frames()
                     if frameset.size() == len(streams):
                         frames[dev_sn] = {}
-        print("Finished capturing dummy frames...")
+        print("[INFO] : Finished capturing dummy frames...")
 
     def step(self, display: int = 0, save_depth_colormap: bool = False) -> dict:
         """Gets the frames streamed from the enabled rs devices.
@@ -387,7 +387,7 @@ class RealsenseWrapper:
                 data_type = color, depth, timestamp, calib
         """
         if len(self.enabled_devices) == 0:
-            print("No devices are enabled...")
+            print("[WARN] : No devices are enabled...")
             return {}
 
         frames = {}
@@ -448,7 +448,7 @@ class RealsenseWrapper:
     def stop(self) -> None:
         """Stops the devices. """
         if len(self.enabled_devices) == 0:
-            print("No devices are enabled...")
+            print("[WARN] : No devices are enabled...")
         else:
             for _, dev in self.enabled_devices.items():
                 dev.pipeline.stop()
@@ -492,7 +492,7 @@ class RealsenseWrapper:
         """Saves camera calibration. """
 
         if len(self.enabled_devices) == 0:
-            print("No devices are enabled...")
+            print("[WARN] : No devices are enabled...")
             return
 
         for dev_sn, dev in self.enabled_devices.items():
@@ -563,7 +563,7 @@ class RealsenseWrapper:
                 with open(path, 'w') as outfile:
                     json.dump(calib_data, outfile, indent=4)
 
-        print("Saved camera calibration data...")
+        print("[INFO] : Saved camera calibration data...")
 
 
 def read_realsense_calibration(file_path: str):

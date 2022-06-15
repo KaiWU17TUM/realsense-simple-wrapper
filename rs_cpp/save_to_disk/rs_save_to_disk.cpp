@@ -23,7 +23,7 @@ try
 
     if (argc != 5 && argc != 6)
     {
-        std::cout << "Please enter fps, height, width, save path, {ipaddress}" << std::endl;
+        std::cout << "[ERROR] : Please enter fps, height, width, save path, {ipaddress}" << std::endl;
         throw std::invalid_argument("There should be 4 or 5 arguments");
     }
 
