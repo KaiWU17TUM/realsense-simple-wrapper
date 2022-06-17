@@ -135,7 +135,7 @@ cmake .. \
   -DFORCE_RSUSB_BACKEND=ON
 make -j$(($(nproc) - 1))
 make -j1
-# sudo make install
+sudo make install
 
 printf "\n${GREEN}================================================================================\n"
 printf "OpenCV and Numpy\n"
