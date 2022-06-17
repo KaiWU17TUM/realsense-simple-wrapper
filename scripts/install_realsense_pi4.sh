@@ -23,9 +23,9 @@ con_dev=$(ls /dev/video* | wc -l)
 exec 2>&3
 
 if [ $con_dev -ne 0 ]; then
-  printf "\n{GREEN}"
+  printf "\n${GREEN}"
   read -p "Remove all RealSense cameras attached. Hit any key when ready"
-  printf "\n{NC}"
+  printf "\n${NC}"
 fi
 
 # Checks
@@ -41,8 +41,11 @@ sudo apt-get update --allow-releaseinfo-change && sudo apt-get dist-upgrade -y
 MAJOR_VERSION=$(uname -r | awk -F '.' '{print $1}')
 MINOR_VERSION=$(uname -r | awk -F '.' '{print $2}')
 if [ $MAJOR_VERSION -ge 5 ] && [ $MINOR_VERSION -ge 10 ] || [ $MAJOR_VERSION -ge 6 ]; then
-  echo "$(uname -r) is >= than 5.10"
+  printf "Linux Kernel : $(uname -r) is >= 5.10"
 else
+  printf "Linux Kernel : $(uname -r) is < 5.10"
+  printf "But it has been updated in the previous command."
+  printf "Rebooting..."
   sudo reboot
 fi
 
@@ -81,7 +84,7 @@ git clone --depth=1 -b v3.10.0 https://github.com/google/protobuf.git
 cd protobuf
 ./autogen.sh
 ./configure
-make -j$(($(nproc) - 2))
+make -j$(($(nproc) - 1))
 sudo make install
 cd python
 export LD_LIBRARY_PATH=../src/.libs
@@ -130,7 +133,7 @@ cmake .. \
   -DPYTHON_EXECUTABLE=$(which python3) \
   -DBUILD_SHARED_LIBS:BOOL=ON \
   -DFORCE_RSUSB_BACKEND=ON
-# make -j$(($(nproc) - 2))
+make -j$(($(nproc) - 1))
 make -j1
 # sudo make install
 
