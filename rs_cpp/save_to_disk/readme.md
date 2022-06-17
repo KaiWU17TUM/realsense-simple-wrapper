@@ -1,5 +1,7 @@
 # rs-save-to-disk Sample
 
+THIS IS THE OFFICIAL README.MD FROM THE REALSENSE EXAMPLE : librealsense/examples/save-to-disk/rs-save-to-disk.cpp
+
 ## Overview
 
 This sample demonstrates how to configure the camera for streaming in a textual environment and save depth and color data to PNG format. In addition, it touches on the subject of [per-frame metadata](../../doc/frame_metadata.md)
