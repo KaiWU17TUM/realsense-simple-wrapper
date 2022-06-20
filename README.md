@@ -34,19 +34,19 @@ Once kernel patching is done, the RS SDK can be installed/upgraded by following 
 
 ## Data transmission testing
 
-| Setting                    | C Read | C Write | D Read |   D Write    |  FPS  | Status                                 |
-| :------------------------- | :----: | :-----: | :----- | :----------: | :---: | :------------------------------------- |
-| pyrealsense2_net 640x480   |   Y    |    Y    | Y      |      Y       |   6   | OK                                     |
-| pyrealsense2_net 640x480   |   Y    |    Y    | Y      |      Y       |  15   | OK                                     |
-| pyrealsense2_net 640x480   |   Y    |    Y    | Y      |      Y       |  30   | Fail, randomly jitters between 5-15fps |
-| realsense2-net c++ 640x480 |   Y    |    Y    | Y      | Y (colormap) |   6   | OK                                     |
-| realsense2-net c++ 640x480 |   Y    |    Y    | Y      | Y (colormap) |  15   | Fail, randomly jitters between 5fps    |
-| realsense2-net c++ 640x480 |   Y    |    Y    | Y      | Y (colormap) |  30   | Fail, randomly jitters between 5fps    |
-| realsense2-net c++ 640x480 |   Y    |    Y    | Y      |      Y       |   6   | OK                                     |
-| realsense2-net c++ 640x480 |   Y    |    Y    | Y      |      Y       |  15   | OK                                     |
-| realsense2-net c++ 640x480 |   Y    |    Y    | Y      |      Y       |  30   | Fail, randomly jitters between 5-15fps |
-| usbip 640x480              |   Y    |    Y    | Y      |      N       |   6   | Fail, randomly drops 1-2 frames        |
-| usbip 640x480              |   Y    |    Y    | Y      |      N       |  15   | Fail, randomly jitters between 2-6fps  |
+| Setting                    | C Read | C Write | D Read |    D Write    |  FPS  | Status                                 |
+| :------------------------- | :----: | :-----: | :----: | :-----------: | :---: | :------------------------------------- |
+| pyrealsense2_net 640x480   |   X    |    X    |   X    |       X       |   6   | OK                                     |
+| pXrealsense2_net 640x480   |   X    |    X    |   X    |       X       |  15   | OK                                     |
+| pXrealsense2_net 640x480   |   X    |    X    |   X    |       X       |  30   | Fail, randomly jitters between 5-15fps |
+| realsense2-net c++ 640x480 |   X    |    X    |   X    | X (+colormap) |   6   | OK                                     |
+| realsense2-net c++ 640x480 |   X    |    X    |   X    | X (+colormap) |  15   | Fail, randomly jitters between 5fps    |
+| realsense2-net c++ 640x480 |   X    |    X    |   X    | X (+colormap) |  30   | Fail, randomly jitters between 5fps    |
+| realsense2-net c++ 640x480 |   X    |    X    |   X    |       X       |   6   | OK                                     |
+| realsense2-net c++ 640x480 |   X    |    X    |   X    |       X       |  15   | OK                                     |
+| realsense2-net c++ 640x480 |   X    |    X    |   X    |       X       |  30   | Fail, randomly jitters between 5-15fps |
+| usbip wifi 640x480         |   X    |    X    |   X    |               |   6   | Fail, randomly drops 1-2 frames        |
+| usbip wifi 640x480         |   X    |    X    |   X    |               |  15   | Fail, randomly jitters between 2-6fps  |
 
 ## Good to know
 
@@ -86,10 +86,19 @@ WantedBy=multi-user.target
 ```
 
 ### 4. `-DFORCE_LIBUVC=true` vs `-DFORCE_RSUSB_BACKEND=true`
-The former is an old flag of the latter one [link](https://github.com/IntelRealSense/librealsense/issues/7144).
+The former is an old flag of the latter one. See [here](https://github.com/IntelRealSense/librealsense/issues/7144).
 
 ### 5. Metadata extraction
 The extraction of metadata is supported in windows but requires kernel patching for linux OS. See [here](https://github.com/IntelRealSense/librealsense/blob/master/doc/frame_metadata.md#os-support) and [here](https://github.com/IntelRealSense/librealsense/issues/7039).
 
-### 6. bug in align for python with rs_net
+### 6. Bug in align for python with rs_net
 When align is used with rs_net device, the resulting depth images is all zeros.
+
+### 7. Depthmap color visualization
+The rs2::colorizer class performs histogram equalization and thus performs differently compared to the colorizing example using opencv. See [here](https://github.com/IntelRealSense/librealsense/issues/1310).
+
+### 8. Depth filter example
+See [here](https://github.com/IntelRealSense/librealsense/blob/jupyter/notebooks/depth_filters.ipynb). 
+
+### 9. Multi IP connection using realsense_net is not supported
+See [here](https://github.com/IntelRealSense/librealsense/issues/6376)
