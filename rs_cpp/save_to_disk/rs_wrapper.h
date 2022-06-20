@@ -193,10 +193,11 @@ public:
      * @brief Creates the required directories to save data
      *
      */
-    void create_directories();
+    void create_directories(const char *device_sn,
+                            const char *base_path);
     /**
      * @brief Initialize the realsense devices.
-     * 
+     *
      */
     void initialize();
     /**
