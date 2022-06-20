@@ -72,14 +72,14 @@ class CalibrationConfig:
 
 class StoragePaths:
     def __init__(self, device_sn: str = '', base_path: str = '/data/realsense'):
-        super().__init__()
         date_time = datetime.now().strftime("%y%m%d%H%M%S")
-        self.meta_color = f'{base_path}/meta_color/{date_time}_dev{device_sn}'
-        self.meta_depth = f'{base_path}/meta_depth/{date_time}_dev{device_sn}'
-        self.calib = f'{base_path}/calib/{date_time}_dev{device_sn}'
-        self.color = f'{base_path}/color/{date_time}_dev{device_sn}'
-        self.depth = f'{base_path}/depth/{date_time}_dev{device_sn}'
-        self.timestamp = f'{base_path}/timestamp/{date_time}_dev{device_sn}'
+        device_path = os.path.join(base_path, f'dev_{device_sn}', date_time)
+        self.meta_color = os.path.join(device_path, 'meta_color')
+        self.meta_depth = os.path.join(device_path, 'meta_depth')
+        self.calib = os.path.join(device_path, 'calib')
+        self.color = os.path.join(device_path, 'color')
+        self.depth = os.path.join(device_path, 'depth')
+        self.timestamp = os.path.join(device_path, 'timestamp')
         self.timestamp_file = os.path.join(self.timestamp, 'timestamp.txt')
         os.makedirs(self.meta_color, exist_ok=True)
         os.makedirs(self.meta_depth, exist_ok=True)
@@ -297,7 +297,7 @@ class RealsenseWrapper:
                 else:
                     sensor.set_option(rs.option.laser_power, power + 10)
 
-    def get_timestamp(self, frame: rs.frame):
+    def get_timestamp(self, frame: rs.frame) -> int:
         if self.timestamp_mode is None:
             return -1
         else:

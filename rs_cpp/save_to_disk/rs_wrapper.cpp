@@ -6,8 +6,6 @@ rs2wrapper::rs2wrapper(int argc, char *argv[]) : rs2args(argc, argv)
 {
     // prints out info
     info();
-    // Create save directory
-    create_directories();
 }
 
 void rs2wrapper::initialize()
@@ -26,6 +24,8 @@ void rs2wrapper::initialize()
     cfg.enable_stream(RS2_STREAM_DEPTH, width(), height(), RS2_FORMAT_Z16, fps());
     profile = pipe.start(cfg);
 
+    const char *dev_sn = profile.get_device().get_info(RS2_CAMERA_INFO_SERIAL_NUMBER);
+
     std::cout << "[INFO] : Pipeline started..." << std::endl;
     std::cout << "[INFO] : Initialized realsense device..." << std::endl;
 
@@ -43,16 +43,27 @@ void rs2wrapper::initialize()
         std::cout << "not available, " << e.what() << std::endl;
     }
     std::cout << "========================================" << std::endl;
+
+    // Create save directory
+    create_directories(dev_sn, save_path());
 }
 
-void rs2wrapper::create_directories()
+void rs2wrapper::create_directories(const char *device_sn,
+                                    const char *base_path)
 {
+    std::string path;
     // Base
-    mkdir(save_path(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+    path = (std::string)save_path();
+    mkdir(path.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+    // Device
+    path.append("/");
+    path.append(device_sn);
+    mkdir(path.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
     // System time
     time_t current_time;
     time(&current_time);
-    auto path = (std::string)save_path() + "/" + std::to_string(current_time);
+    path.append("/");
+    path.append(std::to_string(current_time));
     mkdir(path.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
     // Calib
     path_map["Calib"] = path + "/Calib";
