@@ -21,9 +21,10 @@ if __name__ == "__main__":
     try:
         c = 0
         while True:
+            print("[INFO] : step")
             frames = rsw.step(display=arg.rs_display_frame)
             if not len(frames) > 0:
-                print("[WARN] Empty...")
+                print("[WARN] : Empty...")
                 continue
             c += 1
             if c > arg.rs_fps * 10:
@@ -31,11 +32,11 @@ if __name__ == "__main__":
 
     except Exception as e:
         print("[ERROR]", e)
-        print("[INFO] Stopping RealSense devices...")
+        print("[INFO] : Stopping RealSense devices...")
         rsw.stop()
 
     finally:
-        print("[INFO] Stopping RealSense devices...")
+        print("[INFO] : Stopping RealSense devices...")
         rsw.stop()
 
-    print("[INFO] Finished")
+    print("[INFO] : Finished")
