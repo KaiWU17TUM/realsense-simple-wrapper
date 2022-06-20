@@ -122,21 +122,21 @@ class RealsenseWrapper:
 
         # device data
         if arg.rs_ip is not None:
+            # No multi ethernet support.
+            # https://github.com/IntelRealSense/librealsense/issues/6376
             print(f'[INFO] : Network mode')
             self.network = True
             self.available_devices = []
-            self.ctx = []
-            for ip in arg.rs_ip:
-                ctx = rs.context()
-                self.ctx.append(ctx)
-                dev = rsnet.net_device(ip)
-                self.available_devices.append(
-                    (dev.get_info(rs.camera_info.serial_number), None))
-                dev.add_to(ctx)
-                print(f'[INFO] : Connected to {ip}')
+            self.ctx = rs.context()
+            dev = rsnet.net_device(arg.rs_ip)
+            self.available_devices.append(
+                (dev.get_info(rs.camera_info.serial_number), None))
+            dev.add_to(self.ctx)
+            print(f'[INFO] : Connected to {arg.rs_ip}')
         else:
             print(f'[INFO] : Local mode')
             self.network = False
+            self.ctx = rs.context()
             self.available_devices = enumerate_connected_devices(self.ctx)
 
         if arg.rs_use_one_dev_only:
@@ -180,20 +180,18 @@ class RealsenseWrapper:
             enable_ir_emitter (bool, optional): Enable the IR for beter
                 depth quality. Defaults to True.
         """
-        if len(self._rs_cfg) == 0:
-            self.configure_stream('default',
+        for device_sn, product_line in self.available_devices:
+            self.configure_stream(device_sn,
                                   self.stream_config_depth,
                                   self.stream_config_color)
 
-        for i, (device_sn, product_line) in enumerate(self.available_devices):
-
             # Pipeline
             if self.network:
-                pipeline = rs.pipeline(self.ctx[i])
+                pipeline = rs.pipeline(self.ctx)
             else:
                 pipeline = rs.pipeline()
 
-            cfg = self._rs_cfg.get(device_sn, self._rs_cfg['default'])
+            cfg = self._rs_cfg[device_sn]
 
             if not self.network:
                 cfg.enable_device(device_sn)
@@ -318,7 +316,7 @@ class RealsenseWrapper:
         Args:
             device_sn (str, optional): serial number. Defaults to None.
         """
-        if device_sn is not None:
+        if device_sn is not None and device_sn not in self._rs_cfg:
             cfg = rs.config()
             if stream_config_depth is not None:
                 cfg.enable_stream(**stream_config_depth.data)
@@ -690,8 +688,8 @@ def get_parser() -> argparse.ArgumentParser:
                         default=False,
                         help='use 1 rs device only.')
     parser.add_argument('--rs-ip',
-                        nargs='*',
-                        # type=str,
+                        # nargs='*',
+                        type=str,
                         # default='192.168.100.39',  # 101 LAN
                         # default='192.168.1.216',  # 101 WLAN
                         # default='192.168.1.11',  # 102 WLAN
