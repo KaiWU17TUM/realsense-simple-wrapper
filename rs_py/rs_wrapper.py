@@ -418,7 +418,7 @@ class RealsenseWrapper:
                 'intrinsic_mat': [intr_color.fx, 0, intr_color.ppx,
                                   0, intr_color.fy, intr_color.ppy,
                                   0, 0, 1],
-                'model': intr_color.model,
+                'model': str(intr_color.model),
                 'coeffs': intr_color.coeffs
             })
             calib_config.depth.append({
@@ -427,7 +427,7 @@ class RealsenseWrapper:
                 'intrinsic_mat': [intr_depth.fx, 0, intr_depth.ppx,
                                   0, intr_depth.fy, intr_depth.ppy,
                                   0, 0, 1],
-                'model': intr_depth.model,
+                'model': str(intr_depth.model),
                 'coeffs': intr_depth.coeffs,
                 'depth_scale': depth_scale,
                 'depth_baseline': depth_baseline
