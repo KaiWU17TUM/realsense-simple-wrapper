@@ -20,46 +20,54 @@ except ImportError as e:
 
 from datetime import datetime
 from functools import partial
-from typing import Optional, Type, Tuple
+from typing import Optional, Tuple, Union
 
 from rs_py.realsense_device_manager import Device
 from rs_py.realsense_device_manager import enumerate_connected_devices
 from rs_py.realsense_device_manager import post_process_depth_frame
 
-METADATA_VALUE_LIST = [
-    rs.frame_metadata_value.actual_exposure,
-    rs.frame_metadata_value.actual_fps,
-    rs.frame_metadata_value.auto_exposure,
-    rs.frame_metadata_value.auto_white_balance_temperature,
-    rs.frame_metadata_value.backend_timestamp,
-    rs.frame_metadata_value.backlight_compensation,
-    rs.frame_metadata_value.brightness,
-    rs.frame_metadata_value.contrast,
-    rs.frame_metadata_value.exposure_priority,
-    rs.frame_metadata_value.exposure_roi_bottom,
-    rs.frame_metadata_value.exposure_roi_left,
-    rs.frame_metadata_value.exposure_roi_right,
-    rs.frame_metadata_value.exposure_roi_top,
-    rs.frame_metadata_value.frame_counter,
-    rs.frame_metadata_value.frame_emitter_mode,
-    rs.frame_metadata_value.frame_laser_power,
-    rs.frame_metadata_value.frame_laser_power_mode,
-    rs.frame_metadata_value.frame_led_power,
-    rs.frame_metadata_value.frame_timestamp,
-    rs.frame_metadata_value.gain_level,
-    rs.frame_metadata_value.gamma,
-    rs.frame_metadata_value.hue,
-    rs.frame_metadata_value.low_light_compensation,
-    rs.frame_metadata_value.manual_white_balance,
-    rs.frame_metadata_value.power_line_frequency,
-    rs.frame_metadata_value.raw_frame_size,
-    rs.frame_metadata_value.saturation,
-    rs.frame_metadata_value.sensor_timestamp,
-    rs.frame_metadata_value.sharpness,
-    rs.frame_metadata_value.temperature,
-    rs.frame_metadata_value.time_of_arrival,
-    rs.frame_metadata_value.white_balance,
-]
+
+class CalibrationConfig:
+    def __init__(self):
+        self.device_sn = []
+        self.color = []
+        self.depth = []
+        self.T_color_depth = []
+
+    def save(self, file_path: str) -> None:
+        self.validate()
+        with open(file_path, 'w') as outfile:
+            json.dump(self.__dict__, outfile, indent=4)
+
+    def load(self, file_path: str) -> None:
+        with open(file_path) as calib_file:
+            calib_data = json.load(calib_file)
+        self.__dict__.update(calib_data)
+        self.validate()
+
+    def get_T_color_depth(self, idx: int) -> np.ndarray:
+        T_color_depth = np.eye(4)
+        T_color_depth[:3, :3] = np.array(self.T_color_depth[idx]['rotation']).reshape(3, 3)  # noqa
+        T_color_depth[:3, 3] = self.T_color_depth[idx]['translation']
+        return T_color_depth
+
+    def get_data(self, device_sn_idx: Union[int, str]):
+        if isinstance(device_sn_idx, int):
+            idx = device_sn_idx
+        elif isinstance(device_sn_idx, str):
+            idx = self.device_sn.index(device_sn_idx)
+        else:
+            raise ValueError("Unknown input arguemtn type...")
+        return {
+            'color': self.color[idx],
+            'depth': self.depth[idx],
+            'T_color_depth': self.get_T_color_depth(idx),
+        }
+
+    def validate(self) -> bool:
+        assert len(self.device_sn) == len(self.color)
+        assert len(self.device_sn) == len(self.depth)
+        assert len(self.device_sn) == len(self.T_color_depth)
 
 
 class StoragePaths:
@@ -511,11 +519,21 @@ class RealsenseWrapper:
             print("[WARN] : No devices are enabled...")
             return
 
+        calib_config = CalibrationConfig()
         for dev_sn, dev in self.enabled_devices.items():
 
             storage_paths = self.storage_paths_per_dev.get(dev_sn, None)
             if storage_paths is None:
                 continue
+
+            assert os.path.exists(storage_paths.calib)
+            if os.path.isfile(storage_paths.calib):
+                save_path = storage_paths.calib
+            else:
+                filename = f'dev{dev_sn}_calib.txt'
+                save_path = os.path.join(storage_paths.calib, filename)
+
+            calib_config.device_sn.append(dev_sn)
 
             profile = dev.pipeline_profile
 
@@ -538,77 +556,87 @@ class RealsenseWrapper:
             extr_mat[:3, 3] = extr.translation
 
             # Depth scale ------------------------------------------------------
+            # for sensor in profile.get_device().query_sensors():
+            #     if sensor.is_depth_sensor():
             depth_sensor = profile.get_device().first_depth_sensor()
+            depth_sensor = rs.depth_stereo_sensor(depth_sensor)
             depth_scale = depth_sensor.get_depth_scale()
-            # print("Depth Scale is: ", depth_scale)
+            depth_baseline = depth_sensor.get_stereo_baseline()
 
             # Write calibration data to json file ------------------------------
-            calib_data = {}
-            calib_data['color'] = []
-            calib_data['color'].append({
+            calib_config.color.append({
                 'width': intr_color.width,
                 'height': intr_color.height,
                 'intrinsic_mat': [intr_color.fx, 0, intr_color.ppx,
                                   0, intr_color.fy, intr_color.ppy,
-                                  0, 0, 1]
+                                  0, 0, 1],
+                'model': intr_color.model,
+                'coeffs': intr_color.coeffs
             })
-            calib_data['depth'] = []
-            calib_data['depth'].append({
+            calib_config.depth.append({
                 'width': intr_depth.width,
                 'height': intr_depth.height,
                 'intrinsic_mat': [intr_depth.fx, 0, intr_depth.ppx,
                                   0, intr_depth.fy, intr_depth.ppy,
                                   0, 0, 1],
-                'depth_scale': depth_scale
+                'model': intr_depth.model,
+                'coeffs': intr_depth.coeffs,
+                'depth_scale': depth_scale,
+                'depth_baseline': depth_baseline
             })
-            calib_data['T_color_depth'] = []
-            calib_data['T_color_depth'].append({
+            calib_config.T_color_depth.append({
                 'rotation': extr.rotation,
                 'translation': extr.translation
             })
 
-            self.calib_data[dev_sn] = calib_data
-
-            assert os.path.exists(storage_paths.calib)
-            if os.path.isfile(storage_paths.calib):
-                with open(storage_paths.calib, 'w') as outfile:
-                    json.dump(calib_data, outfile, indent=4)
-            else:
-                filename = f'dev{dev_sn}_calib.txt'
-                path = os.path.join(storage_paths.calib, filename)
-                with open(path, 'w') as outfile:
-                    json.dump(calib_data, outfile, indent=4)
+            calib_config.save(save_path)
 
         print("[INFO] : Saved camera calibration data...")
 
 
-def read_realsense_calibration(file_path: str):
-
-    class RealsenseConfig:
-        def __init__(self, json_data: dict):
-            self.width = json_data['color'][0]['width']
-            self.height = json_data['color'][0]['height']
-            self.color_intrinsics = np.array(json_data['color'][0]['intrinsic_mat']).reshape(3, 3)  # noqa
-            self.depth_intrinsics = np.array(json_data['depth'][0]['intrinsic_mat']).reshape(3, 3)  # noqa
-            self.depth_scale = json_data['depth'][0]['depth_scale']
-            self.T_color_depth = np.eye(4)
-            self.T_color_depth[:3, :3] = np.array(json_data['T_color_depth'][0]['rotation']).reshape(3, 3)  # noqa
-            self.T_color_depth[:3, 3] = json_data['T_color_depth'][0]['translation']  # noqa
-
-    with open(file_path) as calib_file:
-        calib = json.load(calib_file)
-    return RealsenseConfig(calib)
-
-
-def read_metadata(frame: rs.frame):
+def read_metadata(frame: rs.frame) -> dict:
+    frame_metadata_value_list = [
+        rs.frame_metadata_value.actual_exposure,
+        rs.frame_metadata_value.actual_fps,
+        rs.frame_metadata_value.auto_exposure,
+        rs.frame_metadata_value.auto_white_balance_temperature,
+        rs.frame_metadata_value.backend_timestamp,
+        rs.frame_metadata_value.backlight_compensation,
+        rs.frame_metadata_value.brightness,
+        rs.frame_metadata_value.contrast,
+        rs.frame_metadata_value.exposure_priority,
+        rs.frame_metadata_value.exposure_roi_bottom,
+        rs.frame_metadata_value.exposure_roi_left,
+        rs.frame_metadata_value.exposure_roi_right,
+        rs.frame_metadata_value.exposure_roi_top,
+        rs.frame_metadata_value.frame_counter,
+        rs.frame_metadata_value.frame_emitter_mode,
+        rs.frame_metadata_value.frame_laser_power,
+        rs.frame_metadata_value.frame_laser_power_mode,
+        rs.frame_metadata_value.frame_led_power,
+        rs.frame_metadata_value.frame_timestamp,
+        rs.frame_metadata_value.gain_level,
+        rs.frame_metadata_value.gamma,
+        rs.frame_metadata_value.hue,
+        rs.frame_metadata_value.low_light_compensation,
+        rs.frame_metadata_value.manual_white_balance,
+        rs.frame_metadata_value.power_line_frequency,
+        rs.frame_metadata_value.raw_frame_size,
+        rs.frame_metadata_value.saturation,
+        rs.frame_metadata_value.sensor_timestamp,
+        rs.frame_metadata_value.sharpness,
+        rs.frame_metadata_value.temperature,
+        rs.frame_metadata_value.time_of_arrival,
+        rs.frame_metadata_value.white_balance,
+    ]
     output = {}
-    for i in METADATA_VALUE_LIST:
+    for i in frame_metadata_value_list:
         if frame.supports_frame_metadata(i):
             output[i.name] = frame.get_frame_metadata(i)
     return output
 
 
-def str2bool(v):
+def str2bool(v) -> bool:
     if v.lower() in ('yes', 'true', 't', 'y', '1'):
         return True
     elif v.lower() in ('no', 'false', 'f', 'n', '0'):
@@ -617,7 +645,7 @@ def str2bool(v):
         raise argparse.ArgumentTypeError('Boolean value expected.')
 
 
-def get_parser():
+def get_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description='Run RealSense devices.')
     parser.add_argument('--rs-fps',
                         type=int,
