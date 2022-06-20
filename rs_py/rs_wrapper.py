@@ -123,17 +123,19 @@ class RealsenseWrapper:
         # device data
         self.ctx = rs.context()
         if arg.rs_ip is not None:
-            self.network = True
-            dev = rsnet.net_device(arg.rs_ip)
-            self.available_devices = [
-                (dev.get_info(rs.camera_info.serial_number), None)]
-            dev.add_to(self.ctx)
             print(f'[INFO] : Network mode')
-            print(f'[INFO] : Connected to {arg.rs_ip}')
+            self.network = True
+            self.available_devices = []
+            for ip in arg.rs_ip:
+                dev = rsnet.net_device(ip)
+                self.available_devices.append(
+                    (dev.get_info(rs.camera_info.serial_number), None))
+                dev.add_to(self.ctx)
+                print(f'[INFO] : Connected to {ip}')
         else:
+            print(f'[INFO] : Local mode')
             self.network = False
             self.available_devices = enumerate_connected_devices(self.ctx)
-            print(f'[INFO] : Local mode')
 
         if arg.rs_use_one_dev_only:
             self.available_devices = self.available_devices[0:1]
@@ -168,26 +170,7 @@ class RealsenseWrapper:
             self.storage_paths_per_dev = {sn: storage_paths_fn(sn)
                                           for sn, _ in self.available_devices}
 
-    def configure_stream(
-            self,
-            device_sn: str,
-            stream_config_depth: Optional[StreamConfig] = None,
-            stream_config_color: Optional[StreamConfig] = None) -> None:
-        """Defines per device stream configurations.
-
-        device('001622070408')
-        device('001622070717')
-
-        Args:
-            device_sn (str, optional): serial number. Defaults to None.
-        """
-        if device_sn is not None:
-            cfg = rs.config()
-            if stream_config_depth is not None:
-                cfg.enable_stream(**stream_config_depth.data)
-            if stream_config_color is not None:
-                cfg.enable_stream(**stream_config_color.data)
-            self._rs_cfg[device_sn] = cfg
+# [MAIN FUNCTIONS] *************************************************************
 
     def initialize(self, enable_ir_emitter: bool = True) -> None:
         """Initializes the device pipelines and starts them.
@@ -210,8 +193,10 @@ class RealsenseWrapper:
                 pipeline = rs.pipeline()
 
             cfg = self._rs_cfg.get(device_serial, self._rs_cfg['default'])
+
             if not self.network:
                 cfg.enable_device(device_serial)
+
             check = cfg.can_resolve(pipeline)
             print(f"[INFO] : 'cfg' usable with 'pipeline' : {check}")
 
@@ -229,165 +214,14 @@ class RealsenseWrapper:
             self.enabled_devices[device_serial] = (
                 Device(pipeline, pipeline_profile, product_line))
 
-            print("========================================")
-            print(">>>>> camera info <<<<<")
-            print("========================================")
-            print(f'Name          : {pipeline_profile.get_device().get_info(rs.camera_info.name)}')  # noqa
-            print(f'Serial Number : {pipeline_profile.get_device().get_info(rs.camera_info.serial_number)}')  # noqa
-            try:
-                print(f'Product Line  : {pipeline_profile.get_device().get_info(rs.camera_info.product_line)}')  # noqa
-            except Exception as e:
-                print(f'Product Line  : not available', e)
-            try:
-                print(f'Firmware      : {pipeline_profile.get_device().get_info(rs.camera_info.firmware_version)}')  # noqa
-            except Exception as e:
-                print(f'Firmware      : not available', e)  # noqa
-            print("========================================")
+            self._print_camera_info(pipeline_profile)
 
             # Check which timestamp is available.
             if len(self.storage_paths_per_dev) > 0:
-                wait_flag = True
-                while wait_flag:
-                    streams = pipeline_profile.get_streams()
-                    frameset = pipeline.poll_for_frames()
-                    if frameset.size() == len(streams):
-                        wait_flag = False
-                fmv = rs.frame_metadata_value
-                if frameset.supports_frame_metadata(fmv.sensor_timestamp):
-                    self.timestamp_mode = fmv.sensor_timestamp
-                    print(f'[INFO] : sensor_timestamp is being used...')
-                elif frameset.supports_frame_metadata(fmv.frame_timestamp):
-                    self.timestamp_mode = fmv.frame_timestamp
-                    print(f'[INFO] : frame_timestamp is being used...')
-                else:
-                    self.storage_paths_per_dev.pop(device_serial)
-                    print('[WARN] : Both sensor_timestamp/frame_timestamp '
-                          'are not available. No data will be saved...')
+                self._query_timestamp_mode(
+                    pipeline, pipeline_profile, device_serial)
 
         print("[INFO] : Initialized RealSense devices...")
-
-    def set_storage_paths(self, paths: StoragePaths) -> None:
-        self.storage_paths_per_dev = {sn: paths(sn)
-                                      for sn in self.enabled_devices}
-
-    def set_ir_laser_power(self, power: int = 300):
-        """Sets the power of the IR laser. If power value is too high the
-        rs connection will crash.
-
-        https://github.com/IntelRealSense/librealsense/issues/1258
-
-        Args:
-            power (int, optional): IR power. Defaults to 300.
-        """
-        for _, dev in self.enabled_devices.items():
-            sensor = dev.pipeline_profile.get_device().first_depth_sensor()
-            if sensor.supports(rs.option.emitter_enabled):
-                ir_range = sensor.get_option_range(rs.option.laser_power)
-                if power + 10 > ir_range.max:
-                    sensor.set_option(rs.option.laser_power, ir_range.max)
-                else:
-                    sensor.set_option(rs.option.laser_power, power + 10)
-
-    def get_timestamp(self, frame: rs.frame) -> int:
-        if self.timestamp_mode is None:
-            return -1
-        else:
-            return frame.get_frame_metadata(self.timestamp_mode)
-
-    def get_color_stream(self,
-                         frameset: rs.composite_frame,
-                         frame_dict: dict,
-                         storage_paths: Optional[StoragePaths] = None,
-                         ) -> Tuple[dict, np.ndarray]:
-        """Get color stream data.
-
-        Args:
-            frameset (rs.composite_frame): frameset from pipeline.
-            frame_dict (dict): dict to save the data from frameset.
-            storage_paths (Optional[StoragePaths], optional): If not None,
-                data from frameset will be stored. Defaults to None.
-
-        Returns:
-            Tuple[dict, np.ndarray]: updated frame_dict and data from framset.
-        """
-        frame = frameset.first_or_default(rs.stream.color)
-        timestamp = self.get_timestamp(frame)
-        frame_dict['timestamp_color'] = timestamp
-        frame_data = np.asanyarray(frame.get_data())
-        frame_dict['color'] = frame_data
-        if storage_paths is not None:
-            filepath = storage_paths.color
-            if filepath is not None:
-                np.save(os.path.join(filepath, f'{timestamp}'), frame_data)
-            filepath = storage_paths.meta_color
-            if filepath is not None:
-                path = os.path.join(filepath, f'{timestamp}.json')
-                with open(path, 'w') as json_f:
-                    json.dump(read_metadata(frame), json_f, indent=4)
-        return frame_dict, frame_data
-
-    def get_depth_stream(self,
-                         frameset: rs.composite_frame,
-                         frame_dict: dict,
-                         storage_paths: Optional[StoragePaths] = None,
-                         save_colormap: bool = False
-                         ) -> Tuple[dict, np.ndarray]:
-        """Get depth stream data.
-
-        Args:
-            frameset (rs.composite_frame): frameset from pipeline.
-            frame_dict (dict): dict to save the data from frameset.
-            storage_paths (Optional[StoragePaths], optional): If not None,
-                data from frameset will be stored. Defaults to None.
-            save_colormap (bool): Whether to save depth image as colormap.
-                Defaults to False.
-
-        Returns:
-            Tuple[dict, np.ndarray]: updated frame_dict and data from framset.
-        """
-        frame = frameset.first_or_default(rs.stream.depth)
-        frame = post_process_depth_frame(frame)
-        timestamp = self.get_timestamp(frame)
-        frame_dict['timestamp_depth'] = timestamp
-        frame_data = np.asanyarray(frame.get_data())
-        frame_dict['depth'] = frame_data
-        if storage_paths is not None:
-            filepath = storage_paths.depth
-            if filepath is not None:
-                np.save(os.path.join(filepath, f'{timestamp}'), frame_data)
-            if save_colormap:
-                # Apply colormap on depth image
-                # (image must be converted to 8-bit per pixel first)
-                image = cv2.applyColorMap(
-                    cv2.convertScaleAbs(frame_data, alpha=0.03),
-                    cv2.COLORMAP_JET
-                )
-                image_name = os.path.join(filepath, f'{timestamp}.jpg')
-                cv2.imwrite(image_name, image)
-            filepath = storage_paths.meta_depth
-            if filepath is not None:
-                path = os.path.join(filepath, f'{timestamp}.json')
-                with open(path, 'w') as json_f:
-                    json.dump(read_metadata(frame), json_f, indent=4)
-        return frame_dict, frame_data
-
-    def dummy_capture(self, num_frames: int = 30) -> None:
-        """Dummy capture 'num_frames' frames to give
-        autoexposure, etc. a chance to settle.
-
-        Args:
-            num_frames (int): Number of dummy frames to skip. Defaults to 30.
-        """
-        print("[INFO] : Capturing dummy frames...")
-        frames = {}
-        for _ in range(num_frames):
-            while len(frames) < len(self.enabled_devices.items()):
-                for dev_sn, dev in self.enabled_devices.items():
-                    streams = dev.pipeline_profile.get_streams()
-                    frameset = dev.pipeline.poll_for_frames()
-                    if frameset.size() == len(streams):
-                        frames[dev_sn] = {}
-        print("[INFO] : Finished capturing dummy frames...")
 
     def step(self, display: int = 0, save_depth_colormap: bool = False) -> dict:
         """Gets the frames streamed from the enabled rs devices.
@@ -433,13 +267,13 @@ class RealsenseWrapper:
                         # frame_data = frame.get_data()
                         # frame_dict[st] = frame_data
                         if st == rs.stream.color:
-                            frame_dict, frame_data = self.get_color_stream(
+                            frame_dict, frame_data = self._get_color_stream(
                                 frameset=aligned_frameset,
                                 frame_dict=frame_dict,
                                 storage_paths=storage_paths,
                             )
                         elif st == rs.stream.depth:
-                            frame_dict, frame_data = self.get_depth_stream(
+                            frame_dict, frame_data = self._get_depth_stream(
                                 frameset=aligned_frameset,
                                 frame_dict=frame_dict,
                                 storage_paths=storage_paths,
@@ -468,40 +302,64 @@ class RealsenseWrapper:
             for _, dev in self.enabled_devices.items():
                 dev.pipeline.stop()
 
-    def _display_rs_data(self, frames: dict, scale: int) -> bool:
-        terminate = False
-        for dev_sn, data_dict in frames.items():
-            # Render images
-            depth_colormap = cv2.applyColorMap(
-                cv2.convertScaleAbs(data_dict['depth'], alpha=0.03),
-                cv2.COLORMAP_JET)
-            # # Set pixels further than clipping_distance to grey
-            # clipping_distance = 10
-            # grey_color = 153
-            # # depth image is 1 channel, color is 3 channels
-            # depth_image_3d = np.dstack(
-            #     (depth_image, depth_image, depth_image))
-            # bg_removed = np.where(
-            #     (depth_image_3d > clipping_distance) | (
-            #         depth_image_3d <= 0), grey_color, color_image)
-            # images = np.hstack((bg_removed, depth_colormap))
-            # images = np.hstack((color_image, depth_colormap))
-            images_overlapped = cv2.addWeighted(
-                data_dict['color'], 0.3, depth_colormap, 0.5, 0)
-            images = np.hstack(
-                (data_dict['color'], depth_colormap, images_overlapped))
-            images = cv2.resize(images, (images.shape[1]//scale,
-                                         images.shape[0]//scale))
-            cv2.namedWindow(f'{dev_sn}', cv2.WINDOW_AUTOSIZE)
-            cv2.imshow(f'{dev_sn}', images)
-            key = cv2.waitKey(30)
-            # Press esc or 'q' to close the image window
-            if key & 0xFF == ord('q') or key == 27:
-                cv2.destroyAllWindows()
-                cv2.waitKey(5)
-                terminate = True
+# [UTIL FUNCTIONS] *************************************************************
 
-        return terminate
+    def configure_stream(
+            self,
+            device_sn: str,
+            stream_config_depth: Optional[StreamConfig] = None,
+            stream_config_color: Optional[StreamConfig] = None) -> None:
+        """Defines per device stream configurations.
+
+        device('001622070408')
+        device('001622070717')
+
+        Args:
+            device_sn (str, optional): serial number. Defaults to None.
+        """
+        if device_sn is not None:
+            cfg = rs.config()
+            if stream_config_depth is not None:
+                cfg.enable_stream(**stream_config_depth.data)
+            if stream_config_color is not None:
+                cfg.enable_stream(**stream_config_color.data)
+            self._rs_cfg[device_sn] = cfg
+
+    def set_ir_laser_power(self, power: int = 300):
+        """Sets the power of the IR laser. If power value is too high the
+        rs connection will crash.
+
+        https://github.com/IntelRealSense/librealsense/issues/1258
+
+        Args:
+            power (int, optional): IR power. Defaults to 300.
+        """
+        for _, dev in self.enabled_devices.items():
+            sensor = dev.pipeline_profile.get_device().first_depth_sensor()
+            if sensor.supports(rs.option.emitter_enabled):
+                ir_range = sensor.get_option_range(rs.option.laser_power)
+                if power + 10 > ir_range.max:
+                    sensor.set_option(rs.option.laser_power, ir_range.max)
+                else:
+                    sensor.set_option(rs.option.laser_power, power + 10)
+
+    def dummy_capture(self, num_frames: int = 30) -> None:
+        """Dummy capture 'num_frames' frames to give
+        autoexposure, etc. a chance to settle.
+
+        Args:
+            num_frames (int): Number of dummy frames to skip. Defaults to 30.
+        """
+        print("[INFO] : Capturing dummy frames...")
+        frames = {}
+        for _ in range(num_frames):
+            while len(frames) < len(self.enabled_devices.items()):
+                for dev_sn, dev in self.enabled_devices.items():
+                    streams = dev.pipeline_profile.get_streams()
+                    frameset = dev.pipeline.poll_for_frames()
+                    if frameset.size() == len(streams):
+                        frames[dev_sn] = {}
+        print("[INFO] : Finished capturing dummy frames...")
 
     def save_calibration(self) -> None:
         """Saves camera calibration. """
@@ -583,6 +441,170 @@ class RealsenseWrapper:
             calib_config.save(save_path)
 
         print("[INFO] : Saved camera calibration data...")
+
+# [PRIVATE FUNCTIONS] **********************************************************
+
+    def _query_timestamp_mode(self,
+                              pipeline: rs.pipeline,
+                              profile: rs.pipeline_profile,
+                              device_sn: str):
+        wait_flag = True
+        while wait_flag:
+            streams = profile.get_streams()
+            frameset = pipeline.poll_for_frames()
+            if frameset.size() == len(streams):
+                wait_flag = False
+        fmv = rs.frame_metadata_value
+        if frameset.supports_frame_metadata(fmv.sensor_timestamp):
+            self.timestamp_mode = fmv.sensor_timestamp
+            print(f'[INFO] : sensor_timestamp is being used...')
+        elif frameset.supports_frame_metadata(fmv.frame_timestamp):
+            self.timestamp_mode = fmv.frame_timestamp
+            print(f'[INFO] : frame_timestamp is being used...')
+        else:
+            self.storage_paths_per_dev.pop(device_sn)
+            print('[WARN] : Both sensor_timestamp/frame_timestamp '
+                  'are not available. No data will be saved...')
+
+    def _get_timestamp(self, frame: rs.frame) -> int:
+        if self.timestamp_mode is None:
+            return -1
+        else:
+            return frame.get_frame_metadata(self.timestamp_mode)
+
+    def _get_color_stream(self,
+                          frameset: rs.composite_frame,
+                          frame_dict: dict,
+                          storage_paths: Optional[StoragePaths] = None,
+                          ) -> Tuple[dict, np.ndarray]:
+        """Get color stream data.
+
+        Args:
+            frameset (rs.composite_frame): frameset from pipeline.
+            frame_dict (dict): dict to save the data from frameset.
+            storage_paths (Optional[StoragePaths], optional): If not None,
+                data from frameset will be stored. Defaults to None.
+
+        Returns:
+            Tuple[dict, np.ndarray]: updated frame_dict and data from framset.
+        """
+        frame = frameset.first_or_default(rs.stream.color)
+        timestamp = self._get_timestamp(frame)
+        frame_dict['timestamp_color'] = timestamp
+        frame_data = np.asanyarray(frame.get_data())
+        frame_dict['color'] = frame_data
+        if storage_paths is not None:
+            filepath = storage_paths.color
+            if filepath is not None:
+                np.save(os.path.join(filepath, f'{timestamp}'), frame_data)
+            filepath = storage_paths.meta_color
+            if filepath is not None:
+                path = os.path.join(filepath, f'{timestamp}.json')
+                with open(path, 'w') as json_f:
+                    json.dump(read_metadata(frame), json_f, indent=4)
+        return frame_dict, frame_data
+
+    def _get_depth_stream(self,
+                          frameset: rs.composite_frame,
+                          frame_dict: dict,
+                          storage_paths: Optional[StoragePaths] = None,
+                          save_colormap: bool = False
+                          ) -> Tuple[dict, np.ndarray]:
+        """Get depth stream data.
+
+        Args:
+            frameset (rs.composite_frame): frameset from pipeline.
+            frame_dict (dict): dict to save the data from frameset.
+            storage_paths (Optional[StoragePaths], optional): If not None,
+                data from frameset will be stored. Defaults to None.
+            save_colormap (bool): Whether to save depth image as colormap.
+                Defaults to False.
+
+        Returns:
+            Tuple[dict, np.ndarray]: updated frame_dict and data from framset.
+        """
+        frame = frameset.first_or_default(rs.stream.depth)
+        frame = post_process_depth_frame(frame)
+        timestamp = self._get_timestamp(frame)
+        frame_dict['timestamp_depth'] = timestamp
+        frame_data = np.asanyarray(frame.get_data())
+        frame_dict['depth'] = frame_data
+        if storage_paths is not None:
+            filepath = storage_paths.depth
+            if filepath is not None:
+                np.save(os.path.join(filepath, f'{timestamp}'), frame_data)
+            if save_colormap:
+                # Apply colormap on depth image
+                # (image must be converted to 8-bit per pixel first)
+                image = cv2.applyColorMap(
+                    cv2.convertScaleAbs(frame_data, alpha=0.03),
+                    cv2.COLORMAP_JET
+                )
+                image_name = os.path.join(filepath, f'{timestamp}.jpg')
+                cv2.imwrite(image_name, image)
+            filepath = storage_paths.meta_depth
+            if filepath is not None:
+                path = os.path.join(filepath, f'{timestamp}.json')
+                with open(path, 'w') as json_f:
+                    json.dump(read_metadata(frame), json_f, indent=4)
+        return frame_dict, frame_data
+
+    def _display_rs_data(self, frames: dict, scale: int) -> bool:
+        terminate = False
+        for dev_sn, data_dict in frames.items():
+            # Render images
+            depth_colormap = cv2.applyColorMap(
+                cv2.convertScaleAbs(data_dict['depth'], alpha=0.03),
+                cv2.COLORMAP_JET)
+            # # Set pixels further than clipping_distance to grey
+            # clipping_distance = 10
+            # grey_color = 153
+            # # depth image is 1 channel, color is 3 channels
+            # depth_image_3d = np.dstack(
+            #     (depth_image, depth_image, depth_image))
+            # bg_removed = np.where(
+            #     (depth_image_3d > clipping_distance) | (
+            #         depth_image_3d <= 0), grey_color, color_image)
+            # images = np.hstack((bg_removed, depth_colormap))
+            # images = np.hstack((color_image, depth_colormap))
+            images_overlapped = cv2.addWeighted(
+                data_dict['color'], 0.3, depth_colormap, 0.5, 0)
+            images = np.hstack(
+                (data_dict['color'], depth_colormap, images_overlapped))
+            images = cv2.resize(images, (images.shape[1]//scale,
+                                         images.shape[0]//scale))
+            cv2.namedWindow(f'{dev_sn}', cv2.WINDOW_AUTOSIZE)
+            cv2.imshow(f'{dev_sn}', images)
+            key = cv2.waitKey(30)
+            # Press esc or 'q' to close the image window
+            if key & 0xFF == ord('q') or key == 27:
+                cv2.destroyAllWindows()
+                cv2.waitKey(5)
+                terminate = True
+
+        return terminate
+
+    def _print_camera_info(self, profile: rs.pipeline_profile):
+        """Prints out info about the camera
+
+        Args:
+            profile (rs.pipeline_profile): pipeline_profile of a rs device.
+        """
+        _info = profile.get_device().get_info
+        print("========================================")
+        print(">>>>> camera info <<<<<")
+        print("========================================")
+        print(f'Name          : {_info(rs.camera_info.name)}')
+        print(f'Serial Number : {_info(rs.camera_info.serial_number)}')
+        try:
+            print(f'Product Line  : {_info(rs.camera_info.product_line)}')
+        except Exception as e:
+            print(f'Product Line  : not available', e)
+        try:
+            print(f'Firmware      : {_info(rs.camera_info.firmware_version)}')
+        except Exception as e:
+            print(f'Firmware      : not available', e)
+        print("========================================")
 
 
 def read_metadata(frame: rs.frame) -> dict:
