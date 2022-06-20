@@ -219,11 +219,11 @@ class RealsenseWrapper:
 
             # IR for depth
             if enable_ir_emitter:
-                depth_sensor = pipeline_profile.get_device().first_depth_sensor()
-                if depth_sensor.supports(rs.option.emitter_enabled):
-                    depth_sensor.set_option(rs.option.emitter_enabled,
-                                            1 if enable_ir_emitter else 0)
-                    # depth_sensor.set_option(rs.option.laser_power, 330)
+                d_sensor = pipeline_profile.get_device().first_depth_sensor()
+                if d_sensor.supports(rs.option.emitter_enabled):
+                    d_sensor.set_option(rs.option.emitter_enabled,
+                                        1 if enable_ir_emitter else 0)
+                    # d_sensor.set_option(rs.option.laser_power, 330)
 
             # Stored the enabled devices
             self.enabled_devices[device_serial] = (
