@@ -163,14 +163,13 @@ class RealsenseWrapper:
         # Save paths
         self.timestamp_mode = None
         self.storage_paths_per_dev = {}
-        if arg.rs_save_data:
-            if arg.rs_save_path is not None:
-                storage_paths_fn = partial(
-                    StoragePaths, base_path=arg.rs_save_path)
-            else:
-                storage_paths_fn = StoragePaths
-            self.storage_paths_per_dev = {sn: storage_paths_fn(sn)
-                                          for sn, _ in self.available_devices}
+        if arg.rs_save_path is not None:
+            storage_paths_fn = partial(
+                StoragePaths, base_path=arg.rs_save_path)
+        else:
+            storage_paths_fn = StoragePaths
+        self.storage_paths_per_dev = {sn: storage_paths_fn(sn)
+                                      for sn, _ in self.available_devices}
 
 # [MAIN FUNCTIONS] *************************************************************
 
@@ -186,7 +185,7 @@ class RealsenseWrapper:
                                   self.stream_config_depth,
                                   self.stream_config_color)
 
-        for i, device_serial, product_line in enumerate(self.available_devices):
+        for i, (device_sn, product_line) in enumerate(self.available_devices):
 
             # Pipeline
             if self.network:
@@ -194,10 +193,10 @@ class RealsenseWrapper:
             else:
                 pipeline = rs.pipeline()
 
-            cfg = self._rs_cfg.get(device_serial, self._rs_cfg['default'])
+            cfg = self._rs_cfg.get(device_sn, self._rs_cfg['default'])
 
             if not self.network:
-                cfg.enable_device(device_serial)
+                cfg.enable_device(device_sn)
 
             check = cfg.can_resolve(pipeline)
             print(f"[INFO] : 'cfg' usable with 'pipeline' : {check}")
@@ -213,7 +212,7 @@ class RealsenseWrapper:
                     # d_sensor.set_option(rs.option.laser_power, 330)
 
             # Stored the enabled devices
-            self.enabled_devices[device_serial] = (
+            self.enabled_devices[device_sn] = (
                 Device(pipeline, pipeline_profile, product_line))
 
             self._print_camera_info(pipeline_profile)
@@ -221,7 +220,7 @@ class RealsenseWrapper:
             # Check which timestamp is available.
             if len(self.storage_paths_per_dev) > 0:
                 self._query_timestamp_mode(
-                    pipeline, pipeline_profile, device_serial)
+                    pipeline, pipeline_profile, device_sn)
 
         print("[INFO] : Initialized RealSense devices...")
 
@@ -682,10 +681,6 @@ def get_parser() -> argparse.ArgumentParser:
                         type=int,
                         default=0,
                         help='scale for displaying realsense raw images.')
-    parser.add_argument('--rs-save-data',
-                        type=str2bool,
-                        default=False,
-                        help='if true, saves realsense frames.')
     parser.add_argument('--rs-save-path',
                         type=str,
                         default='/data/realsense',
