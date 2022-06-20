@@ -676,14 +676,6 @@ def get_parser() -> argparse.ArgumentParser:
                         type=int,
                         default=140,
                         help='laser power')
-    parser.add_argument('--rs-stream-color',
-                        type=str2bool,
-                        default=True,
-                        help='enable color stream')
-    parser.add_argument('--rs-stream-depth',
-                        type=str2bool,
-                        default=True,
-                        help='enable depth stream')
     parser.add_argument('--rs-display-frame',
                         type=int,
                         default=0,
