@@ -121,16 +121,18 @@ class RealsenseWrapper:
         super().__init__()
 
         # device data
-        self.ctx = rs.context()
         if arg.rs_ip is not None:
             print(f'[INFO] : Network mode')
             self.network = True
             self.available_devices = []
+            self.ctx = []
             for ip in arg.rs_ip:
+                ctx = rs.context()
+                self.ctx.append(ctx)
                 dev = rsnet.net_device(ip)
                 self.available_devices.append(
                     (dev.get_info(rs.camera_info.serial_number), None))
-                dev.add_to(self.ctx)
+                dev.add_to(ctx)
                 print(f'[INFO] : Connected to {ip}')
         else:
             print(f'[INFO] : Local mode')
@@ -184,11 +186,11 @@ class RealsenseWrapper:
                                   self.stream_config_depth,
                                   self.stream_config_color)
 
-        for device_serial, product_line in self.available_devices:
+        for i, device_serial, product_line in enumerate(self.available_devices):
 
             # Pipeline
             if self.network:
-                pipeline = rs.pipeline(self.ctx)
+                pipeline = rs.pipeline(self.ctx[i])
             else:
                 pipeline = rs.pipeline()
 
