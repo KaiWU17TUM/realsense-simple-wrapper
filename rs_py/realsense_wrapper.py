@@ -91,18 +91,21 @@ class StoragePaths:
 
 
 class StreamConfig:
-    def __init__(self):
-        self.fps = 30
-        self.height = 480
-        self.width = 848
+    def __init__(self,
+                 stream_type: rs.stream,
+                 width: int,
+                 height: int,
+                 format: rs.format,
+                 framerate: int):
+        self.stream_type = stream_type  # rs.stream.depth/color
+        self.width = width  # 848
+        self.height = height  # 480
+        self.format = format  # rs.format.z16/bgr8
+        self.framerate = framerate  # 30
 
     @property
     def data(self) -> dict:
-        return {
-            'width': self.width,
-            'height': self.height,
-            'framerate': self.fps
-        }
+        return self.__dict__
 
 
 class RealsenseWrapper:
@@ -144,22 +147,14 @@ class RealsenseWrapper:
 
         # configurations
         self._rs_cfg = {}
-        self.stream_config_color = StreamConfig()
-        self.stream_config_depth = StreamConfig()
-
-        if arg.rs_stream_color:
-            self.stream_config_color.fps = arg.rs_fps
-            self.stream_config_color.height = arg.rs_image_height
-            self.stream_config_color.width = arg.rs_image_width
-        else:
-            self.stream_config_color = None
-
-        if arg.rs_stream_depth:
-            self.stream_config_depth.fps = arg.rs_fps
-            self.stream_config_depth.height = arg.rs_image_height
-            self.stream_config_depth.width = arg.rs_image_width
-        else:
-            self.stream_config_depth = None
+        self.stream_config_color = StreamConfig(
+            rs.stream.color, arg.rs_image_width, arg.rs_image_height,
+            rs.format.bgr8, arg.rs_fps
+        )
+        self.stream_config_depth = StreamConfig(
+            rs.stream.depth, arg.rs_image_width, arg.rs_image_height,
+            rs.format.z16, arg.rs_fps
+        )
 
         # Save paths
         self.timestamp_mode = None
@@ -189,13 +184,9 @@ class RealsenseWrapper:
         if device_sn is not None:
             cfg = rs.config()
             if stream_config_depth is not None:
-                cfg.enable_stream(stream_type=rs.stream.depth,
-                                  format=rs.format.z16,
-                                  **stream_config_depth.data)
+                cfg.enable_stream(**stream_config_depth.data)
             if stream_config_color is not None:
-                cfg.enable_stream(stream_type=rs.stream.color,
-                                  format=rs.format.bgr8,
-                                  **stream_config_color.data)
+                cfg.enable_stream(**stream_config_color.data)
             self._rs_cfg[device_sn] = cfg
 
     def initialize(self, enable_ir_emitter: bool = True) -> None:
@@ -227,8 +218,8 @@ class RealsenseWrapper:
             pipeline_profile = pipeline.start(cfg)
 
             # IR for depth
-            depth_sensor = pipeline_profile.get_device().first_depth_sensor()
             if enable_ir_emitter:
+                depth_sensor = pipeline_profile.get_device().first_depth_sensor()
                 if depth_sensor.supports(rs.option.emitter_enabled):
                     depth_sensor.set_option(rs.option.emitter_enabled,
                                             1 if enable_ir_emitter else 0)
@@ -688,7 +679,8 @@ def get_parser() -> argparse.ArgumentParser:
                         default=False,
                         help='use 1 rs device only.')
     parser.add_argument('--rs-ip',
-                        type=str,
+                        nargs='*',
+                        # type=str,
                         # default='192.168.100.39',  # 101 LAN
                         # default='192.168.1.216',  # 101 WLAN
                         # default='192.168.1.11',  # 102 WLAN
