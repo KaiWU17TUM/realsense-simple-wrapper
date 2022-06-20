@@ -29,11 +29,13 @@ if __name__ == "__main__":
             if c > arg.rs_fps * 10:
                 break
 
-    except:  # noqa
-        print("Stopping RealSense devices...")
+    except Exception as e:
+        print("[ERROR]", e)
+        print("[INFO] Stopping RealSense devices...")
         rsw.stop()
 
     finally:
+        print("[INFO] Stopping RealSense devices...")
         rsw.stop()
 
-    print("Finished")
+    print("[INFO] Finished")
