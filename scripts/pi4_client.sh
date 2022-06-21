@@ -5,84 +5,108 @@ BLUE='\033[0;36m'
 NC='\033[0m'
 
 MODE=$1
-IP_RASP=$2
-RASP_ADDR='pi@'${IP_RASP}
+RASP_IP=$2
+RASP_USER=$3
+RASP_ADDR=${RASP_USER}'@'${RASP_IP}
 
-if [ $# -eq 2 ]; then
+if [ $# -eq 3 ]; then
 
     if [ "${MODE}" = "start" ]; then
 
-        printf "\n${GREEN}================================================================================\n"
-        printf "Start initialization to setup hardwares in mocked ICU room\n"
-        printf "================================================================================${NC}\n"
+        printf "${GREEN}"
+        printf "\n================================================================================\n"
+        printf "Attaching all hardwares\n"
+        printf "================================================================================\n"
+        printf "${NC}"
 
-        printf "\n${BLUE}********************************************************************************\n"
-        printf "STEP 1 : Copy and run commands in Raspberry pi ${IP_RASP} ${NC}\n"
-        scp -i ~/.ssh/id_ed25519 server ${RASP_ADDR}:/home/pi/
-        ssh -i ~/.ssh/id_ed25519 ${RASP_ADDR} 'sh pi4_server.sh start  > /dev/null 2>&1 &'
-
-        printf "${BLUE}Running commands in localmachine ${NC}\n"
+        printf "${BLUE}"
+        printf "[1/4] Copy and run commands in Raspberry pi ${RASP_IP} \n"
+        printf "${NC}"
+        printf "Running commands in localmachine \n"
+        scp -i ~/.ssh/id_ed25519 pi4_server.sh ${RASP_ADDR}:/home/${RASP_USER}/
+        ssh -i ~/.ssh/id_ed25519 ${RASP_ADDR} 'sh pi4_server.sh start > /dev/null 2>&1 &'
 
         sleep 2
 
-        printf "\n${BLUE}********************************************************************************\n"
-        printf "STEP 2 : Mounting necessary driver for usb-ip ... ${NC}\n"
+        printf "${BLUE}"
+        printf "[2/4] Mounting necessary driver for usb-ip ... \n"
+        printf "${NC}"
         sudo modprobe vhci-hcd
 
-        printf "\n${BLUE}********************************************************************************\n"
-        printf "STEP 3 : Connecting existing devices from ip address ... $IP_RASP ${NC}\n"
-        DEVICES_AVAILABLE=$(sudo usbip list -r $IP_RASP | grep Intel | cut -d ":" -f 1)
+        printf "${BLUE}"
+        printf "[3/4] Connecting existing devices from ip address ... $RASP_IP \n"
+        printf "${NC}"
+        DEVICES_AVAILABLE=$(sudo usbip list -r $RASP_IP | grep Intel | cut -d ":" -f 1)
 
         for DEVICE in $DEVICES_AVAILABLE; do
-            printf "$DEVICE \n"
-            sudo usbip attach -r $IP_RASP -b $DEVICE
+            printf "Attaching to '$RASP_IP' busid '$DEVICE' \n"
+            sudo usbip attach -r $RASP_IP -b $DEVICE
         done
 
-        printf "\n${BLUE}********************************************************************************\n"
-        printf "STEP 4 : Changing access permission of USB devices ... $IP_RASP ${NC}\n"
+        printf "${BLUE}"
+        printf "[4/4] Changing access permission of USB devices ... $RASP_IP \n"
+        printf "${NC}"
         sleep 3
         DEVICES_CONNECTED=$(ls /dev/ | grep ttyUSB*)
         for DEVICE in $DEVICES_CONNECTED; do
-            printf "$DEVICE \n"
+            printf "Changing permission of '$RASP_IP' /dev/$DEVICE \n"
             sudo chmod +777 /dev/$DEVICE
         done
 
-        printf "\n${GREEN}================================================================================\n"
-        printf "Finish initialization\n"
-        printf "================================================================================${NC}\n\n"
+        printf "${GREEN}"
+        printf "================================================================================\n"
+        printf "Attached all hardwares\n"
+        printf "================================================================================\n\n"
+        printf "${NC}"
 
-        printf "${BLUE}Start the program to acquire data from devices ${NC}\n"
-        printf "${BLUE}Start the program to acquire data from realsense ${NC}\n\n"
+        printf "${BLUE}"
+        printf "Start the program to acquire data from devices \n"
+        printf "Start the program to acquire data from realsense \n\n"
+        printf "${NC}"
 
     elif [ "${MODE}" = "stop" ]; then
 
-        printf "\n${GREEN}================================================================================\n"
-        printf "Detaching all hardwares in mocked ICU room\n"
-        printf "================================================================================${NC}\n"
+        printf "${GREEN}"
+        printf "\n================================================================================\n"
+        printf "Detaching all hardwares\n"
+        printf "================================================================================\n"
+        printf "${NC}"
 
-        printf "${BLUE}Running commands in localmachine ${NC}\n"
+        printf "${BLUE}"
+        printf "Detach all devices \n"
+        printf "${NC}"
+        IPS_AVAILABLE=($(sudo usbip port | grep usbip | cut -d ":" -f 2 | cut -d "/" -f 3))
+        PORTS_AVAILABLE=($(sudo usbip port | grep usbip -B3 | grep Port | cut -d ":" -f 1 | cut -d " " -f 2))
+        for i in "${!PORTS_AVAILABLE[@]}"; do
+            if [ "${IPS_AVAILABLE[i]}" = "${RASP_IP}" ]; then
+                printf "${IPS_AVAILABLE[i]} :: ${PORTS_AVAILABLE[i]}\n"
+                printf "Detaching port '${PORTS_AVAILABLE[i]}' \n"
+                sudo usbip detach -p ${PORTS_AVAILABLE[i]}
+            fi
+        done
 
-        printf "${BLUE}Detach all devices ${NC}\n"
-        sudo usbip detach -p 00
-
-        printf "${BLUE}Running commands in Raspberry pi ${IP_RASP} ${NC}\n"
-        scp -i ~/.ssh/id_ed25519 server ${RASP_ADDR}:/home/pi/
+        printf "${BLUE}"
+        printf "Running commands in RaspberryPi4 ${RASP_IP} \n"
+        printf "${NC}"
+        scp -i ~/.ssh/id_ed25519 pi4_server.sh ${RASP_ADDR}:/home/${RASP_USER}/
         ssh -i ~/.ssh/id_ed25519 ${RASP_ADDR} 'sh pi4_server.sh stop'
 
-        printf "\n${GREEN}================================================================================\n"
-        printf "Detached all hardwares in mocked ICU room\n"
-        printf "================================================================================${NC}\n\n"
+        printf "${GREEN}"
+        printf "================================================================================\n"
+        printf "Detached all hardwares\n"
+        printf "================================================================================\n\n"
+        printf "${NC}"
 
     else
 
-        echo "argument 1 is expected to be : {start/stop}"
+        printf "argument 1 is expected to be : {start/stop}"
         exit 1
 
     fi
 
 else
 
-    echo "2 arguments are expected : {start/stop}, {ip_address}"
+    printf "2 arguments are expected : {start/stop}, {ip_address}, {username}"
     exit 1
 
 fi

@@ -10,38 +10,64 @@ if [ $# -eq 1 ]; then
 
     if [ "${MODE}" = "start" ]; then
 
-        echo "${BLUE}STEP I : starting necessary services ...${NC}"
+        printf "${PURPLE}"
+        printf "\n================================================================================\n"
+        printf ">>>>> pi4_server.sh start <<<<<\n"
+        printf "================================================================================\n"
+        printf "${NC}"
+
+        printf "${BLUE}"
+        printf "[1/2] starting necessary services..."
+        printf "${NC}"
         sudo modprobe usbip_host
         sudo usbipd &
 
-        echo "${BLUE}STEP II : listing available devices ...${NC}"
+        printf "${BLUE}"
+        printf "[2/2] listing available devices..."
+        printf "${NC}"
         DEVICE_ARRAY=$(sudo usbip list -l | cut -d " " -f 4 | grep [0-9])
-        #echo "Devices connected are"
         for DEVICE in $DEVICE_ARRAY; do
+            printf "bind busid '$DEVICE' \n"
             sudo usbip bind -b $DEVICE
         done
 
+        printf "${PURPLE}"
+        printf "================================================================================\n\n"
+        printf "${NC}"
+
     elif [ "${MODE}" = "stop" ]; then
 
-        printf "${BLUE}Detaching available devices ${NC}\n"
+        printf "${PURPLE}"
+        printf "\n================================================================================\n"
+        printf ">>>>> pi4_server.sh stop <<<<<\n"
+        printf "================================================================================\n"
+        printf "${NC}"
+
+        printf "${BLUE}"
+        printf "Detaching available devices \n"
+        printf "${NC}"
         DEVICE_ARRAY=$(sudo usbip list -l | cut -d " " -f 4 | grep [0-9])
         for DEVICE in $DEVICE_ARRAY; do
-            printf "$DEVICE \n"
+            printf "unbind busid '$DEVICE' \n"
             sudo usbip unbind -b $DEVICE
         done
 
         sudo killall -9 usbipd
 
+        printf "${PURPLE}"
+        printf "================================================================================\n\n"
+        printf "${NC}"
+
     else
 
-        echo "argument 1 is expected to be : {start/stop}"
+        printf "argument 1 is expected to be : {start/stop}"
         exit 1
 
     fi
 
 else
 
-    echo "1 argument is expected : {start/stop}"
+    printf "1 argument is expected : {start/stop}"
     exit 1
 
 fi
