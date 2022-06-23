@@ -187,11 +187,11 @@ class RealsenseWrapper:
         self._rs_cfg = {}
         self.stream_config_color = StreamConfig(
             rs.stream.color, arg.rs_image_width, arg.rs_image_height,
-            rs.format.bgr8, arg.rs_fps
+            arg.rs_color_format, arg.rs_fps
         )
         self.stream_config_depth = StreamConfig(
             rs.stream.depth, arg.rs_image_width, arg.rs_image_height,
-            rs.format.z16, arg.rs_fps
+            arg.rs_depth_format, arg.rs_fps
         )
 
         # Save paths
@@ -651,7 +651,7 @@ class RealsenseWrapper:
 
 
 def read_metadata(frame: rs.frame) -> dict:
-    frame_metadata_value_list = [
+    _FRAME_METADATA_VALUE_LIST = [
         rs.frame_metadata_value.actual_exposure,
         rs.frame_metadata_value.actual_fps,
         rs.frame_metadata_value.auto_exposure,
@@ -686,7 +686,7 @@ def read_metadata(frame: rs.frame) -> dict:
         rs.frame_metadata_value.white_balance,
     ]
     output = {}
-    for i in frame_metadata_value_list:
+    for i in _FRAME_METADATA_VALUE_LIST:
         if frame.supports_frame_metadata(i):
             output[i.name] = frame.get_frame_metadata(i)
     return output
@@ -701,6 +701,19 @@ def str2bool(v) -> bool:
         raise argparse.ArgumentTypeError('Boolean value expected.')
 
 
+def str2rsformat(v) -> rs.format:
+    _SUPPORTED_FORMATS = {
+        'z16': rs.format.z16,
+        'bgr8': rs.format.bgr8,
+        'rgb8': rs.format.rgb8,
+        'yuyv': rs.format.yuyv
+    }
+    if v.lower() not in _SUPPORTED_FORMATS.keys():
+        raise argparse.ArgumentTypeError('unknown stream format')
+    else:
+        return _SUPPORTED_FORMATS.get(v.lower())
+
+
 def get_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description='Run RealSense devices.')
     parser.add_argument('--rs-fps',
@@ -709,15 +722,23 @@ def get_parser() -> argparse.ArgumentParser:
                         help='fps')
     parser.add_argument('--rs-image-width',
                         type=int,
-                        default=640,
+                        default=848,
                         help='image width in px')
     parser.add_argument('--rs-image-height',
                         type=int,
                         default=480,
                         help='image height in px')
+    parser.add_argument('--rs-color-format',
+                        type=str2rsformat,
+                        default=rs.format.bgr8,
+                        help='format of color stream')
+    parser.add_argument('--rs-depth-format',
+                        type=str2rsformat,
+                        default=rs.format.z16,
+                        help='format of depth stream')
     parser.add_argument('--rs-laser-power',
                         type=int,
-                        default=140,
+                        default=290,
                         help='laser power')
     parser.add_argument('--rs-display-frame',
                         type=int,
