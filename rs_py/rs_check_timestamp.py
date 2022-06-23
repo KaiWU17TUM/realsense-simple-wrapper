@@ -1,6 +1,6 @@
 import os
 
-PATH = '/tmp/testing15'
+PATH = '/tmp/testing'
 
 
 def get_timestamp(base_path):

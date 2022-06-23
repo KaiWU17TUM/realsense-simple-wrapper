@@ -53,8 +53,10 @@ Once kernel patching is done, the RS SDK can be installed/upgraded by following 
 ### 1. [Sensor timestamp](https://github.com/IntelRealSense/librealsense/issues/2188)
 - SENSOR_TIMESTAMP: Device clock / sensor starts taking the image
 - FRAME_TIMESTAMP: Device clock / frame starts to transfer to the driver
-- BACKEND_TIMESTAMP: PC clock / frame starts to transfer to the driver
-- TIME_OF_ARRIVAL: PC clock / frame is transfered to the driver
+- BACKEND_TIMESTAMP: PC clock / frame starts to transfer to the driver (HW->Kernel transition)
+- TIME_OF_ARRIVAL: PC clock / frame is transfered to the driver (kernel->user space transition)
+
+There is an [issue](https://github.com/IntelRealSense/librealsense/issues/7972) with arm-based chips, i.e. pi4, where the backend_timestamp cannot be obtained.
 
 ### 2. [HW Sync](https://dev.intelrealsense.com/docs/external-synchronization-of-intel-realsense-depth-cameras)
 The realsense can be syncroized using an external sync cable so that the cameras captures at the exact same timestamp.

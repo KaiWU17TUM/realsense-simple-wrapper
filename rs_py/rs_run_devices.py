@@ -21,7 +21,7 @@ if __name__ == "__main__":
     try:
         c = 0
         while True:
-            print("[INFO] : step")
+            print(f"[INFO] : step {c}")
             frames = rsw.step(display=arg.rs_display_frame)
             if not len(frames) > 0:
                 print("[WARN] : Empty...")
