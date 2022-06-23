@@ -13,17 +13,16 @@ if [ $# -eq 1 ]; then
         printf "${PURPLE}"
         printf "\n================================================================================\n"
         printf ">>>>> pi4_server.sh start <<<<<\n"
-        printf "================================================================================\n"
         printf "${NC}"
 
         printf "${BLUE}"
-        printf "[1/2] starting necessary services..."
+        printf "[1/2] starting necessary services...\n"
         printf "${NC}"
         sudo modprobe usbip_host
         sudo usbipd &
 
         printf "${BLUE}"
-        printf "[2/2] listing available devices..."
+        printf "[2/2] listing available devices...\n"
         printf "${NC}"
         DEVICE_ARRAY=$(sudo usbip list -l | cut -d " " -f 4 | grep [0-9])
         for DEVICE in $DEVICE_ARRAY; do
@@ -32,7 +31,7 @@ if [ $# -eq 1 ]; then
         done
 
         printf "${PURPLE}"
-        printf "================================================================================\n\n"
+        printf "================================================================================\n"
         printf "${NC}"
 
     elif [ "${MODE}" = "stop" ]; then
@@ -40,7 +39,6 @@ if [ $# -eq 1 ]; then
         printf "${PURPLE}"
         printf "\n================================================================================\n"
         printf ">>>>> pi4_server.sh stop <<<<<\n"
-        printf "================================================================================\n"
         printf "${NC}"
 
         printf "${BLUE}"
@@ -55,7 +53,7 @@ if [ $# -eq 1 ]; then
         sudo killall -9 usbipd
 
         printf "${PURPLE}"
-        printf "================================================================================\n\n"
+        printf "================================================================================\n"
         printf "${NC}"
 
     else

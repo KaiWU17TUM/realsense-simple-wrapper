@@ -128,14 +128,17 @@ mkdir build && cd build
 # cmake .. -DBUILD_EXAMPLES=true -DCMAKE_BUILD_TYPE=Release -DFORCE_LIBUVC=true
 cmake .. \
   -DCMAKE_BUILD_TYPE=Release \
+  -DBUILD_GRAPHICAL_EXAMPLES=OFF \
   -DBUILD_NETWORK_DEVICE=ON \
   -DBUILD_PYTHON_BINDINGS=bool:true \
   -DPYTHON_EXECUTABLE=$(which python3) \
   -DBUILD_SHARED_LIBS:BOOL=ON \
   -DFORCE_RSUSB_BACKEND=ON
 make -j$(($(nproc) - 1))
-make -j1
+# make -j1
+sudo git config --global --add safe.directory "*"
 sudo make install
+sudo cp ../wrappers/python/pyrealsense2/__init__.py  /usr/lib/python3/dist-packages/pyrealsense2/
 
 printf "\n${GREEN}================================================================================\n"
 printf "OpenCV and Numpy\n"

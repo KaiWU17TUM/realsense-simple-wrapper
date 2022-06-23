@@ -14,9 +14,11 @@ if [ $# -eq 3 ]; then
     if [ "${MODE}" = "start" ]; then
 
         printf "${GREEN}"
-        printf "\n================================================================================\n"
-        printf "Attaching all hardwares\n"
         printf "================================================================================\n"
+        printf "${NC}"
+
+        printf "${GREEN}"
+        printf "Attaching all hardwares\n"
         printf "${NC}"
 
         printf "${BLUE}"
@@ -54,22 +56,26 @@ if [ $# -eq 3 ]; then
         done
 
         printf "${GREEN}"
-        printf "================================================================================\n"
         printf "Attached all hardwares\n"
-        printf "================================================================================\n\n"
         printf "${NC}"
 
         printf "${BLUE}"
         printf "Start the program to acquire data from devices \n"
-        printf "Start the program to acquire data from realsense \n\n"
+        printf "Start the program to acquire data from realsense \n"
+        printf "${NC}"
+
+        printf "${GREEN}"
+        printf "================================================================================\n"
         printf "${NC}"
 
     elif [ "${MODE}" = "stop" ]; then
 
         printf "${GREEN}"
-        printf "\n================================================================================\n"
-        printf "Detaching all hardwares\n"
         printf "================================================================================\n"
+        printf "${NC}"
+
+        printf "${GREEN}"
+        printf "Detaching all hardwares\n"
         printf "${NC}"
 
         printf "${BLUE}"
@@ -92,9 +98,11 @@ if [ $# -eq 3 ]; then
         ssh -i ~/.ssh/id_ed25519 ${RASP_ADDR} 'sh pi4_server.sh stop'
 
         printf "${GREEN}"
-        printf "================================================================================\n"
         printf "Detached all hardwares\n"
-        printf "================================================================================\n\n"
+        printf "${NC}"
+
+        printf "${GREEN}"
+        printf "================================================================================\n"
         printf "${NC}"
 
     else
