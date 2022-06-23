@@ -34,10 +34,16 @@ class CalibrationConfig:
         self.depth = []
         self.T_color_depth = []
 
-    def save(self, file_path: str) -> None:
+    def save(self,
+             file_path: str,
+             device_sn_idx: Optional[Union[int, str]] = None) -> None:
         self.validate()
-        with open(file_path, 'w') as outfile:
-            json.dump(self.__dict__, outfile, indent=4)
+        if device_sn_idx is None:
+            with open(file_path, 'w') as outfile:
+                json.dump(self.__dict__, outfile, indent=4)
+        else:
+            with open(file_path, 'w') as outfile:
+                json.dump(self.get_data(device_sn_idx), outfile, indent=4)
 
     def load(self, file_path: str) -> None:
         with open(file_path) as calib_file:
@@ -45,10 +51,17 @@ class CalibrationConfig:
         self.__dict__.update(calib_data)
         self.validate()
 
-    def get_T_color_depth(self, idx: int) -> np.ndarray:
+    def get_T_color_depth_np(self,
+                             idx: Optional[int] = None,
+                             T_color_depth: Optional[dict] = None
+                             ) -> np.ndarray:
         T_color_depth = np.eye(4)
-        T_color_depth[:3, :3] = np.array(self.T_color_depth[idx]['rotation']).reshape(3, 3)  # noqa
-        T_color_depth[:3, 3] = self.T_color_depth[idx]['translation']
+        if idx is not None:
+            T_color_depth[:3, :3] = np.array(self.T_color_depth[idx]['rotation']).reshape(3, 3)  # noqa
+            T_color_depth[:3, 3] = self.T_color_depth[idx]['translation']
+        elif T_color_depth is not None:
+            T_color_depth[:3, :3] = np.array(T_color_depth['rotation']).reshape(3, 3)  # noqa
+            T_color_depth[:3, 3] = T_color_depth['translation']
         return T_color_depth
 
     def get_data(self, device_sn_idx: Union[int, str]):
@@ -57,11 +70,12 @@ class CalibrationConfig:
         elif isinstance(device_sn_idx, str):
             idx = self.device_sn.index(device_sn_idx)
         else:
-            raise ValueError("Unknown input arguemtn type...")
+            raise ValueError("Unknown input argument type...")
         return {
             'color': self.color[idx],
             'depth': self.depth[idx],
-            'T_color_depth': self.get_T_color_depth(idx),
+            # 'T_color_depth': self.get_T_color_depth(idx),
+            'T_color_depth': self.T_color_depth[idx],
         }
 
     def validate(self) -> bool:
@@ -74,19 +88,26 @@ class StoragePaths:
     def __init__(self, device_sn: str = '', base_path: str = '/data/realsense'):
         date_time = datetime.now().strftime("%y%m%d%H%M%S")
         device_path = os.path.join(base_path, f'dev_{device_sn}', date_time)
-        self.meta_color = os.path.join(device_path, 'meta_color')
-        self.meta_depth = os.path.join(device_path, 'meta_depth')
-        self.calib = os.path.join(device_path, 'calib')
+
+        # self.color = None
+        # self.depth = None
         self.color = os.path.join(device_path, 'color')
         self.depth = os.path.join(device_path, 'depth')
-        self.timestamp = os.path.join(device_path, 'timestamp')
-        self.timestamp_file = os.path.join(self.timestamp, 'timestamp.txt')
-        os.makedirs(self.meta_color, exist_ok=True)
-        os.makedirs(self.meta_depth, exist_ok=True)
-        os.makedirs(self.calib, exist_ok=True)
         os.makedirs(self.color, exist_ok=True)
         os.makedirs(self.depth, exist_ok=True)
+
+        self.meta_color = os.path.join(device_path, 'meta_color')
+        self.meta_depth = os.path.join(device_path, 'meta_depth')
+        os.makedirs(self.meta_color, exist_ok=True)
+        os.makedirs(self.meta_depth, exist_ok=True)
+
+        self.calib = os.path.join(device_path, 'calib')
+        os.makedirs(self.calib, exist_ok=True)
+
+        self.timestamp = os.path.join(device_path, 'timestamp')
+        self.timestamp_file = os.path.join(self.timestamp, 'timestamp.txt')
         os.makedirs(self.timestamp, exist_ok=True)
+
         print(f"[INFO] : Prepared storage paths...")
 
 
@@ -117,8 +138,18 @@ class RealsenseWrapper:
 
     """
 
-    def __init__(self, arg: argparse.Namespace) -> None:
-        super().__init__()
+    def __init__(self,
+                 arg: argparse.Namespace,
+                 dev_sn: Optional[str] = None,
+                 ctx: Optional[rs.context] = None) -> None:
+        """Initializes the RealsenseWrapper class object.
+
+        Args:
+            arg (argparse.Namespace): argument parsed from cli.
+            dev_sn (Optional[str], optional): If not None, only the device
+                with this sn will be used. Defaults to None.
+            ctx
+        """
 
         # device data
         if arg.rs_ip is not None:
@@ -127,7 +158,7 @@ class RealsenseWrapper:
             print(f'[INFO] : Network mode')
             self.network = True
             self.available_devices = []
-            self.ctx = rs.context()
+            self.ctx = ctx if ctx is not None else rs.context()
             dev = rsnet.net_device(arg.rs_ip)
             self.available_devices.append(
                 (dev.get_info(rs.camera_info.serial_number), None))
@@ -136,10 +167,13 @@ class RealsenseWrapper:
         else:
             print(f'[INFO] : Local mode')
             self.network = False
-            self.ctx = rs.context()
+            self.ctx = ctx if ctx is not None else rs.context()
             self.available_devices = enumerate_connected_devices(self.ctx)
 
-        if arg.rs_use_one_dev_only:
+        if dev_sn is not None:
+            self.available_devices = [
+                i for i in self.available_devices if i[0] == dev_sn]
+        elif arg.rs_use_one_dev_only:
             self.available_devices = self.available_devices[0:1]
 
         # serial numbers of enabled devices
@@ -271,7 +305,7 @@ class RealsenseWrapper:
                                 frame_dict=frame_dict,
                                 storage_paths=storage_paths,
                             )
-                        elif st == rs.stream.depth:
+                        if st == rs.stream.depth:
                             frame_dict, frame_data = self._get_depth_stream(
                                 frameset=aligned_frameset,
                                 frame_dict=frame_dict,
@@ -437,7 +471,7 @@ class RealsenseWrapper:
                 'translation': extr.translation
             })
 
-            calib_config.save(save_path)
+            calib_config.save(save_path, dev_sn)
 
         print("[INFO] : Saved camera calibration data...")
 
@@ -454,7 +488,13 @@ class RealsenseWrapper:
             if frameset.size() == len(streams):
                 wait_flag = False
         fmv = rs.frame_metadata_value
-        if frameset.supports_frame_metadata(fmv.sensor_timestamp):
+        if frameset.supports_frame_metadata(fmv.time_of_arrival):
+            self.timestamp_mode = fmv.time_of_arrival
+            print(f'[INFO] : time_of_arrival is being used...')
+        # if frameset.supports_frame_metadata(fmv.backend_timestamp):
+        #     self.timestamp_mode = fmv.backend_timestamp
+        #     print(f'[INFO] : backend_timestamp is being used...')
+        elif frameset.supports_frame_metadata(fmv.sensor_timestamp):
             self.timestamp_mode = fmv.sensor_timestamp
             print(f'[INFO] : sensor_timestamp is being used...')
         elif frameset.supports_frame_metadata(fmv.frame_timestamp):
@@ -523,7 +563,7 @@ class RealsenseWrapper:
             Tuple[dict, np.ndarray]: updated frame_dict and data from framset.
         """
         frame = frameset.first_or_default(rs.stream.depth)
-        frame = post_process_depth_frame(frame)
+        # frame = post_process_depth_frame(frame)
         timestamp = self._get_timestamp(frame)
         frame_dict['timestamp_depth'] = timestamp
         frame_data = np.asanyarray(frame.get_data())
@@ -603,6 +643,10 @@ class RealsenseWrapper:
             print(f'Firmware      : {_info(rs.camera_info.firmware_version)}')
         except Exception as e:
             print(f'Firmware      : not available', e)
+        try:
+            print(f'USB type      : {_info(rs.camera_info.usb_type_descriptor)}')  # noqa
+        except Exception as e:
+            print(f'USB type      : not available', e)
         print("========================================")
 
 
@@ -687,6 +731,9 @@ def get_parser() -> argparse.ArgumentParser:
                         type=str2bool,
                         default=False,
                         help='use 1 rs device only.')
+    parser.add_argument('--rs-dev',
+                        type=str,
+                        help='rs device sn to run')
     parser.add_argument('--rs-ip',
                         # nargs='*',
                         type=str,

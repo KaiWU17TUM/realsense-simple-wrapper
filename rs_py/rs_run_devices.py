@@ -11,12 +11,12 @@ if __name__ == "__main__":
         print(f"{k} : {v}")
     print("========================================")
 
-    rsw = RealsenseWrapper(arg)
+    rsw = RealsenseWrapper(arg, arg.rs_dev)
     rsw.initialize()
     rsw.set_ir_laser_power(arg.rs_laser_power)
     rsw.save_calibration()
 
-    rsw.dummy_capture(30)
+    rsw.dummy_capture(arg.rs_fps * 5)
 
     try:
         c = 0
