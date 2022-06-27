@@ -1,5 +1,6 @@
 #!/bin/bash
 
+RED='\033[1;31m'
 GREEN='\033[1;32m'
 BLUE='\033[0;36m'
 NC='\033[0m'
@@ -107,14 +108,18 @@ if [ $# -eq 3 ]; then
 
     else
 
-        printf "argument 1 is expected to be : {start/stop}"
+        printf "${RED}"
+        printf "argument 1 is expected to be : {start/stop}\n"
+        printf "${NC}"
         exit 1
 
     fi
 
 else
 
-    printf "2 arguments are expected : {start/stop}, {ip_address}, {username}"
+    printf "${RED}"
+    printf "2 arguments are expected : {start/stop}, {ip_address}, {username}\n"
+    printf "${NC}"
     exit 1
 
 fi

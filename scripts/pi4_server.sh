@@ -1,5 +1,6 @@
 #!/bin/bash
 
+RED='\033[1;31m'
 PURPLE='\033[0;35m'
 BLUE='\033[0;36m'
 NC='\033[0m'
@@ -58,14 +59,18 @@ if [ $# -eq 1 ]; then
 
     else
 
-        printf "argument 1 is expected to be : {start/stop}"
+        printf "${RED}"
+        printf "argument 1 is expected to be : {start/stop}\n"
+        printf "${NC}"
         exit 1
 
     fi
 
 else
 
-    printf "1 argument is expected : {start/stop}"
+    printf "${RED}"
+    printf "1 argument is expected : {start/stop}\n"
+    printf "${NC}"
     exit 1
 
 fi
