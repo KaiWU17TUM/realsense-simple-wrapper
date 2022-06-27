@@ -1,6 +1,7 @@
 import os
+import sys
 
-PATH = '/tmp/testing'
+BASE_PATH = sys.argv[1]
 
 
 def get_timestamp(base_path):
@@ -16,10 +17,10 @@ def get_timestamp(base_path):
 
 if __name__ == "__main__":
 
-    dev_ts_file = get_timestamp(PATH)
+    dev_ts_file_path = get_timestamp(BASE_PATH)
 
-    for dev, ts_file in dev_ts_file.items():
-        with open(ts_file, 'r') as f:
+    for dev, ts_file_path in dev_ts_file_path.items():
+        with open(ts_file_path, 'r') as f:
             lines = f.readlines()
 
         c_ts = [float(i.split("::")[0]) for i in lines]

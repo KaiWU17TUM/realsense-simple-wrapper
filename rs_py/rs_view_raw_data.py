@@ -2,11 +2,12 @@ import cv2
 import json
 import numpy as np
 import os
+import sys
 
 # Currently the code only shows the data from the newest timestamp folder.
 
-FPS = 5
-PATH = '/tmp/testing'
+BASE_PATH = sys.argv[1]
+FPS = sys.argv[2]
 
 
 # https://github.com/IntelRealSense/librealsense/issues/4646
@@ -46,9 +47,9 @@ def get_filepaths(base_path: str, sensor: str) -> dict:
 
 
 def get_filepaths_with_timestamps():
-    dev_color_files = get_filepaths(PATH, 'color')
-    dev_depth_files = get_filepaths(PATH, 'depth')
-    dev_calib_file = get_calib(PATH)
+    dev_color_files = get_filepaths(BASE_PATH, 'color')
+    dev_depth_files = get_filepaths(BASE_PATH, 'depth')
+    dev_calib_file = get_calib(BASE_PATH)
 
     num_data = len(tuple(dev_color_files.values())[0])
     num_dev = len(list(dev_calib_file.keys()))
@@ -133,9 +134,9 @@ if __name__ == "__main__":
                     img = np.fromfile(f, np.uint8).reshape(h_c, w_c, 3)
             else:
                 img = np.load(color_file)
-                if isinstance(img, np.uint8):
+                if img.dtype == np.dtype(np.uint8):
                     img = img.reshape(h_c, w_c, 3)
-                elif isinstance(img, np.uint16):
+                elif img.dtype == np.dtype(np.uint16):
                     img = get_brg(img.reshape(h_c, w_c))
                 else:
                     raise ValueError("Unknown data type :", img.dtype)

@@ -1,21 +1,18 @@
-# import open3d as o3d
-# mesh = o3d.geometry.TriangleMesh.create_sphere()
-# mesh.compute_vertex_normals()
-# o3d.visualization.draw(mesh)
-
-
 import cv2
 import json
 import numpy as np
 import os
+import sys
 
 import open3d as o3d
 
 # Currently the code only shows the data from the newest timestamp folder.
 
-SCALE = 0.5
-FPS = 20
-PATH = '/code/realsense-simple-wrapper/output/rs_sample_3dev'
+# PATH = '/code/realsense-simple-wrapper/output/rs_sample_3dev'
+
+BASE_PATH = sys.argv[1]
+FPS = sys.argv[2]
+SCALE = sys.argv[3]
 
 
 def get_calib(base_path: str) -> dict:
@@ -42,9 +39,9 @@ def get_filepaths(base_path: str, sensor: str) -> dict:
 
 
 def get_filepaths_with_timestamps():
-    dev_color_files = get_filepaths(PATH, 'color')
-    dev_depth_files = get_filepaths(PATH, 'depth')
-    dev_calib_file = get_calib(PATH)
+    dev_color_files = get_filepaths(BASE_PATH, 'color')
+    dev_depth_files = get_filepaths(BASE_PATH, 'depth')
+    dev_calib_file = get_calib(BASE_PATH)
 
     num_data = len(tuple(dev_color_files.values())[0])
     num_dev = len(list(dev_calib_file.keys()))
