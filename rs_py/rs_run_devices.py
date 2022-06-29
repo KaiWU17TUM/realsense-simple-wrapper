@@ -22,12 +22,15 @@ if __name__ == "__main__":
         c = 0
         while True:
             print(f"[INFO] : step {c}")
-            frames = rsw.step(display=arg.rs_display_frame)
+            frames = rsw.step(
+                display=arg.rs_display_frame,
+                display_and_save_with_key=arg.rs_save_with_key
+            )
             if not len(frames) > 0:
                 print("[WARN] : Empty...")
                 continue
             c += 1
-            if c > arg.rs_fps * 10:
+            if c > arg.rs_fps * arg.rs_steps:
                 break
 
     except Exception as e:

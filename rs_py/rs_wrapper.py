@@ -86,6 +86,10 @@ class CalibrationConfig:
 
 class StoragePaths:
     def __init__(self, device_sn: str = '', base_path: str = '/data/realsense'):
+
+        # flag that can be used to see if data should be saved
+        self.save = True
+
         date_time = datetime.now().strftime("%y%m%d%H%M%S")
         device_path = os.path.join(base_path, f'dev_{device_sn}', date_time)
 
@@ -205,6 +209,8 @@ class RealsenseWrapper:
         self.storage_paths_per_dev = {sn: storage_paths_fn(sn)
                                       for sn, _ in self.available_devices}
 
+        self.key = -1
+
 # [MAIN FUNCTIONS] *************************************************************
 
     def initialize(self, enable_ir_emitter: bool = True) -> None:
@@ -256,13 +262,16 @@ class RealsenseWrapper:
 
         print("[INFO] : Initialized RealSense devices...")
 
-    def step(self, display: int = 0, save_depth_colormap: bool = False) -> dict:
+    def step(self,
+             display: int = 0,
+             display_and_save_with_key: bool = False,
+             save_depth_colormap: bool = False) -> dict:
         """Gets the frames streamed from the enabled rs devices.
 
         Args:
             display (int, optional): Whether to display the retrieved frames.
                 The value corresponds to the scale to visualize the frames.
-                Defaults to 0 = no display.
+                0 = no display, 1 = display scale
 
         Returns:
             dict: Empty dict or {serial_number: {data_type: data}}.
@@ -278,6 +287,14 @@ class RealsenseWrapper:
             for dev_sn, dev in self.enabled_devices.items():
 
                 storage_paths = self.storage_paths_per_dev.get(dev_sn, None)
+
+                if display_and_save_with_key:
+                    if self.key == -1:
+                        storage_paths.save = False
+                    else:
+                        if self.key & 0xFF == ord('c'):
+                            storage_paths.save = True
+                            self.key = -1
 
                 streams = dev.pipeline_profile.get_streams()
                 frameset = dev.pipeline.poll_for_frames()
@@ -313,11 +330,7 @@ class RealsenseWrapper:
                                 save_colormap=save_depth_colormap
                             )
 
-                    if storage_paths is not None:
-                        ts_file = storage_paths.timestamp_file
-                        if ts_file is not None:
-                            with open(ts_file, 'a+') as f:
-                                f.write(f"{frame_dict['timestamp_color']}::{frame_dict['timestamp_depth']}\n")  # noqa
+                    self._save_timestamp(frame_dict, storage_paths)
 
                     frames[dev_sn] = frame_dict
 
@@ -533,14 +546,15 @@ class RealsenseWrapper:
         frame_data = np.asanyarray(frame.get_data())
         frame_dict['color'] = frame_data
         if storage_paths is not None:
-            filepath = storage_paths.color
-            if filepath is not None:
-                np.save(os.path.join(filepath, f'{timestamp}'), frame_data)
-            filepath = storage_paths.meta_color
-            if filepath is not None:
-                path = os.path.join(filepath, f'{timestamp}.json')
-                with open(path, 'w') as json_f:
-                    json.dump(read_metadata(frame), json_f, indent=4)
+            if storage_paths.save:
+                filepath = storage_paths.color
+                if filepath is not None:
+                    np.save(os.path.join(filepath, f'{timestamp}'), frame_data)
+                filepath = storage_paths.meta_color
+                if filepath is not None:
+                    path = os.path.join(filepath, f'{timestamp}.json')
+                    with open(path, 'w') as json_f:
+                        json.dump(read_metadata(frame), json_f, indent=4)
         return frame_dict, frame_data
 
     def _get_depth_stream(self,
@@ -569,24 +583,33 @@ class RealsenseWrapper:
         frame_data = np.asanyarray(frame.get_data())
         frame_dict['depth'] = frame_data
         if storage_paths is not None:
-            filepath = storage_paths.depth
-            if filepath is not None:
-                np.save(os.path.join(filepath, f'{timestamp}'), frame_data)
-            if save_colormap:
-                # Apply colormap on depth image
-                # (image must be converted to 8-bit per pixel first)
-                image = cv2.applyColorMap(
-                    cv2.convertScaleAbs(frame_data, alpha=0.03),
-                    cv2.COLORMAP_JET
-                )
-                image_name = os.path.join(filepath, f'{timestamp}.jpg')
-                cv2.imwrite(image_name, image)
-            filepath = storage_paths.meta_depth
-            if filepath is not None:
-                path = os.path.join(filepath, f'{timestamp}.json')
-                with open(path, 'w') as json_f:
-                    json.dump(read_metadata(frame), json_f, indent=4)
+            if storage_paths.save:
+                filepath = storage_paths.depth
+                if filepath is not None:
+                    np.save(os.path.join(filepath, f'{timestamp}'), frame_data)
+                if save_colormap:
+                    # Apply colormap on depth image
+                    # (image must be converted to 8-bit per pixel first)
+                    image = cv2.applyColorMap(
+                        cv2.convertScaleAbs(frame_data, alpha=0.03),
+                        cv2.COLORMAP_JET
+                    )
+                    image_name = os.path.join(filepath, f'{timestamp}.jpg')
+                    cv2.imwrite(image_name, image)
+                filepath = storage_paths.meta_depth
+                if filepath is not None:
+                    path = os.path.join(filepath, f'{timestamp}.json')
+                    with open(path, 'w') as json_f:
+                        json.dump(read_metadata(frame), json_f, indent=4)
         return frame_dict, frame_data
+
+    def _save_timestamp(self, frame_dict: dict, storage_paths: StoragePaths):
+        if storage_paths is not None:
+            if storage_paths.save:
+                ts_file = storage_paths.timestamp_file
+                if ts_file is not None:
+                    with open(ts_file, 'a+') as f:
+                        f.write(f"{frame_dict['timestamp_color']}::{frame_dict['timestamp_depth']}\n")  # noqa
 
     def _display_rs_data(self, frames: dict, scale: int) -> bool:
         terminate = False
@@ -614,9 +637,9 @@ class RealsenseWrapper:
                                          images.shape[0]//scale))
             cv2.namedWindow(f'{dev_sn}', cv2.WINDOW_AUTOSIZE)
             cv2.imshow(f'{dev_sn}', images)
-            key = cv2.waitKey(30)
+            self.key = cv2.waitKey(30)
             # Press esc or 'q' to close the image window
-            if key & 0xFF == ord('q') or key == 27:
+            if self.key & 0xFF == ord('q') or self.key == 27:
                 cv2.destroyAllWindows()
                 cv2.waitKey(5)
                 terminate = True
@@ -716,6 +739,10 @@ def str2rsformat(v) -> rs.format:
 
 def get_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description='Run RealSense devices.')
+    parser.add_argument('--rs-steps',
+                        type=int,
+                        default=10,
+                        help='number of steps to run (in secs)')
     parser.add_argument('--rs-fps',
                         type=int,
                         default=6,
@@ -744,6 +771,10 @@ def get_parser() -> argparse.ArgumentParser:
                         type=int,
                         default=0,
                         help='scale for displaying realsense raw images.')
+    parser.add_argument('--rs-save-with-key',
+                        type=str2bool,
+                        default=False,
+                        help='save using key = "c" ')
     parser.add_argument('--rs-save-path',
                         type=str,
                         default='/data/realsense',
