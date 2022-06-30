@@ -7,17 +7,6 @@ import sys
 from typing import Tuple, Optional
 
 
-# PATH = sys.argv[1]
-# FPS = sys.argv[2]
-# SCALE = sys.argv[3]
-# SYNC = sys.argv[4]
-
-PATH = '/code/realsense-simple-wrapper/output/rs_sample_3dev'
-FPS = 5
-SCALE = 0.75
-SYNC = 1
-
-
 class DataContainer:
     def __init__(self,
                  file=None,
@@ -123,8 +112,10 @@ def get_filepaths_with_timestamps(base_path: str) -> Tuple[dict, dict, list]:
     return color_dict, depth_dict, trial_list
 
 
-def iterate_over_raw_data(base_path: str,
-                          sync_ts: bool,
+def iterate_over_raw_data(base_path: Optional[str] = None,
+                          sync_ts: bool = False,
+                          fps: int = 6,
+                          scale: float = 1.0,
                           data_process_fn: Optional[callable] = None):
 
     # trial(as timestamp) > dev > timestamps > [filepath, calib]
@@ -200,6 +191,8 @@ def iterate_over_raw_data(base_path: str,
                                     color_ts_idxs=_color_ts_idxs,
                                     depth_ts_idxs=_depth_ts_idxs,
                                     sync_ts=sync_ts,
+                                    scale=scale,
+                                    fps=fps
                                     )
 
         except Exception as e:
@@ -217,6 +210,8 @@ def data_process_fn(**kwargs):
     color_ts_idxs = kwargs['color_ts_idxs']
     depth_ts_idxs = kwargs['depth_ts_idxs']
     sync_ts = kwargs['sync_ts']
+    scale = kwargs['scale']
+    fps = kwargs['fps']
 
     imgs = []
     num_dev = len(color_files)
@@ -263,17 +258,28 @@ def data_process_fn(**kwargs):
         imgs.append(np.vstack([image, depth]))
 
     output = np.hstack(imgs)
-    output = cv2.resize(output, (int(output.shape[1]*SCALE),
-                                 int(output.shape[0]*SCALE)))
+    output = cv2.resize(output, (int(output.shape[1]*scale),
+                                 int(output.shape[0]*scale)))
 
     name = f'output - sync={sync_ts}'
     cv2.namedWindow(name)
     cv2.moveWindow(name, 0, 0)
     cv2.imshow(name, output)
-    # cv2.waitKey(1000//FPS)
+    # cv2.waitKey(1000//fps)
     cv2.waitKey(0)
 
 
 if __name__ == "__main__":
 
-    iterate_over_raw_data(PATH, SYNC, data_process_fn=data_process_fn)
+    PATH = sys.argv[1]
+    SYNC = sys.argv[2]
+    FPS = sys.argv[3]
+    SCALE = sys.argv[4]
+
+    # PATH = '/code/realsense-simple-wrapper/output/calibration_848_480'
+    # SYNC = 1
+    # FPS = 5
+    # SCALE = 0.75
+
+    iterate_over_raw_data(PATH, SYNC, FPS, SCALE,
+                          data_process_fn=data_process_fn)

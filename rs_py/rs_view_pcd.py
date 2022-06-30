@@ -17,17 +17,6 @@ from rs_py.rs_view_raw_data import read_color_file
 from rs_py.rs_view_raw_data import read_depth_file
 
 
-PATH = sys.argv[1]
-FPS = sys.argv[2]
-SCALE = sys.argv[3]
-SYNC = sys.argv[4]
-
-# PATH = '/code/realsense-simple-wrapper/output/rs_sample_3dev'
-# FPS = 5
-# SCALE = 0.75
-# SYNC = 0
-
-
 def data_process_fn(**kwargs):
 
     color_files = kwargs['color_files']
@@ -98,7 +87,7 @@ def data_process_fn(**kwargs):
             )
             fig.update_layout(
                 title={
-                    'text': f"{depth_file.split('/')[-1]}, "
+                    'text': f"{depth_dc.file.split('/')[-1]}, "
                             f"num of points : {z.shape}, "
                             f"yz swapped, x+y+z negated",
                     'y': 0.9,
@@ -135,4 +124,13 @@ def data_process_fn(**kwargs):
 
 if __name__ == "__main__":
 
-    iterate_over_raw_data(PATH, SYNC, data_process_fn=data_process_fn)
+    PATH = sys.argv[1]
+    SYNC = sys.argv[2]
+    FPS = 0
+    SCALE = 0
+
+    # PATH = '/code/realsense-simple-wrapper/output/rs_sample_3dev'
+    # SYNC = 0
+
+    iterate_over_raw_data(PATH, SYNC, FPS, SCALE,
+                          data_process_fn=data_process_fn)
