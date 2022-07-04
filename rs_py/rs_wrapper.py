@@ -206,8 +206,15 @@ class RealsenseWrapper:
                 StoragePaths, base_path=arg.rs_save_path)
         else:
             storage_paths_fn = StoragePaths
-        self.storage_paths_per_dev = {sn: storage_paths_fn(sn)
-                                      for sn, _ in self.available_devices}
+        for sn, _ in self.available_devices:
+            _storage_path = storage_paths_fn(sn)
+            if not arg.rs_save_color:
+                _storage_path.color = None
+                _storage_path.meta_color = None
+            if not arg.rs_save_depth:
+                _storage_path.depth = None
+                _storage_path.meta_depth = None
+            self.storage_paths_per_dev[sn] = _storage_path
 
         self.key = -1
 
@@ -779,6 +786,14 @@ def get_parser() -> argparse.ArgumentParser:
                         type=str,
                         default='/data/realsense',
                         help='path to save realsense frames if --rs-save-data=True.')  # noqa
+    parser.add_argument('--rs-save-color',
+                        type=str2bool,
+                        default=True,
+                        help='Whether to save color frames')
+    parser.add_argument('--rs-save-depth',
+                        type=str2bool,
+                        default=True,
+                        help='Whether to save depth frames')
     parser.add_argument('--rs-use-one-dev-only',
                         type=str2bool,
                         default=False,
