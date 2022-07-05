@@ -1,3 +1,6 @@
+import time
+
+from rs_py import printout
 from rs_py import get_rs_parser
 from rs_py import RealsenseWrapper
 
@@ -20,26 +23,27 @@ if __name__ == "__main__":
 
     try:
         c = 0
+        max_c = int(1e8)
         while True:
-            print(f"[INFO] : step {c}")
+            printout(f"Step {c:8d}", 'i')
             frames = rsw.step(
                 display=arg.rs_display_frame,
                 display_and_save_with_key=arg.rs_save_with_key
             )
             if not len(frames) > 0:
-                print("[WARN] : Empty...")
+                printout(f"Empty...", 'w')
                 continue
             c += 1
-            if c > arg.rs_fps * arg.rs_steps:
+            if c > arg.rs_fps * arg.rs_steps or c > max_c:
                 break
 
     except Exception as e:
-        print("[ERROR]", e)
-        print("[INFO] : Stopping RealSense devices...")
+        printout(f"{e}", 'e')
+        printout(f"Stopping RealSense devices...", 'i')
         rsw.stop()
 
     finally:
-        print("[INFO] : Stopping RealSense devices...")
+        printout(f"Final RealSense devices...", 'i')
         rsw.stop()
 
-    print("[INFO] : Finished")
+    printout(f"Finished...", 'i')

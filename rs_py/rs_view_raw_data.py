@@ -6,6 +6,8 @@ import sys
 
 from typing import Tuple, Optional
 
+from rs_py import printout
+
 
 class DataContainer:
     def __init__(self,
@@ -113,7 +115,7 @@ def get_filepaths_with_timestamps(base_path: str) -> Tuple[dict, dict, list]:
 
 
 def iterate_over_raw_data(base_path: Optional[str] = None,
-                          sync_ts: bool = False,
+                          sync_ts: int = 0,
                           fps: int = 6,
                           scale: float = 1.0,
                           data_process_fn: Optional[callable] = None):
@@ -196,7 +198,7 @@ def iterate_over_raw_data(base_path: Optional[str] = None,
                                     )
 
         except Exception as e:
-            print(e)
+            printout(e, 'x')
             exit(1)
 
         finally:

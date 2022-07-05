@@ -25,6 +25,7 @@ from typing import Optional, Tuple, Union
 from rs_py.realsense_device_manager import Device
 from rs_py.realsense_device_manager import enumerate_connected_devices
 from rs_py.realsense_device_manager import post_process_depth_frame
+from rs_py.utils import str2bool
 
 
 class CalibrationConfig:
@@ -720,15 +721,6 @@ def read_metadata(frame: rs.frame) -> dict:
         if frame.supports_frame_metadata(i):
             output[i.name] = frame.get_frame_metadata(i)
     return output
-
-
-def str2bool(v) -> bool:
-    if v.lower() in ('yes', 'true', 't', 'y', '1'):
-        return True
-    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
-        return False
-    else:
-        raise argparse.ArgumentTypeError('Boolean value expected.')
 
 
 def str2rsformat(v) -> rs.format:

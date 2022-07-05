@@ -7,6 +7,8 @@ import os
 from rs_py.rs_view_raw_data import iterate_over_raw_data
 from rs_py.rs_view_raw_data import read_color_file
 
+from rs_py import printout
+
 
 def data_process_fn(**kwargs):
 
@@ -34,16 +36,16 @@ def data_process_fn(**kwargs):
         new_file = os.path.splitext(new_file)[0] + '.png'
         cv2.imwrite(new_file, image)
 
-    print("-"*80)
-    print(calib_data)
+    printout("-"*80, 'i')
+    printout(calib_data, 'i')
 
 
 if __name__ == "__main__":
 
-    # PATH = '/code/realsense-simple-wrapper/output/calibration_848_480'
+    # PATH = '/code/realsense-simple-wrapper/output/rs_3dev_sample2'
 
     PATH = sys.argv[1]
-    SYNC = False
+    SYNC = 0
     FPS = 0
     SCALE = 0
 
