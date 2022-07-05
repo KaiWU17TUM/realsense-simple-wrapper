@@ -4,7 +4,7 @@ import json
 import numpy as np
 import os
 
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Union
 
 from rs_py import printout
 from rs_py import RealsenseWrapper
@@ -18,10 +18,6 @@ THICKNESS = 2
 
 def get_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
-    parser.add_argument('--ar-only',
-                        type=str2bool,
-                        default=False,
-                        help='whether to use aruco code only without rsw.')
     parser.add_argument('--ar-mode',
                         type=str,
                         # required=True,
@@ -35,15 +31,19 @@ def get_parser() -> argparse.ArgumentParser:
                         help="type of ArUCo tag to generate")
     parser.add_argument('--ar-display',
                         type=int,
-                        default=3,
-                        help="1: display the generated ArUCo tag"
-                             "2: display the detected ArUCo tag"
-                             "3: display the pose estimation"
-                             "4: display the detection and pose estimation")
+                        default=0,
+                        help="1: generated ArUCo tag"
+                             "2: detected ArUCo tag"
+                             "3: pose estimation"
+                             "4: detection and pose estimation"
+                             "12: detected ArUCo tag with rsw"
+                             "13: pose estimation with rsw"
+                             "14: detection and pose estimation with rsw")
     parser.add_argument('--ar-save-path',
                         type=str,
                         default='-1',
                         help="path to save image containing ArUCo tag")
+
     # generate
     parser.add_argument('--ar-id',
                         type=int,
@@ -74,6 +74,12 @@ def get_parser() -> argparse.ArgumentParser:
                         default='-1',
                         help="Path to json file with calibration matrix "
                              "and distortion coefficients")
+    # # RSW
+    # parser.add_argument('--ar-with-rsw',
+    #                     type=str2bool,
+    #                     default=False,
+    #                     help="whether to use aruco code with rsw. If True, "
+    #                          "it ignores --ar-calib-path, --ar-save-path")
     return parser
 
 
@@ -81,63 +87,122 @@ class ArucoWrapper:
     # main reference :
     # https://docs.opencv.org/4.x/d5/dae/tutorial_aruco_detection.html
 
-    def __init__(self, args: argparse.Namespace,) -> None:
+    def __init__(self,
+                 args: argparse.Namespace,
+                 rsw: Optional[RealsenseWrapper] = None) -> None:
+        # 1. general
         self.mode = args.ar_mode
         self.type = args.ar_type
         self.display = args.ar_display
-        self.save_path = args.ar_save_path
-        if self.save_path == '-1':
-            self.save_path = None
-        else:
-            os.makedirs(self.save_path, exist_ok=True)
-
+        self.save_path = None
+        self.dev_sn_list = []
+        self.save_path_per_dev = {}
+        # 2. generation
         self.id = args.ar_id
         self.size = args.ar_size
         self.dummy = args.ar_dummy
-
+        # 3. detection
         self.image_path = args.ar_image_path
         self.include_rejected = args.ar_include_rejected
+        # 4. pose estimation
+        self.calib_path = None
+        self.intrinsic_mat = None
+        self.coeffs = None
+        self.calib_path_per_dev = {}
+        self.intrinsic_mat_per_dev = {}
+        self.coeffs_per_dev = {}
+        # 5. whether to use with rsw
+        if rsw is None:
+            # 5.1. path to save results
+            self.save_path = args.ar_save_path
+            if self.save_path == '-1':
+                self.save_path = None
+            else:
+                os.makedirs(self.save_path, exist_ok=True)
+            # 5.2. calib for pose estimation
+            self.calib_path = args.ar_calib_path
+            if self.calib_path != '-1':
+                with open(self.calib_path) as calib_file:
+                    self.calib_data = json.load(calib_file)
+                self.intrinsic_mat, self.coeffs = \
+                    self.get_camera_matrix_and_distortion_coeffs(
+                        self.calib_data)
+        else:
+            self.dev_sn_list = [sn for sn, _ in rsw.available_devices]
+            for dev_sn in self.dev_sn_list:
+                # 5.1. path to save results
+                save_path = rsw.storage_paths_per_dev[dev_sn].color
+                save_path = save_path.replace('/color',
+                                              f'/color_{ar_args.ar_mode}')
+                os.makedirs(save_path, exist_ok=True)
+                self.save_path_per_dev[dev_sn] = save_path
+                # 5.2. calib for pose estimation
+                calib_path = rsw.storage_paths_per_dev[dev_sn].calib
+                calib_path = os.path.join(calib_path,
+                                          os.listdir(calib_path)[0])
+                self.calib_path_per_dev[dev_sn] = calib_path
+                with open(calib_path) as calib_file:
+                    calib_data = json.load(calib_file)
+                intrinsic_mat, coeffs = \
+                    self.get_camera_matrix_and_distortion_coeffs(
+                        calib_data)
+                self.intrinsic_mat_per_dev[dev_sn] = intrinsic_mat
+                self.coeffs_per_dev[dev_sn] = coeffs
 
-        self.calib_path = args.ar_calib_path
-        if self.calib_path != '-1':
-            with open(self.calib_path) as calib_file:
-                self.calib_data = json.load(calib_file)
+    def step(self,
+             image: Optional[Union[np.ndarray, dict]] = None,
+             idx: Union[int, dict] = 0):
 
-            intrinsic_mat = np.zeros((3, 3))
-            intrinsic_mat[0, 0] = self.calib_data['color']['intrinsic_mat'][0]
-            intrinsic_mat[0, 1] = self.calib_data['color']['intrinsic_mat'][1]
-            intrinsic_mat[0, 2] = self.calib_data['color']['intrinsic_mat'][2]
-            intrinsic_mat[1, 0] = self.calib_data['color']['intrinsic_mat'][3]
-            intrinsic_mat[1, 1] = self.calib_data['color']['intrinsic_mat'][4]
-            intrinsic_mat[1, 2] = self.calib_data['color']['intrinsic_mat'][5]
-            intrinsic_mat[2, 0] = self.calib_data['color']['intrinsic_mat'][6]
-            intrinsic_mat[2, 1] = self.calib_data['color']['intrinsic_mat'][7]
-            intrinsic_mat[2, 2] = self.calib_data['color']['intrinsic_mat'][8]
-
-            coeffs = np.zeros((4))
-            coeffs[0] = self.calib_data['color']['coeffs'][0]
-            coeffs[1] = self.calib_data['color']['coeffs'][1]
-            coeffs[2] = self.calib_data['color']['coeffs'][2]
-            coeffs[3] = self.calib_data['color']['coeffs'][3]
-
-            # cameraMatrix - Intrinsic matrix of the calibrated camera
-            # distCoeffs - Distortion coefficients associated with your camera
-            self.intrinsic_mat = intrinsic_mat
-            self.coeffs = coeffs
-
-    def run(self, image: Optional[np.ndarray] = None):
         if self.mode == 'generate':
-            return self.generate_aruco_marker()
+            return self.generate_marker()
+
         elif self.mode == 'detect':
-            return self.detect_aruco_markers(image)
+            if len(self.dev_sn_list) > 0:
+                output = {}
+                for dev_sn in self.dev_sn_list:
+                    self.save_path = self.save_path_per_dev[dev_sn]
+                    output[dev_sn] = self.detect_markers(image[dev_sn],
+                                                         idx[dev_sn])
+                if self.display == 12:
+                    hstack = np.hstack([i['image'] for _, i in output.items()])
+                    name = f"ArUCo Tag, {self.type}, {self.id}, {self.dev_sn_list}"  # noqa
+                    cv2.namedWindow(name)
+                    # cv2.moveWindow(name, 0, 0)
+                    cv2.imshow(name, hstack)
+                    cv2.waitKey(0)
+                return output
+
+            else:
+                return self.detect_markers(image, idx)
+
         elif self.mode == 'estimatepose':
-            return self.estimate_pose(image)
+            if len(self.dev_sn_list) > 0:
+                output = {}
+                for dev_sn in self.dev_sn_list:
+                    self.save_path = self.save_path_per_dev[dev_sn]
+                    self.calib_path = self.calib_path_per_dev[dev_sn]
+                    self.intrinsic_mat = self.intrinsic_mat_per_dev[dev_sn]
+                    self.coeffs = self.coeffs_per_dev[dev_sn]
+                    output[dev_sn] = self.estimate_pose(image[dev_sn],
+                                                        idx[dev_sn])
+                if self.display in [13, 14]:
+                    hstack = np.hstack([i['image'] for _, i in output.items()])
+                    name = f"ArUCo Tag, {self.type}, {self.id}, {self.dev_sn_list}"  # noqa
+                    cv2.namedWindow(name)
+                    # cv2.moveWindow(name, 0, 0)
+                    cv2.imshow(name, hstack)
+                    cv2.waitKey(0)
+                return output
+
+            else:
+                return self.estimate_pose(image, idx)
+
         else:
             raise ValueError("Unknown mode...")
 
     # Based on :
     # https://pyimagesearch.com/2020/12/14/generating-aruco-markers-with-opencv-and-python/
-    def generate_aruco_marker(self):
+    def generate_marker(self):
 
         printout(f"generating ArUCo type {self.type} with ID {self.id}", 'i')
 
@@ -160,7 +225,7 @@ class ArucoWrapper:
         if self.display == 1:
             name = "ArUCo Tag"
             cv2.namedWindow(name)
-            cv2.moveWindow(name, 0, 0)
+            # cv2.moveWindow(name, 0, 0)
             cv2.imshow(name, marker)
             cv2.waitKey(0)
 
@@ -168,10 +233,10 @@ class ArucoWrapper:
 
     # Based on :
     # https://pyimagesearch.com/2020/12/21/detecting-aruco-markers-with-opencv-and-python/
-    def detect_aruco_markers(self,
-                             image: Optional[np.ndarray] = None,
-                             idx: int = 0
-                             ) -> dict:
+    def detect_markers(self,
+                       image: Optional[np.ndarray] = None,
+                       idx: int = 0
+                       ) -> dict:
 
         if image is None:
             printout(f"detecting ArUCo from image : {self.image_path}", 'i')
@@ -237,10 +302,10 @@ class ArucoWrapper:
                 output_file = os.path.join(self.save_path, output_file)
                 cv2.imwrite(output_file, image)
 
-            if self.display in [2, 4]:
-                name = "ArUCo Tag"
+            if self.display == 2:
+                name = f"ArUCo Tag, {self.type}, {self.id}, {self.dev_sn}"
                 cv2.namedWindow(name)
-                cv2.moveWindow(name, 0, 0)
+                # cv2.moveWindow(name, 0, 0)
                 cv2.imshow(name, image)
                 cv2.waitKey(0)
 
@@ -273,7 +338,7 @@ class ArucoWrapper:
 
         assert hasattr(self, 'calib_data')
 
-        detection_dict = self.detect_aruco_markers(image)
+        detection_dict = self.detect_markers(image, idx)
         image = detection_dict['image']
         corners = detection_dict['corners']
         ids = detection_dict['ids']
@@ -329,9 +394,9 @@ class ArucoWrapper:
                 cv2.imwrite(output_file, image)
 
             if self.display in [3, 4]:
-                name = "ArUCo Tag"
+                name = f"ArUCo Tag, {self.type}, {self.id}, {self.dev_sn}"
                 cv2.namedWindow(name)
-                cv2.moveWindow(name, 0, 0)
+                # cv2.moveWindow(name, 0, 0)
                 cv2.imshow(name, image)
                 cv2.waitKey(0)
 
@@ -414,6 +479,29 @@ class ArucoWrapper:
             setattr(params, k, v)
         return params
 
+    @staticmethod
+    def get_camera_matrix_and_distortion_coeffs(
+            calib_data: dict) -> Tuple[np.ndarray, np.ndarray]:
+
+        intrinsic_mat = np.zeros((3, 3))
+        intrinsic_mat[0, 0] = calib_data['color']['intrinsic_mat'][0]
+        intrinsic_mat[0, 1] = calib_data['color']['intrinsic_mat'][1]
+        intrinsic_mat[0, 2] = calib_data['color']['intrinsic_mat'][2]
+        intrinsic_mat[1, 0] = calib_data['color']['intrinsic_mat'][3]
+        intrinsic_mat[1, 1] = calib_data['color']['intrinsic_mat'][4]
+        intrinsic_mat[1, 2] = calib_data['color']['intrinsic_mat'][5]
+        intrinsic_mat[2, 0] = calib_data['color']['intrinsic_mat'][6]
+        intrinsic_mat[2, 1] = calib_data['color']['intrinsic_mat'][7]
+        intrinsic_mat[2, 2] = calib_data['color']['intrinsic_mat'][8]
+
+        coeffs = np.zeros((4))
+        coeffs[0] = calib_data['color']['coeffs'][0]
+        coeffs[1] = calib_data['color']['coeffs'][1]
+        coeffs[2] = calib_data['color']['coeffs'][2]
+        coeffs[3] = calib_data['color']['coeffs'][3]
+
+        return intrinsic_mat, coeffs
+
 
 if __name__ == '__main__':
 
@@ -426,7 +514,7 @@ if __name__ == '__main__':
     print("========================================")
     if ar_args.ar_only:
         ARW = ArucoWrapper(ar_args)
-        ARW.run()
+        ARW.step()
         printout(f"Finished...", 'i')
         exit(1)
 
@@ -446,13 +534,7 @@ if __name__ == '__main__':
     RSW.dummy_capture(rs_args.rs_fps * 5)
 
     # 2. Setting up AR
-    ARW_dict = {}
-    dev_sns = [sn for sn, _ in RSW.available_devices]
-    for dev_sn, _ in RSW.available_devices:
-        calib_path = RSW.storage_paths_per_dev[dev_sn].calib
-        calib_path = os.path.join(calib_path, os.listdir(calib_path)[0])
-        ar_args.ar_calib_path = calib_path
-        ARW_dict[dev_sn] = ArucoWrapper(ar_args)
+    ARW = ArucoWrapper(ar_args, rsw=RSW)
 
     # 3. Live loop
     try:
@@ -463,14 +545,12 @@ if __name__ == '__main__':
                 display=rs_args.rs_display_frame,
                 display_and_save_with_key=rs_args.rs_save_with_key
             )
+            images, idxs = {}, {}
             for dev_sn, data in frames.items():
-                RSW.storage_paths_per_dev
-                ARW_dict[dev_sn].run(
-                    image=data['color'].reshape(rs_args.rs_image_height,
-                                                rs_args.rs_image_width,
-                                                3),
-                    idx=c
-                )
+                images[dev_sn] = data['color'].reshape(
+                    rs_args.rs_image_height, rs_args.rs_image_width, 3)
+                idxs[dev_sn] = int(data['timestamp_color'])
+            ARW.step(images, idxs)
             if not len(frames) > 0:
                 printout(f"Empty...", 'w')
                 continue
