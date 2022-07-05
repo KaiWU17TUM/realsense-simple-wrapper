@@ -18,6 +18,10 @@ THICKNESS = 2
 
 def get_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser()
+    parser.add_argument('--ar-only',
+                        type=str2bool,
+                        default=False,
+                        help='whether to use aruco code only without rsw.')
     parser.add_argument('--ar-mode',
                         type=str,
                         # required=True,
@@ -164,11 +168,13 @@ class ArucoWrapper:
                     output[dev_sn] = self.detect_markers(image[dev_sn],
                                                          idx[dev_sn])
                 if self.display == 12:
-                    hstack = np.hstack([i['image'] for _, i in output.items()])
+                    images = np.hstack([i['image'] for _, i in output.items()])
                     name = f"ArUCo Tag, {self.type}, {self.id}, {self.dev_sn_list}"  # noqa
                     cv2.namedWindow(name)
                     # cv2.moveWindow(name, 0, 0)
-                    cv2.imshow(name, hstack)
+                    images = cv2.resize(images, (images.shape[1]//2,
+                                                 images.shape[0]//2))
+                    cv2.imshow(name, images)
                     cv2.waitKey(0)
                 return output
 
@@ -186,11 +192,13 @@ class ArucoWrapper:
                     output[dev_sn] = self.estimate_pose(image[dev_sn],
                                                         idx[dev_sn])
                 if self.display in [13, 14]:
-                    hstack = np.hstack([i['image'] for _, i in output.items()])
+                    images = np.hstack([i['image'] for _, i in output.items()])
                     name = f"ArUCo Tag, {self.type}, {self.id}, {self.dev_sn_list}"  # noqa
                     cv2.namedWindow(name)
                     # cv2.moveWindow(name, 0, 0)
-                    cv2.imshow(name, hstack)
+                    images = cv2.resize(images, (images.shape[1]//2,
+                                                 images.shape[0]//2))
+                    cv2.imshow(name, images)
                     cv2.waitKey(0)
                 return output
 
@@ -259,34 +267,35 @@ class ArucoWrapper:
 
             # Option 2 ----------
             # verify *at least* one ArUco marker was detected
-            if ids is not None and len(ids) > 0:
-                # flatten the ArUco IDs list
-                ids = ids.flatten()
-                # loop over the detected ArUCo corners
-                for (marker_corner, marker_id) in zip(corners, ids):
-                    # extract the marker corners (which are always returned in
-                    # top-left, top-right, bottom-right, and bottom-left order)
-                    marker_corner = marker_corner.reshape((4, 2))
-                    (topLeft, topRight, bottomRight, bottomLeft) = marker_corner
-                    # convert each of the (x, y)-coordinate pairs to integers
-                    topRight = (int(topRight[0]), int(topRight[1]))
-                    bottomRight = (int(bottomRight[0]), int(bottomRight[1]))
-                    bottomLeft = (int(bottomLeft[0]), int(bottomLeft[1]))
-                    topLeft = (int(topLeft[0]), int(topLeft[1]))
-                    # draw the bounding box of the ArUCo detection
-                    cv2.line(image, topLeft, topRight, (0, 255, 0), 2)
-                    cv2.line(image, topRight, bottomRight, (0, 255, 0), 2)
-                    cv2.line(image, bottomRight, bottomLeft, (0, 255, 0), 2)
-                    cv2.line(image, bottomLeft, topLeft, (0, 255, 0), 2)
-                    # compute and draw the center (x, y)-coordinates
-                    cX = int((topLeft[0] + bottomRight[0]) / 2.0)
-                    cY = int((topLeft[1] + bottomRight[1]) / 2.0)
-                    cv2.circle(image, (cX, cY), 4, (0, 0, 255), -1)
-                    # draw the ArUco marker ID on the image
-                    cv2.putText(image, str(marker_id),
-                                (cX+10, cY), cv2.FONT_HERSHEY_SIMPLEX,
-                                1.0, (0, 255, 0), 2)
-                    printout(f"ArUco marker ID {marker_id}", 'i')
+            if ids is not None:
+                if len(ids) > 0:
+                    # flatten the ArUco IDs list
+                    ids = ids.flatten()
+                    # loop over the detected ArUCo corners
+                    for (marker_corner, marker_id) in zip(corners, ids):
+                        # extract the marker corners (which are always
+                        # returned in tl, tr, br, and bl order)
+                        marker_corner = marker_corner.reshape((4, 2))
+                        (tl, tr, br, bl) = marker_corner
+                        # convert each of the (x, y)-coordinate pairs to ints
+                        tr = (int(tr[0]), int(tr[1]))
+                        br = (int(br[0]), int(br[1]))
+                        bl = (int(bl[0]), int(bl[1]))
+                        tl = (int(tl[0]), int(tl[1]))
+                        # draw the bounding box of the ArUCo detection
+                        cv2.line(image, tl, tr, (0, 255, 0), 2)
+                        cv2.line(image, tr, br, (0, 255, 0), 2)
+                        cv2.line(image, br, bl, (0, 255, 0), 2)
+                        cv2.line(image, bl, tl, (0, 255, 0), 2)
+                        # compute and draw the center (x, y)-coordinates
+                        cX = int((tl[0] + br[0]) / 2.0)
+                        cY = int((tl[1] + br[1]) / 2.0)
+                        cv2.circle(image, (cX, cY), 4, (0, 0, 255), -1)
+                        # draw the ArUco marker ID on the image
+                        cv2.putText(image, str(marker_id),
+                                    (cX+10, cY), cv2.FONT_HERSHEY_SIMPLEX,
+                                    1.0, (0, 255, 0), 2)
+                        printout(f"ArUco marker ID {marker_id}", 'i')
 
             if self.include_rejected == 1:
                 printout(f"rejected points : {rejected}", 'i')
@@ -336,15 +345,26 @@ class ArucoWrapper:
                 img, [imgpts[4:]], -1, (0, 0, 255), THICKNESS)
             return img
 
-        assert hasattr(self, 'calib_data')
+        # assert hasattr(self, 'calib_data')
 
-        detection_dict = self.detect_markers(image, idx)
-        image = detection_dict['image']
-        corners = detection_dict['corners']
-        ids = detection_dict['ids']
-        rejected = detection_dict['rejected']
+        output_dict = self.detect_markers(image, idx)
+        image = output_dict['image']
+        corners = output_dict['corners']
+        ids = output_dict['ids']
+        rejected = output_dict['rejected']
 
-        if ids is None and len(ids) == 0:
+        if ids is None:
+            return {
+                'image': image,
+                'corners': corners,
+                'ids': ids,
+                'rejected': rejected,
+                'rvecs': None,
+                'tvecs': None,
+                '_objPoints': None,
+            }
+
+        if len(ids) == 0:
             return {
                 'image': image,
                 'corners': corners,
