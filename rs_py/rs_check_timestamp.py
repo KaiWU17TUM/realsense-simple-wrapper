@@ -1,6 +1,6 @@
 import sys
 
-from rs_py.utils import get_filepaths
+from rs_py import get_filepaths
 
 PATH = sys.argv[1]
 
