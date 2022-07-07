@@ -312,8 +312,8 @@ class RealsenseWrapper:
 
                     frame_dict['calib'] = self.calib_data.get(dev_sn, {})
 
-                    # aligned_frameset = self._align.process(frameset)
-                    aligned_frameset = frameset
+                    aligned_frameset = self._align.process(frameset)
+                    # aligned_frameset = frameset
                     for stream in streams:
                         st = stream.stream_type()
                         # if stream.stream_type() == rs.stream.infrared:
