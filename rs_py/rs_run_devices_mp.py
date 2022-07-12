@@ -1,65 +1,64 @@
-import math
-from multiprocessing import Manager, Pool, RLock, Manager
-import numpy as np
-from time import sleep
+import multiprocessing as mp
+import os
+import threading
+import time
 
-from rs_py.rs_wrapper import rs
+from rs_py import rs
+
+from rs_py import printout
 from rs_py import get_rs_parser
 from rs_py import RealsenseWrapper
 
-
-ctx = Manager().list([rs.context()])
-
-
-def check_arr_arg_length(arg, length: int):
-    if length >= 0:
-        assert len(arg) == length
-    return len(arg)
+ctx = None
 
 
-def parallel_processing(func, num_of_processes: int, *args):
+def thread(dev_sn, arg):
+    print("Thread pid:", os.getpid(),
+          " tid:", threading.current_thread().ident)
 
-    arrays, non_arrays = [], []
-    c = -1
+    global ctx
+    if ctx is None:
+        print(ctx)
+        ctx = rs.context()
 
-    for arg in args:
-        if isinstance(arg, list):
-            c = check_arr_arg_length(arg, c)
-            arrays.append(arg)
-        elif isinstance(arg, np.ndarray):
-            c = check_arr_arg_length(arg, c)
-            arrays.append(arg)
-        else:
-            non_arrays.append(arg)
+    rsw = RealsenseWrapper(arg, dev_sn, ctx)
+    rsw.initialize()
+    rsw.set_ir_laser_power(arg.rs_laser_power)
+    rsw.save_calibration()
 
-    num_ele_per_process = math.ceil(c / num_of_processes)
+    rsw.dummy_capture(arg.rs_fps * 5)
 
-    argument_list = []
-    for pid in range(num_of_processes):
-        arg_tuple = []
-        for ele in non_arrays:
-            arg_tuple.append(ele)
-        for ele in arrays:
-            arg_tuple.append(ele[pid*num_ele_per_process:
-                                 (pid+1)*num_ele_per_process])
-        arg_tuple.append(pid)
-        arg_tuple = tuple(arg_tuple)
-        argument_list.append(arg_tuple)
+    try:
+        c = 0
+        max_c = int(1e8)
+        while True:
+            printout(f"Step {c:8d}", 'i')
+            frames = rsw.step(
+                display=0,
+                display_and_save_with_key=False
+            )
+            if not len(frames) > 0:
+                printout(f"Empty...", 'w')
+                continue
+            c += 1
+            if c > arg.rs_fps * arg.rs_steps or c > max_c:
+                break
 
-    pool = Pool(processes=num_of_processes,
-                initargs=(RLock(),))
-    jobs = [pool.apply_async(func, args=arg) for arg in argument_list]
-    pool.close()
-    result_list = [job.get() for job in jobs]
-    return result_list
+    except Exception as e:
+        printout(f"{e}", 'e')
+        printout(f"Stopping RealSense devices...", 'i')
+        rsw.stop()
+
+    finally:
+        printout(f"Final RealSense devices...", 'i')
+        rsw.stop()
+
+    printout(f"Finished...", 'i')
 
 
-def main(arg, dev_sn, pid):
+def main():
 
-    sleep(pid)
-
-    arg = arg[0]
-    dev_sn = dev_sn[0]
+    arg = get_rs_parser().parse_args()
     print("========================================")
     print(">>>>> args <<<<<")
     print("========================================")
@@ -67,38 +66,21 @@ def main(arg, dev_sn, pid):
         print(f"{k} : {v}")
     print("========================================")
 
-    rsw = RealsenseWrapper(arg, dev_sn, ctx[0])
-    rsw.initialize()
-    rsw.set_ir_laser_power(arg.rs_laser_power)
-    rsw.save_calibration()
-
-    rsw.dummy_capture(30)
-
-    try:
-        c = 0
-        while True:
-            print("[INFO] : step")
-            frames = rsw.step(display=arg.rs_display_frame)
-            if not len(frames) > 0:
-                print("[WARN] : Empty...")
-                continue
-            c += 1
-            if c > arg.rs_fps * 3:
-                break
-
-    except Exception as e:
-        print("[ERROR]", e)
-        print("[INFO] : Stopping RealSense devices...")
-        rsw.stop()
-
-    finally:
-        print("[INFO] : Stopping RealSense devices...")
-        rsw.stop()
+    print("TestMultiProcess pid:", os.getpid(),
+          " tid:", threading.current_thread().ident)
+    p1 = mp.Process(target=thread, args=('001622070408', arg,))
+    time.sleep(3)
+    p2 = mp.Process(target=thread, args=('001622070717', arg,))
+    p3 = mp.Process(target=thread, args=('001622071039', arg,))
+    p1.start()
+    p2.start()
+    p3.start()
+    p1.join()
+    p2.join()
+    p3.join()
 
 
-if __name__ == "__main__":
-    arg = get_rs_parser().parse_args()
-    parallel_processing(main, 3,
-                        [arg, arg, arg],
-                        ['001622070408', '001622070717', '001622071039'])
-    print("[INFO] : Finished")
+if __name__ == '__main__':
+    print("mainThread pid:", os.getpid(),
+          " tid:", threading.current_thread().ident)
+    main()

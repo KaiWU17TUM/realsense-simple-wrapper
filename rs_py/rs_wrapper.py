@@ -8,17 +8,6 @@ import numpy as np
 import os
 import time
 
-try:
-    from pyrealsense2 import pyrealsense2 as rs
-except ImportError as e:
-    print('Error: pyrealsense2 library could not be found.')
-    raise e
-try:
-    from pyrealsense2 import pyrealsense2_net as rsnet
-except ImportError as e:
-    print('Error: pyrealsense2_net could not be found.')
-    raise e
-
 from datetime import datetime
 from functools import partial
 from typing import Optional, Tuple, Union
@@ -27,6 +16,9 @@ from rs_py.realsense_device_manager import Device
 from rs_py.realsense_device_manager import enumerate_connected_devices
 from rs_py.realsense_device_manager import post_process_depth_frame
 from rs_py.utils import str2bool
+
+from rs_py import rs
+from rs_py import rsnet
 
 
 def read_metadata(frame: rs.frame) -> dict:
@@ -296,7 +288,10 @@ class RealsenseWrapper:
             print(f'[INFO] : Local mode')
             self.network = False
             self.ctx = ctx if ctx is not None else rs.context()
-            self.available_devices = enumerate_connected_devices(self.ctx)
+            if dev_sn is None:
+                self.available_devices = enumerate_connected_devices(self.ctx)
+            else:
+                self.available_devices = [(dev_sn, 'D400')]
 
         if dev_sn is not None:
             self.available_devices = [
