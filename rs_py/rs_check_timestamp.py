@@ -18,8 +18,8 @@ if __name__ == "__main__":
             with open(ts_filepath, 'r') as f:
                 lines = f.readlines()
 
-            c_ts = [float(i.split("::")[0]) for i in lines]
-            d_ts = [float(i.split("::")[1]) for i in lines]
+            c_ts = [float(i.split("::")[1]) for i in lines]
+            d_ts = [float(i.split("::")[2]) for i in lines]
 
             c_fps = float(len(c_ts))/((c_ts[-1]-c_ts[0])/1e6)
             d_fps = float(len(d_ts))/((d_ts[-1]-d_ts[0])/1e6)
