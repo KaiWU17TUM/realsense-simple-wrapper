@@ -1,5 +1,3 @@
-import time
-
 from rs_py import printout
 from rs_py import get_rs_parser
 from rs_py import RealsenseWrapper

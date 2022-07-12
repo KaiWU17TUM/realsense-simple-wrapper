@@ -29,6 +29,128 @@ from rs_py.realsense_device_manager import post_process_depth_frame
 from rs_py.utils import str2bool
 
 
+def read_metadata(frame: rs.frame) -> dict:
+    _FRAME_METADATA_VALUE_LIST = [
+        rs.frame_metadata_value.actual_exposure,
+        rs.frame_metadata_value.actual_fps,
+        rs.frame_metadata_value.auto_exposure,
+        rs.frame_metadata_value.auto_white_balance_temperature,
+        rs.frame_metadata_value.backend_timestamp,
+        rs.frame_metadata_value.backlight_compensation,
+        rs.frame_metadata_value.brightness,
+        rs.frame_metadata_value.contrast,
+        rs.frame_metadata_value.exposure_priority,
+        rs.frame_metadata_value.exposure_roi_bottom,
+        rs.frame_metadata_value.exposure_roi_left,
+        rs.frame_metadata_value.exposure_roi_right,
+        rs.frame_metadata_value.exposure_roi_top,
+        rs.frame_metadata_value.frame_counter,
+        rs.frame_metadata_value.frame_emitter_mode,
+        rs.frame_metadata_value.frame_laser_power,
+        rs.frame_metadata_value.frame_laser_power_mode,
+        rs.frame_metadata_value.frame_led_power,
+        rs.frame_metadata_value.frame_timestamp,
+        rs.frame_metadata_value.gain_level,
+        rs.frame_metadata_value.gamma,
+        rs.frame_metadata_value.hue,
+        rs.frame_metadata_value.low_light_compensation,
+        rs.frame_metadata_value.manual_white_balance,
+        rs.frame_metadata_value.power_line_frequency,
+        rs.frame_metadata_value.raw_frame_size,
+        rs.frame_metadata_value.saturation,
+        rs.frame_metadata_value.sensor_timestamp,
+        rs.frame_metadata_value.sharpness,
+        rs.frame_metadata_value.temperature,
+        rs.frame_metadata_value.time_of_arrival,
+        rs.frame_metadata_value.white_balance,
+    ]
+    output = {}
+    for i in _FRAME_METADATA_VALUE_LIST:
+        if frame.supports_frame_metadata(i):
+            output[i.name] = frame.get_frame_metadata(i)
+    return output
+
+
+def str2rsformat(v) -> rs.format:
+    _SUPPORTED_FORMATS = {
+        'z16': rs.format.z16,
+        'bgr8': rs.format.bgr8,
+        'rgb8': rs.format.rgb8,
+        'yuyv': rs.format.yuyv
+    }
+    if v.lower() not in _SUPPORTED_FORMATS.keys():
+        raise argparse.ArgumentTypeError('unknown stream format')
+    else:
+        return _SUPPORTED_FORMATS.get(v.lower())
+
+
+def get_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description='Run RealSense devices.')
+    parser.add_argument('--rs-steps',
+                        type=int,
+                        default=10,
+                        help='number of steps to run (in secs)')
+    parser.add_argument('--rs-fps',
+                        type=int,
+                        default=6,
+                        help='fps')
+    parser.add_argument('--rs-image-width',
+                        type=int,
+                        default=848,
+                        help='image width in px')
+    parser.add_argument('--rs-image-height',
+                        type=int,
+                        default=480,
+                        help='image height in px')
+    parser.add_argument('--rs-color-format',
+                        type=str2rsformat,
+                        default=rs.format.bgr8,
+                        help='format of color stream')
+    parser.add_argument('--rs-depth-format',
+                        type=str2rsformat,
+                        default=rs.format.z16,
+                        help='format of depth stream')
+    parser.add_argument('--rs-laser-power',
+                        type=int,
+                        default=290,
+                        help='laser power')
+    parser.add_argument('--rs-display-frame',
+                        type=int,
+                        default=0,
+                        help='scale for displaying realsense raw images.')
+    parser.add_argument('--rs-save-with-key',
+                        type=str2bool,
+                        default=False,
+                        help='save using key = "c" ')
+    parser.add_argument('--rs-save-path',
+                        type=str,
+                        default='/data/realsense',
+                        help='path to save realsense frames if --rs-save-data=True.')  # noqa
+    parser.add_argument('--rs-save-color',
+                        type=str2bool,
+                        default=True,
+                        help='Whether to save color frames')
+    parser.add_argument('--rs-save-depth',
+                        type=str2bool,
+                        default=True,
+                        help='Whether to save depth frames')
+    parser.add_argument('--rs-use-one-dev-only',
+                        type=str2bool,
+                        default=False,
+                        help='use 1 rs device only.')
+    parser.add_argument('--rs-dev',
+                        type=str,
+                        help='rs device sn to run')
+    parser.add_argument('--rs-ip',
+                        # nargs='*',
+                        type=str,
+                        # default='192.168.100.39',  # 101 LAN
+                        # default='192.168.1.216',  # 101 WLAN
+                        # default='192.168.1.11',  # 102 WLAN
+                        help='ip address')
+    return parser
+
+
 class CalibrationConfig:
     def __init__(self):
         self.device_sn = []
@@ -684,125 +806,3 @@ class RealsenseWrapper:
         except Exception as e:
             print(f'USB type      : not available', e)
         print("========================================")
-
-
-def read_metadata(frame: rs.frame) -> dict:
-    _FRAME_METADATA_VALUE_LIST = [
-        rs.frame_metadata_value.actual_exposure,
-        rs.frame_metadata_value.actual_fps,
-        rs.frame_metadata_value.auto_exposure,
-        rs.frame_metadata_value.auto_white_balance_temperature,
-        rs.frame_metadata_value.backend_timestamp,
-        rs.frame_metadata_value.backlight_compensation,
-        rs.frame_metadata_value.brightness,
-        rs.frame_metadata_value.contrast,
-        rs.frame_metadata_value.exposure_priority,
-        rs.frame_metadata_value.exposure_roi_bottom,
-        rs.frame_metadata_value.exposure_roi_left,
-        rs.frame_metadata_value.exposure_roi_right,
-        rs.frame_metadata_value.exposure_roi_top,
-        rs.frame_metadata_value.frame_counter,
-        rs.frame_metadata_value.frame_emitter_mode,
-        rs.frame_metadata_value.frame_laser_power,
-        rs.frame_metadata_value.frame_laser_power_mode,
-        rs.frame_metadata_value.frame_led_power,
-        rs.frame_metadata_value.frame_timestamp,
-        rs.frame_metadata_value.gain_level,
-        rs.frame_metadata_value.gamma,
-        rs.frame_metadata_value.hue,
-        rs.frame_metadata_value.low_light_compensation,
-        rs.frame_metadata_value.manual_white_balance,
-        rs.frame_metadata_value.power_line_frequency,
-        rs.frame_metadata_value.raw_frame_size,
-        rs.frame_metadata_value.saturation,
-        rs.frame_metadata_value.sensor_timestamp,
-        rs.frame_metadata_value.sharpness,
-        rs.frame_metadata_value.temperature,
-        rs.frame_metadata_value.time_of_arrival,
-        rs.frame_metadata_value.white_balance,
-    ]
-    output = {}
-    for i in _FRAME_METADATA_VALUE_LIST:
-        if frame.supports_frame_metadata(i):
-            output[i.name] = frame.get_frame_metadata(i)
-    return output
-
-
-def str2rsformat(v) -> rs.format:
-    _SUPPORTED_FORMATS = {
-        'z16': rs.format.z16,
-        'bgr8': rs.format.bgr8,
-        'rgb8': rs.format.rgb8,
-        'yuyv': rs.format.yuyv
-    }
-    if v.lower() not in _SUPPORTED_FORMATS.keys():
-        raise argparse.ArgumentTypeError('unknown stream format')
-    else:
-        return _SUPPORTED_FORMATS.get(v.lower())
-
-
-def get_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description='Run RealSense devices.')
-    parser.add_argument('--rs-steps',
-                        type=int,
-                        default=10,
-                        help='number of steps to run (in secs)')
-    parser.add_argument('--rs-fps',
-                        type=int,
-                        default=6,
-                        help='fps')
-    parser.add_argument('--rs-image-width',
-                        type=int,
-                        default=848,
-                        help='image width in px')
-    parser.add_argument('--rs-image-height',
-                        type=int,
-                        default=480,
-                        help='image height in px')
-    parser.add_argument('--rs-color-format',
-                        type=str2rsformat,
-                        default=rs.format.bgr8,
-                        help='format of color stream')
-    parser.add_argument('--rs-depth-format',
-                        type=str2rsformat,
-                        default=rs.format.z16,
-                        help='format of depth stream')
-    parser.add_argument('--rs-laser-power',
-                        type=int,
-                        default=290,
-                        help='laser power')
-    parser.add_argument('--rs-display-frame',
-                        type=int,
-                        default=0,
-                        help='scale for displaying realsense raw images.')
-    parser.add_argument('--rs-save-with-key',
-                        type=str2bool,
-                        default=False,
-                        help='save using key = "c" ')
-    parser.add_argument('--rs-save-path',
-                        type=str,
-                        default='/data/realsense',
-                        help='path to save realsense frames if --rs-save-data=True.')  # noqa
-    parser.add_argument('--rs-save-color',
-                        type=str2bool,
-                        default=True,
-                        help='Whether to save color frames')
-    parser.add_argument('--rs-save-depth',
-                        type=str2bool,
-                        default=True,
-                        help='Whether to save depth frames')
-    parser.add_argument('--rs-use-one-dev-only',
-                        type=str2bool,
-                        default=False,
-                        help='use 1 rs device only.')
-    parser.add_argument('--rs-dev',
-                        type=str,
-                        help='rs device sn to run')
-    parser.add_argument('--rs-ip',
-                        # nargs='*',
-                        type=str,
-                        # default='192.168.100.39',  # 101 LAN
-                        # default='192.168.1.216',  # 101 WLAN
-                        # default='192.168.1.11',  # 102 WLAN
-                        help='ip address')
-    return parser
