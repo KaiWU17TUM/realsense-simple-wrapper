@@ -39,8 +39,8 @@ if [ $# -eq 3 ]; then
         printf "${BLUE}"
         printf "[3/4] Connecting existing devices from ip address ... $RASP_IP \n"
         printf "${NC}"
-        DEVICES_AVAILABLE=$(sudo usbip list -r $RASP_IP | grep Intel | cut -d ":" -f 1)
-
+        # DEVICES_AVAILABLE=$(sudo usbip list -r $RASP_IP | grep Intel | cut -d ":" -f 1)
+        DEVICES_AVAILABLE=$(usbip list -r $RASP_IP | grep -B 1 ": /sys" | cut -d ":" -f 1)
         for DEVICE in $DEVICES_AVAILABLE; do
             printf "Attaching to '$RASP_IP' busid '$DEVICE' \n"
             sudo usbip attach -r $RASP_IP -b $DEVICE
