@@ -6,6 +6,7 @@ import cv2
 import json
 import numpy as np
 import os
+import time
 
 try:
     from pyrealsense2 import pyrealsense2 as rs
@@ -218,6 +219,7 @@ class RealsenseWrapper:
             self.storage_paths_per_dev[sn] = _storage_path
 
         self.key = -1
+        self.__timestamp = 0
 
 # [MAIN FUNCTIONS] *************************************************************
 
@@ -308,6 +310,9 @@ class RealsenseWrapper:
                 frameset = dev.pipeline.poll_for_frames()
 
                 if frameset.size() == len(streams):
+
+                    self.__timestamp = time.time()
+
                     frame_dict = {}
 
                     frame_dict['calib'] = self.calib_data.get(dev_sn, {})
@@ -617,7 +622,7 @@ class RealsenseWrapper:
                 ts_file = storage_paths.timestamp_file
                 if ts_file is not None:
                     with open(ts_file, 'a+') as f:
-                        f.write(f"{frame_dict['timestamp_color']}::{frame_dict['timestamp_depth']}\n")  # noqa
+                        f.write(f"{self.__timestamp}::{frame_dict['timestamp_color']}::{frame_dict['timestamp_depth']}\n")  # noqa
 
     def _display_rs_data(self, frames: dict, scale: int) -> bool:
         terminate = False
