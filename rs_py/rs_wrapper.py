@@ -10,12 +10,13 @@ import time
 
 from datetime import datetime
 from functools import partial
-from typing import Optional, Tuple, Union
+from typing import Optional, Tuple, Union, Any
 
 from rs_py.realsense_device_manager import Device
 from rs_py.realsense_device_manager import enumerate_connected_devices
 from rs_py.realsense_device_manager import post_process_depth_frame
 from rs_py.utils import str2bool
+from rs_py.utils import printout
 
 from rs_py import rs
 from rs_py import rsnet
@@ -126,6 +127,10 @@ def get_parser() -> argparse.ArgumentParser:
                         type=str2bool,
                         default=True,
                         help='Whether to save depth frames')
+    parser.add_argument('--rs-save-stacked',
+                        type=str2bool,
+                        default=False,
+                        help='Whether to save color and depth frames in a stack')  # noqa
     parser.add_argument('--rs-use-one-dev-only',
                         type=str2bool,
                         default=False,
@@ -216,10 +221,12 @@ class StoragePaths:
         os.makedirs(self.color, exist_ok=True)
         os.makedirs(self.depth, exist_ok=True)
 
-        self.meta_color = os.path.join(device_path, 'meta_color')
-        self.meta_depth = os.path.join(device_path, 'meta_depth')
-        os.makedirs(self.meta_color, exist_ok=True)
-        os.makedirs(self.meta_depth, exist_ok=True)
+        # self.color_metadata = None
+        # self.depth_metadata = None
+        self.color_metadata = os.path.join(device_path, 'color_metadata')
+        self.depth_metadata = os.path.join(device_path, 'depth_metadata')
+        os.makedirs(self.color_metadata, exist_ok=True)
+        os.makedirs(self.depth_metadata, exist_ok=True)
 
         self.calib = os.path.join(device_path, 'calib')
         os.makedirs(self.calib, exist_ok=True)
@@ -320,6 +327,7 @@ class RealsenseWrapper:
         # Save paths
         self.timestamp_mode = None
         self.storage_paths_per_dev = {}
+        self.save_stacked = arg.save_stacked
         if arg.rs_save_path is not None:
             storage_paths_fn = partial(
                 StoragePaths, base_path=arg.rs_save_path)
@@ -329,14 +337,14 @@ class RealsenseWrapper:
             _storage_path = storage_paths_fn(sn)
             if not arg.rs_save_color:
                 _storage_path.color = None
-                _storage_path.meta_color = None
+                _storage_path.color_metadata = None
             if not arg.rs_save_depth:
                 _storage_path.depth = None
-                _storage_path.meta_depth = None
+                _storage_path.depth_metadata = None
             self.storage_paths_per_dev[sn] = _storage_path
 
         self.key = -1
-        self.__timestamp = 0
+        self._timestamp = 0
 
 # [MAIN FUNCTIONS] *************************************************************
 
@@ -428,7 +436,7 @@ class RealsenseWrapper:
 
                 if frameset.size() == len(streams):
 
-                    self.__timestamp = time.time()
+                    self._timestamp = time.time()
 
                     frame_dict = {}
 
@@ -444,25 +452,51 @@ class RealsenseWrapper:
                         #     key_ = (stream.stream_type(),
                         #             stream.stream_index())
                         # frame = aligned_frameset.first_or_default(st)
-                        # frame_data = frame.get_data()
-                        # frame_dict[st] = frame_data
+                        # framedata = frame.get_data()
+                        # frame_dict[st] = framedata
                         if st == rs.stream.color:
-                            frame_dict, frame_data = self._get_color_stream(
+                            frame_dict, framedata = self._get_color_stream(
                                 frameset=aligned_frameset,
                                 frame_dict=frame_dict,
-                                storage_paths=storage_paths,
+                                storage_paths=None if self.save_stacked else storage_paths,  # noqa
                             )
                         if st == rs.stream.depth:
-                            frame_dict, frame_data = self._get_depth_stream(
+                            frame_dict, framedata = self._get_depth_stream(
                                 frameset=aligned_frameset,
                                 frame_dict=frame_dict,
-                                storage_paths=storage_paths,
+                                storage_paths=None if self.save_stacked else storage_paths,  # noqa
                                 save_colormap=save_depth_colormap
                             )
 
                     self._save_timestamp(frame_dict, storage_paths)
 
                     frames[dev_sn] = frame_dict
+
+        # Save data as a stacked array
+        if self.save_stacked:
+            color_framedata_list = []
+            color_timestamp_list = []
+            color_metadata_dict = {}
+            depth_framedata_list = []
+            depth_timestamp_list = []
+            depth_metadata_dict = {}
+            for dev_sn, frame_dict in frames.items():
+                color_framedata_list.append(frame_dict['color_framedata'])
+                color_timestamp_list.append(str(frame_dict['color_timestamp']))
+                color_metadata_dict[dev_sn] = frame_dict['color_metadata']
+                depth_framedata_list.append(frame_dict['depth_framedata'])
+                depth_timestamp_list.append(str(frame_dict['depth_timestamp']))
+                depth_metadata_dict[dev_sn] = frame_dict['depth_metadata']
+            frame_dict['color_framedata'] = np.hstack(color_framedata_list)
+            frame_dict['color_timestamp'] = "_".join(color_timestamp_list)
+            frame_dict['color_metadata'] = color_metadata_dict
+            frame_dict['depth_framedata'] = np.hstack(depth_framedata_list)
+            frame_dict['depth_timestamp'] = "_".join(depth_timestamp_list)
+            frame_dict['depth_metadata'] = depth_metadata_dict
+            storage = self.storage_paths_per_dev[self.available_devices[0][0]]
+            self._save_color_framedata(frame_dict, storage)
+            self._save_depth_framedata(frame_dict, storage,
+                                       save_depth_colormap)
 
         if display > 0:
             if self._display_rs_data(frames, display):
@@ -672,20 +706,13 @@ class RealsenseWrapper:
         """
         frame = frameset.first_or_default(rs.stream.color)
         timestamp = self._get_timestamp(frame)
-        frame_dict['timestamp_color'] = timestamp
-        frame_data = np.asanyarray(frame.get_data())
-        frame_dict['color'] = frame_data
-        if storage_paths is not None:
-            if storage_paths.save:
-                filepath = storage_paths.color
-                if filepath is not None:
-                    np.save(os.path.join(filepath, f'{timestamp}'), frame_data)
-                filepath = storage_paths.meta_color
-                if filepath is not None:
-                    path = os.path.join(filepath, f'{timestamp}.json')
-                    with open(path, 'w') as json_f:
-                        json.dump(read_metadata(frame), json_f, indent=4)
-        return frame_dict, frame_data
+        frame_dict['color_timestamp'] = timestamp
+        framedata = np.asanyarray(frame.get_data())
+        frame_dict['color_framedata'] = framedata
+        metadata = read_metadata(frame)
+        frame_dict['color_metadata'] = metadata
+        self._save_color_framedata(frame_dict, storage_paths)
+        return frame_dict, framedata
 
     def _get_depth_stream(self,
                           frameset: rs.composite_frame,
@@ -709,29 +736,13 @@ class RealsenseWrapper:
         frame = frameset.first_or_default(rs.stream.depth)
         # frame = post_process_depth_frame(frame)
         timestamp = self._get_timestamp(frame)
-        frame_dict['timestamp_depth'] = timestamp
-        frame_data = np.asanyarray(frame.get_data())
-        frame_dict['depth'] = frame_data
-        if storage_paths is not None:
-            if storage_paths.save:
-                filepath = storage_paths.depth
-                if filepath is not None:
-                    np.save(os.path.join(filepath, f'{timestamp}'), frame_data)
-                if save_colormap:
-                    # Apply colormap on depth image
-                    # (image must be converted to 8-bit per pixel first)
-                    image = cv2.applyColorMap(
-                        cv2.convertScaleAbs(frame_data, alpha=0.03),
-                        cv2.COLORMAP_JET
-                    )
-                    image_name = os.path.join(filepath, f'{timestamp}.jpg')
-                    cv2.imwrite(image_name, image)
-                filepath = storage_paths.meta_depth
-                if filepath is not None:
-                    path = os.path.join(filepath, f'{timestamp}.json')
-                    with open(path, 'w') as json_f:
-                        json.dump(read_metadata(frame), json_f, indent=4)
-        return frame_dict, frame_data
+        frame_dict['depth_timestamp'] = timestamp
+        framedata = np.asanyarray(frame.get_data())
+        frame_dict['depth_framedata'] = framedata
+        metadata = read_metadata(frame)
+        frame_dict['depth_metadata'] = metadata
+        self._save_depth_framedata(frame_dict, storage_paths, save_colormap)
+        return frame_dict, framedata
 
     def _save_timestamp(self, frame_dict: dict, storage_paths: StoragePaths):
         if storage_paths is not None:
@@ -739,14 +750,68 @@ class RealsenseWrapper:
                 ts_file = storage_paths.timestamp_file
                 if ts_file is not None:
                     with open(ts_file, 'a+') as f:
-                        f.write(f"{self.__timestamp}::{frame_dict['timestamp_color']}::{frame_dict['timestamp_depth']}\n")  # noqa
+                        f.write(f"{self._timestamp}::{frame_dict['color_timestamp']}::{frame_dict['depth_timestamp']}\n")  # noqa
+
+    def _save_color_framedata(self,
+                              frame_dict: dict,
+                              storage_paths: StoragePaths):
+        ts = frame_dict['color_timestamp']
+        # No storage
+        if storage_paths is None:
+            return
+        # If save flag is true
+        if storage_paths.save:
+            # save frame
+            filedir = storage_paths.color
+            if filedir is not None:
+                np.save(os.path.join(filedir, f"{ts}"),
+                        frame_dict['color_framedata'])
+            # save meta
+            filedir = storage_paths.color_metadata
+            if filedir is not None:
+                with open(os.path.join(filedir, f"{ts}.json"), 'w') as json_f:
+                    json.dump(frame_dict['color_metadata'], json_f, indent=4)
+
+    def _save_depth_framedata(self,
+                              frame_dict: dict,
+                              storage_paths: StoragePaths,
+                              save_colormap: bool = False):
+        ts = frame_dict['depth_timestamp']
+        # No storage
+        if storage_paths is None:
+            return
+        # If save flag is true
+        if storage_paths.save:
+            # save frame
+            filedir = storage_paths.depth
+            if filedir is not None:
+                arr1 = np.uint8(frame_dict['depth_framedata'] >> 8)
+                arr2 = np.uint8(frame_dict['depth_framedata'])
+                np.save(os.path.join(filedir, f'{ts}_arr1'), arr1)
+                np.save(os.path.join(filedir, f'{ts}_arr2'), arr2)
+            # save depth colormap
+            if save_colormap:
+                # Apply colormap on depth image
+                # (image must be converted to 8-bit per pixel first)
+                image = cv2.applyColorMap(
+                    cv2.convertScaleAbs(
+                        frame_dict['depth_framedata'], alpha=0.03),
+                    cv2.COLORMAP_JET
+                )
+                image_name = os.path.join(filedir, f'{ts}.jpg')
+                cv2.imwrite(image_name, image)
+            # save meta
+            filedir = storage_paths.depth_metadata
+            if filedir is not None:
+                with open(os.path.join(filedir, f"{ts}.json"), 'w') as json_f:
+                    json.dump(frame_dict['depth_metadata'], json_f, indent=4)
 
     def _display_rs_data(self, frames: dict, scale: int) -> bool:
         terminate = False
         for dev_sn, data_dict in frames.items():
             # Render images
             depth_colormap = cv2.applyColorMap(
-                cv2.convertScaleAbs(data_dict['depth'], alpha=0.03),
+                cv2.convertScaleAbs(data_dict['depth_framedata'], alpha=0.03),
                 cv2.COLORMAP_JET)
             # # Set pixels further than clipping_distance to grey
             # clipping_distance = 10
@@ -760,9 +825,10 @@ class RealsenseWrapper:
             # images = np.hstack((bg_removed, depth_colormap))
             # images = np.hstack((color_image, depth_colormap))
             images_overlapped = cv2.addWeighted(
-                data_dict['color'], 0.3, depth_colormap, 0.5, 0)
-            images = np.hstack(
-                (data_dict['color'], depth_colormap, images_overlapped))
+                data_dict['color_framedata'], 0.3, depth_colormap, 0.5, 0)
+            images = np.hstack((data_dict['color_framedata'],
+                                depth_colormap,
+                                images_overlapped))
             images = cv2.resize(images, (images.shape[1]//scale,
                                          images.shape[0]//scale))
             cv2.namedWindow(f'{dev_sn}', cv2.WINDOW_AUTOSIZE)
