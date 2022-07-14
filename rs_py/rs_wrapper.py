@@ -357,7 +357,8 @@ class RealsenseWrapper:
         self._key = -1
         self._timestamp = 0
         self._temperature_log_interval = 300
-        self._temperature_log_counter = 0
+        self._temperature_log_counter = {sn: 0
+                                         for sn, _ in self.available_devices}
 
 # [MAIN FUNCTIONS] *************************************************************
 
@@ -484,7 +485,7 @@ class RealsenseWrapper:
                                 storage_paths=None if self.save_stacked else storage_paths,  # noqa
                                 save_colormap=save_depth_colormap
                             )
-                            self._print_camera_temperature(dev.depth_sensor)
+                            self._print_camera_temperature(dev_sn)
 
                     self._save_timestamp(frame_dict, storage_paths)
 
@@ -886,13 +887,14 @@ class RealsenseWrapper:
             print(f'USB type      : not available', e)
         print("========================================")
 
-    def _print_camera_temperature(self, sensor):
-        if self._timestamp > self._temperature_log_counter:
-            if self._timestamp // self._temperature_log_interval > 1:
-                self._temperature_log_counter = self._timestamp
-                if sensor.supports(rs.option.asic_temperature):
-                    temp = sensor.get_option(rs.option.asic_temperature)
-                    printout(f"Temperature ASIC : {temp}", 'i')
-                if sensor.supports(rs.option.projector_temperature):
-                    temp = sensor.get_option(rs.option.projector_temperature)
-                    printout(f"Temperature Projector : {temp}", 'i')
+    def _print_camera_temperature(self, dev_sn: str):
+        _count = self._timestamp // self._temperature_log_interval
+        if _count > self._temperature_log_counter[dev_sn]:
+            self._temperature_log_counter[dev_sn] = _count
+            sensor = self.enabled_devices[dev_sn].depth_sensor
+            if sensor.supports(rs.option.asic_temperature):
+                temp = sensor.get_option(rs.option.asic_temperature)
+                printout(f"Temperature ASIC : {temp}", 'i')
+            if sensor.supports(rs.option.projector_temperature):
+                temp = sensor.get_option(rs.option.projector_temperature)
+                printout(f"Temperature Projector : {temp}", 'i')
