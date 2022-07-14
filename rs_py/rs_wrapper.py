@@ -12,7 +12,6 @@ from datetime import datetime
 from functools import partial
 from typing import Optional, Tuple, Union, Any
 
-from rs_py.realsense_device_manager import Device
 from rs_py.realsense_device_manager import enumerate_connected_devices
 from rs_py.realsense_device_manager import post_process_depth_frame
 from rs_py.utils import str2bool
@@ -256,6 +255,15 @@ class StreamConfig:
         return self.__dict__
 
 
+# Based on realsense_device_manager.py
+class Device:
+    def __init__(self, pipeline, pipeline_profile, color_sensor, depth_sensor):
+        self.pipeline = pipeline
+        self.pipeline_profile = pipeline_profile
+        self.color_sensor = color_sensor
+        self.depth_sensor = depth_sensor
+
+
 class RealsenseWrapper:
     """Wrapper to run multiple realsense cameras.
 
@@ -345,8 +353,10 @@ class RealsenseWrapper:
                 _storage_path.depth_metadata = None
             self.storage_paths_per_dev[sn] = _storage_path
 
-        self.key = -1
+        # internal variables
+        self._key = -1
         self._timestamp = 0
+        self._temperature_log_interval = 300
 
 # [MAIN FUNCTIONS] *************************************************************
 
@@ -377,18 +387,19 @@ class RealsenseWrapper:
             print(f"[INFO] : 'cfg' usable with 'pipeline' : {check}")
 
             pipeline_profile = pipeline.start(cfg)
+            c_sensor = pipeline_profile.get_device().first_color_sensor()
+            d_sensor = pipeline_profile.get_device().first_depth_sensor()
 
             # IR for depth
             if enable_ir_emitter:
-                d_sensor = pipeline_profile.get_device().first_depth_sensor()
                 if d_sensor.supports(rs.option.emitter_enabled):
                     d_sensor.set_option(rs.option.emitter_enabled,
                                         1 if enable_ir_emitter else 0)
                     # d_sensor.set_option(rs.option.laser_power, 330)
 
             # Stored the enabled devices
-            self.enabled_devices[device_sn] = (
-                Device(pipeline, pipeline_profile, product_line))
+            self.enabled_devices[device_sn] = \
+                Device(pipeline, pipeline_profile, c_sensor, d_sensor)
 
             self._print_camera_info(pipeline_profile)
 
@@ -426,12 +437,12 @@ class RealsenseWrapper:
                 storage_paths = self.storage_paths_per_dev.get(dev_sn, None)
 
                 if display_and_save_with_key:
-                    if self.key == -1:
+                    if self._key == -1:
                         storage_paths.save = False
                     else:
-                        if self.key & 0xFF == ord('c'):
+                        if self._key & 0xFF == ord('c'):
                             storage_paths.save = True
-                            self.key = -1
+                            self._key = -1
 
                 streams = dev.pipeline_profile.get_streams()
                 frameset = dev.pipeline.poll_for_frames()
@@ -441,13 +452,14 @@ class RealsenseWrapper:
                     self._timestamp = time.time()
 
                     frame_dict = {}
-
                     frame_dict['calib'] = self.calib_data.get(dev_sn, {})
 
                     aligned_frameset = self._align.process(frameset)
                     # aligned_frameset = frameset
+
                     for stream in streams:
                         st = stream.stream_type()
+
                         # if stream.stream_type() == rs.stream.infrared:
                         #     frame = aligned_frameset.get_infrared_frame(
                         #         stream.stream_index())
@@ -456,12 +468,14 @@ class RealsenseWrapper:
                         # frame = aligned_frameset.first_or_default(st)
                         # framedata = frame.get_data()
                         # frame_dict[st] = framedata
+
                         if st == rs.stream.color:
                             frame_dict, framedata = self._get_color_stream(
                                 frameset=aligned_frameset,
                                 frame_dict=frame_dict,
                                 storage_paths=None if self.save_stacked else storage_paths,  # noqa
                             )
+
                         if st == rs.stream.depth:
                             frame_dict, framedata = self._get_depth_stream(
                                 frameset=aligned_frameset,
@@ -469,6 +483,8 @@ class RealsenseWrapper:
                                 storage_paths=None if self.save_stacked else storage_paths,  # noqa
                                 save_colormap=save_depth_colormap
                             )
+                            if (int(self._timestamp) // self._temperature_log_interval == 1):  # noqa
+                                self._print_camera_temperature(dev.d_sensor)
 
                     self._save_timestamp(frame_dict, storage_paths)
 
@@ -835,9 +851,9 @@ class RealsenseWrapper:
                                          images.shape[0]//scale))
             cv2.namedWindow(f'{dev_sn}', cv2.WINDOW_AUTOSIZE)
             cv2.imshow(f'{dev_sn}', images)
-            self.key = cv2.waitKey(30)
+            self._key = cv2.waitKey(30)
             # Press esc or 'q' to close the image window
-            if self.key & 0xFF == ord('q') or self.key == 27:
+            if self._key & 0xFF == ord('q') or self._key == 27:
                 cv2.destroyAllWindows()
                 cv2.waitKey(5)
                 terminate = True
@@ -869,3 +885,12 @@ class RealsenseWrapper:
         except Exception as e:
             print(f'USB type      : not available', e)
         print("========================================")
+
+    @staticmethod
+    def _print_camera_temperature(sensor):
+        if sensor.supports(rs.option.asic_temperature):
+            temp = sensor.get_option(rs.option.asic_temperature)
+            printout(f"Temperature ASIC : {temp}", 'i')
+        if sensor.supports(rs.option.projector_temperature):
+            temp = sensor.get_option(rs.option.projector_temperature)
+            printout(f"Temperature Projector : {temp}", 'i')
