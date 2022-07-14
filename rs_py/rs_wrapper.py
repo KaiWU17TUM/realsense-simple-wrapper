@@ -242,7 +242,7 @@ class StoragePaths:
         self.timestamp_file = os.path.join(self.timestamp, 'timestamp.txt')
         os.makedirs(self.timestamp, exist_ok=True)
 
-        print(f"[INFO] : Prepared storage paths...")
+        printout("Prepared storage paths...", 'i')
 
 
 class StreamConfig:
@@ -298,7 +298,7 @@ class RealsenseWrapper:
         if arg.rs_ip is not None:
             # No multi ethernet support.
             # https://github.com/IntelRealSense/librealsense/issues/6376
-            print(f'[INFO] : Network mode')
+            printout("Network mode", 'i')
             self.network = True
             self.available_devices = []
             self.ctx = ctx if ctx is not None else rs.context()
@@ -306,9 +306,9 @@ class RealsenseWrapper:
             self.available_devices.append(
                 (dev.get_info(rs.camera_info.serial_number), None))
             dev.add_to(self.ctx)
-            print(f'[INFO] : Connected to {arg.rs_ip}')
+            printout(f"Connected to {arg.rs_ip}", 'i')
         else:
-            print(f'[INFO] : Local mode')
+            printout("Local mode", 'i')
             self.network = False
             self.ctx = ctx if ctx is not None else rs.context()
             if dev_sn is None:
@@ -374,13 +374,15 @@ class RealsenseWrapper:
 
     def initialize_device(self,
                           device_sn: str,
-                          enable_ir_emitter: bool = True) -> None:
+                          enable_ir_emitter: bool = True,
+                          verbose: bool = True) -> None:
         """Initializes a single device pipeline and starts it.
 
         Args:
             dev_sn (str): Device to start.
             enable_ir_emitter (bool, optional): Enable the IR for beter
                 depth quality. Defaults to True.
+            verbose (bool): Whether to printout infos. Defaults to True.
         """
         self.configure_stream(device_sn,
                               self.stream_config_depth,
@@ -395,7 +397,7 @@ class RealsenseWrapper:
         if not self.network:
             cfg.enable_device(device_sn)
         check = cfg.can_resolve(pipeline)
-        print(f"[INFO] : 'cfg' usable with 'pipeline' : {check}")
+        printout(f"'cfg' usable with 'pipeline' : {check}", 'i')
         # Pipeline
         pipeline_profile = pipeline.start(cfg)
         color_sensor = pipeline_profile.get_device().first_color_sensor()
@@ -413,20 +415,22 @@ class RealsenseWrapper:
         if len(self.storage_paths_per_dev) > 0:
             self._query_timestamp_mode(device_sn)
         # Camera info
-        self._print_camera_info(pipeline_profile)
+        if verbose:
+            self._print_camera_info(pipeline_profile)
+        printout(f"Initialized RealSense devices...", 'i')
 
-        print("[INFO] : Initialized RealSense devices...")
-
-    def initialize(self, enable_ir_emitter: bool = True) -> None:
+    def initialize(self,
+                   enable_ir_emitter: bool = True,
+                   verbose: bool = True) -> None:
         """Initializes the device pipelines and starts them.
 
         Args:
-            enable_ir_emitter (bool, optional): Enable the IR for beter
+            enable_ir_emitter (bool): Enable the IR for beter
                 depth quality. Defaults to True.
+            verbose (bool): Whether to printout infos. Defaults to True.
         """
         for device_sn, product_line in self.available_devices:
-            self.initialize_device(device_sn, enable_ir_emitter)
-        print("[INFO] : Initialized RealSense devices...")
+            self.initialize_device(device_sn, enable_ir_emitter, verbose)
 
     def step(self,
              display: int = 0,
@@ -444,7 +448,7 @@ class RealsenseWrapper:
                 data_type = color, depth, timestamp, calib
         """
         if len(self.enabled_devices) == 0:
-            print("[WARN] : No devices are enabled...")
+            printout(f"No devices are enabled...", 'w')
             return {}
 
         frames = {}
@@ -549,7 +553,7 @@ class RealsenseWrapper:
             device_sn (Optional[str]): If given, stops only that device.
         """
         if len(self.enabled_devices) == 0:
-            print("[WARN] : No devices are enabled...")
+            printout(f"No devices are enabled...", 'w')
         else:
             if device_sn is not None:
                 self.enabled_devices[device_sn].pipeline.stop()
@@ -605,7 +609,7 @@ class RealsenseWrapper:
         Args:
             num_frames (int): Number of dummy frames to skip. Defaults to 30.
         """
-        print("[INFO] : Capturing dummy frames...")
+        printout(f"Capturing dummy frames...", 'i')
         frames = {}
         for _ in range(num_frames):
             while len(frames) < len(self.enabled_devices.items()):
@@ -614,13 +618,13 @@ class RealsenseWrapper:
                     frameset = dev.pipeline.poll_for_frames()
                     if frameset.size() == len(streams):
                         frames[dev_sn] = {}
-        print("[INFO] : Finished capturing dummy frames...")
+        printout(f"Finished capturing dummy frames...", 'i')
 
     def save_calibration(self) -> None:
         """Saves camera calibration. """
 
         if len(self.enabled_devices) == 0:
-            print("[WARN] : No devices are enabled...")
+            printout(f"No devices are enabled...", 'w')
             return
 
         calib_config = CalibrationConfig()
@@ -695,7 +699,7 @@ class RealsenseWrapper:
 
             calib_config.save(save_path, dev_sn)
 
-        print("[INFO] : Saved camera calibration data...")
+        printout(f"Saved camera calibration data...", 'i')
 
 # [PRIVATE FUNCTIONS] **********************************************************
 
@@ -711,20 +715,21 @@ class RealsenseWrapper:
         fmv = rs.frame_metadata_value
         if frameset.supports_frame_metadata(fmv.sensor_timestamp):
             self.timestamp_mode = fmv.sensor_timestamp
-            print(f'[INFO] : sensor_timestamp is being used...')
+            printout(f"sensor_timestamp is being used..", 'i')
         elif frameset.supports_frame_metadata(fmv.frame_timestamp):
             self.timestamp_mode = fmv.frame_timestamp
-            print(f'[INFO] : frame_timestamp is being used...')
+            printout(f"frame_timestamp is being used..", 'i')
         # elif frameset.supports_frame_metadata(fmv.backend_timestamp):
         #     self.timestamp_mode = fmv.backend_timestamp
         #     print(f'[INFO] : backend_timestamp is being used...')
         elif frameset.supports_frame_metadata(fmv.time_of_arrival):
             self.timestamp_mode = fmv.time_of_arrival
+            printout(f"time_of_arrival is being used..", 'i')
             print(f'[INFO] : time_of_arrival is being used...')
         else:
             self.storage_paths_per_dev.pop(device_sn)
-            print('[WARN] : Both sensor_timestamp/frame_timestamp '
-                  'are not available. No data will be saved...')
+            printout("Both sensor_timestamp/frame_timestamp "
+                     "are not available. No data will be saved...", 'w')
 
     def _get_timestamp(self, frame: rs.frame) -> int:
         if self.timestamp_mode is None:

@@ -78,9 +78,9 @@ def run_devices(args: argparse.Namespace):
 
 
 if __name__ == "__main__":
-    args = get_rs_parser().parse_argss()
+    args = get_rs_parser().parse_args()
     print("========================================")
-    print(">>>>> argss <<<<<")
+    print(">>>>> args <<<<<")
     print("========================================")
     for k, v in vars(args).items():
         print(f"{k} : {v}")
