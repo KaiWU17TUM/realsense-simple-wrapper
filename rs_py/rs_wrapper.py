@@ -388,19 +388,19 @@ class RealsenseWrapper:
             print(f"[INFO] : 'cfg' usable with 'pipeline' : {check}")
 
             pipeline_profile = pipeline.start(cfg)
-            c_sensor = pipeline_profile.get_device().first_color_sensor()
-            d_sensor = pipeline_profile.get_device().first_depth_sensor()
+            color_sensor = pipeline_profile.get_device().first_color_sensor()
+            depth_sensor = pipeline_profile.get_device().first_depth_sensor()
 
             # IR for depth
             if enable_ir_emitter:
-                if d_sensor.supports(rs.option.emitter_enabled):
-                    d_sensor.set_option(rs.option.emitter_enabled,
-                                        1 if enable_ir_emitter else 0)
-                    # d_sensor.set_option(rs.option.laser_power, 330)
+                if depth_sensor.supports(rs.option.emitter_enabled):
+                    depth_sensor.set_option(rs.option.emitter_enabled,
+                                            1 if enable_ir_emitter else 0)
+                    # depth_sensor.set_option(rs.option.laser_power, 330)
 
             # Stored the enabled devices
             self.enabled_devices[device_sn] = \
-                Device(pipeline, pipeline_profile, c_sensor, d_sensor)
+                Device(pipeline, pipeline_profile, color_sensor, depth_sensor)
 
             self._print_camera_info(pipeline_profile)
 
@@ -484,7 +484,7 @@ class RealsenseWrapper:
                                 storage_paths=None if self.save_stacked else storage_paths,  # noqa
                                 save_colormap=save_depth_colormap
                             )
-                            self._print_camera_temperature(dev.d_sensor)
+                            self._print_camera_temperature(dev.depth_sensor)
 
                     self._save_timestamp(frame_dict, storage_paths)
 
