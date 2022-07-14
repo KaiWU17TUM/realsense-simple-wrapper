@@ -22,15 +22,21 @@ if __name__ == "__main__":
     try:
         c = 0
         max_c = int(1e8)
+
         while True:
-            printout(f"Step {c:8d}", 'i')
+
+            if c % arg.rs_fps == 0:
+                printout(f"Step {c:8d}", 'i')
+
             frames = rsw.step(
                 display=arg.rs_display_frame,
                 display_and_save_with_key=arg.rs_save_with_key
             )
+
             if not len(frames) > 0:
                 printout(f"Empty...", 'w')
                 continue
+
             c += 1
             if c > arg.rs_fps * arg.rs_steps or c > max_c:
                 break

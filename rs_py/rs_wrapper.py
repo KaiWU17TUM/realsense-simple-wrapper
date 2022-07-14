@@ -478,7 +478,7 @@ class RealsenseWrapper:
                                 storage_paths=None if self.save_stacked else storage_paths,  # noqa
                             )
 
-                        if st == rs.stream.depth:
+                        elif st == rs.stream.depth:
                             frame_dict, framedata = self._get_depth_stream(
                                 frameset=aligned_frameset,
                                 frame_dict=frame_dict,
@@ -486,6 +486,9 @@ class RealsenseWrapper:
                                 save_colormap=save_depth_colormap
                             )
                             self._print_camera_temperature(dev_sn)
+
+                        else:
+                            raise ValueError(f"Unsupported stream : {st}")
 
                     self._save_timestamp(frame_dict, storage_paths)
 
@@ -808,6 +811,8 @@ class RealsenseWrapper:
                 arr2 = np.uint8(frame_dict['depth_framedata'])
                 np.save(os.path.join(filedir, f'{ts}_arr1'), arr1)
                 np.save(os.path.join(filedir, f'{ts}_arr2'), arr2)
+                # np.save(os.path.join(filedir, f'{ts}'),
+                #         frame_dict['depth_framedata'])
             # save depth colormap
             if save_colormap:
                 # Apply colormap on depth image
@@ -894,7 +899,7 @@ class RealsenseWrapper:
             sensor = self.enabled_devices[dev_sn].depth_sensor
             if sensor.supports(rs.option.asic_temperature):
                 temp = sensor.get_option(rs.option.asic_temperature)
-                printout(f"Temperature ASIC : {temp}", 'i')
+                printout(f"{dev_sn} Temperature ASIC : {temp}", 'i')
             if sensor.supports(rs.option.projector_temperature):
                 temp = sensor.get_option(rs.option.projector_temperature)
-                printout(f"Temperature Projector : {temp}", 'i')
+                printout(f"{dev_sn} Temperature Projector : {temp}", 'i')
