@@ -30,7 +30,9 @@ def _get_brg_from_yuv(data_array: np.ndarray) -> np.ndarray:
     YUV = np.zeros((data_array.shape[0], 2), 'uint8')
     YUV[:, 0] = Y
     YUV[:, 1] = UV
+    YUV = YUV.reshape(-1, 1, 2)
     BGR = cv2.cvtColor(YUV, cv2.COLOR_YUV2BGR_YUYV)
+    BGR = BGR.reshape(-1, 3)
     return BGR
 
 
@@ -235,6 +237,8 @@ def data_process_fn(**kwargs):
 
         image = image.reshape(h_c, w_c, 3)
         depth = depth[-h_d*w_d:].reshape(h_d, w_d)
+        # depth_i = depth[-(h_d//3)*(w_d//3+2):].reshape(h_d//3, w_d//3+2)
+        # depth = cv2.resize(depth_i, (w_d, h_d))
 
         depth = cv2.applyColorMap(
             cv2.convertScaleAbs(depth, alpha=0.03),
