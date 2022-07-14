@@ -293,7 +293,6 @@ class RealsenseWrapper:
                 with this sn will be used. Defaults to None.
             ctx
         """
-
         # device data
         if arg.rs_ip is not None:
             # No multi ethernet support.
@@ -316,6 +315,7 @@ class RealsenseWrapper:
             else:
                 self.available_devices = [(dev_sn, 'D400')]
 
+        # available devices
         if dev_sn is not None:
             self.available_devices = [
                 i for i in self.available_devices if i[0] == dev_sn]
@@ -344,24 +344,26 @@ class RealsenseWrapper:
 
         # Save paths
         self.timestamp_mode = None
-        self.save_stacked = False
+        self.save_stacked = arg.rs_save_stacked
         self.storage_paths_per_dev = {}
-        if arg.rs_save_data:
-            self.save_stacked = arg.rs_save_stacked
-            if arg.rs_save_path is not None:
-                storage_paths_fn = partial(
-                    StoragePaths, base_path=arg.rs_save_path)
+        if arg.rs_save_path is not None:
+            storage_paths_fn = partial(
+                StoragePaths, base_path=arg.rs_save_path)
+        else:
+            storage_paths_fn = StoragePaths
+        for sn, _ in self.available_devices:
+            _storage_path = storage_paths_fn(sn)
+            if arg.rs_save_data:
+                _storage_path.save = True
             else:
-                storage_paths_fn = StoragePaths
-            for sn, _ in self.available_devices:
-                _storage_path = storage_paths_fn(sn)
-                if not arg.rs_save_color:
-                    _storage_path.color = None
-                    _storage_path.color_metadata = None
-                if not arg.rs_save_depth:
-                    _storage_path.depth = None
-                    _storage_path.depth_metadata = None
-                self.storage_paths_per_dev[sn] = _storage_path
+                _storage_path.save = False
+            if not arg.rs_save_color:
+                _storage_path.color = None
+                _storage_path.color_metadata = None
+            if not arg.rs_save_depth:
+                _storage_path.depth = None
+                _storage_path.depth_metadata = None
+            self.storage_paths_per_dev[sn] = _storage_path
 
         # internal variables
         self._key = -1
@@ -369,6 +371,18 @@ class RealsenseWrapper:
         self._temperature_log_interval = 300
         self._temperature_log_counter = {sn: 0
                                          for sn, _ in self.available_devices}
+        self._timestamp_per_dev = {
+            sn: {'color_timestamp': 0, 'depth_timestamp': 0}
+            for sn, _ in self.available_devices
+        }
+
+    @property
+    def timestamp(self):
+        return self._timestamp
+
+    @timestamp.setter
+    def timestamp(self, x):
+        self._timestamp = x
 
 # [MAIN FUNCTIONS] *************************************************************
 
@@ -456,48 +470,31 @@ class RealsenseWrapper:
 
             for dev_sn, dev in self.enabled_devices.items():
 
-                storage_paths = self.storage_paths_per_dev.get(dev_sn, None)
-
-                if display_and_save_with_key:
-                    if self._key == -1:
-                        storage_paths.save = False
-                    else:
-                        if self._key & 0xFF == ord('c'):
-                            storage_paths.save = True
-                            self._key = -1
+                storage_paths = self._get_storage_paths(
+                    dev_sn, display_and_save_with_key)
 
                 streams = dev.pipeline_profile.get_streams()
                 frameset = dev.pipeline.poll_for_frames()
 
                 if frameset.size() == len(streams):
 
-                    self._timestamp = time.time()
+                    self.timestamp = time.time()
 
                     frame_dict = {}
                     frame_dict['calib'] = self.calib_data.get(dev_sn, {})
 
+                    # In the rs_net version, this returns zeros for depth frame
                     aligned_frameset = self._align.process(frameset)
                     # aligned_frameset = frameset
 
                     for stream in streams:
                         st = stream.stream_type()
-
-                        # if stream.stream_type() == rs.stream.infrared:
-                        #     frame = aligned_frameset.get_infrared_frame(
-                        #         stream.stream_index())
-                        #     key_ = (stream.stream_type(),
-                        #             stream.stream_index())
-                        # frame = aligned_frameset.first_or_default(st)
-                        # framedata = frame.get_data()
-                        # frame_dict[st] = framedata
-
                         if st == rs.stream.color:
                             frame_dict, framedata = self._get_color_stream(
                                 frameset=aligned_frameset,
                                 frame_dict=frame_dict,
                                 storage_paths=None if self.save_stacked else storage_paths,  # noqa
                             )
-
                         elif st == rs.stream.depth:
                             frame_dict, framedata = self._get_depth_stream(
                                 frameset=aligned_frameset,
@@ -506,13 +503,15 @@ class RealsenseWrapper:
                                 save_colormap=save_depth_colormap
                             )
                             self._print_camera_temperature(dev_sn)
-
                         else:
                             raise ValueError(f"Unsupported stream : {st}")
 
+                    frames[dev_sn] = frame_dict
+
                     self._save_timestamp(frame_dict, storage_paths)
 
-                    frames[dev_sn] = frame_dict
+                    self._reset_device_with_frozen_timestamp(
+                        frame_dict, dev_sn)
 
         # Save data as a stacked array
         if self.save_stacked:
@@ -630,7 +629,7 @@ class RealsenseWrapper:
         calib_config = CalibrationConfig()
         for dev_sn, dev in self.enabled_devices.items():
 
-            storage_paths = self.storage_paths_per_dev.get(dev_sn, None)
+            storage_paths = self._get_storage_paths(dev_sn, False)
             if storage_paths is None:
                 continue
 
@@ -702,6 +701,20 @@ class RealsenseWrapper:
         printout(f"Saved camera calibration data...", 'i')
 
 # [PRIVATE FUNCTIONS] **********************************************************
+
+    def _get_storage_paths(self,
+                           device_sn: str,
+                           display_and_save_with_key: bool):
+        storage_paths = self.storage_paths_per_dev.get(device_sn, None)
+        if storage_paths is not None:
+            if display_and_save_with_key:
+                if self._key == -1:
+                    storage_paths.save = False
+                else:
+                    if self._key & 0xFF == ord('c'):
+                        storage_paths.save = True
+                        self._key = -1
+        return storage_paths
 
     def _query_timestamp_mode(self, device_sn: str):
         pipeline_profile = self.enabled_devices[device_sn].pipeline_profile
@@ -799,7 +812,35 @@ class RealsenseWrapper:
                 ts_file = storage_paths.timestamp_file
                 if ts_file is not None:
                     with open(ts_file, 'a+') as f:
-                        f.write(f"{self._timestamp}::{frame_dict['color_timestamp']}::{frame_dict['depth_timestamp']}\n")  # noqa
+                        f.write(f"{self.timestamp}::{frame_dict['color_timestamp']}::{frame_dict['depth_timestamp']}\n")  # noqa
+
+    def _reset_device_with_frozen_timestamp(self,
+                                            frame_dict: dict,
+                                            device_sn: str):
+        ct = 'color_timestamp'
+        dt = 'depth_timestamp'
+        reset = False
+        if frame_dict.get(ct, None) is not None:
+            if frame_dict[ct] > self._timestamp_per_dev[device_sn][ct]:
+                self._timestamp_per_dev[device_sn][ct] = frame_dict[ct]
+            elif frame_dict[ct] == self._timestamp_per_dev[device_sn][ct]:
+                reset = True
+            else:
+                raise ValueError(
+                    "Current color_timestamp is smaller than previous value")
+        if frame_dict.get(dt, None) is not None:
+            if frame_dict[dt] > self._timestamp_per_dev[device_sn][dt]:
+                self._timestamp_per_dev[device_sn][dt] = frame_dict[dt]
+            elif frame_dict[dt] == self._timestamp_per_dev[device_sn][dt]:
+                reset = True
+            else:
+                raise ValueError(
+                    "Current depth_timestamp is smaller than previous value")
+        if reset:
+            self.stop(device_sn=device_sn)
+            self.initialize_device(device_sn=device_sn)
+            self._timestamp_per_dev[device_sn][ct] = 0
+            self._timestamp_per_dev[device_sn][dt] = 0
 
     def _save_color_framedata(self,
                               frame_dict: dict,
@@ -920,7 +961,7 @@ class RealsenseWrapper:
         print("========================================")
 
     def _print_camera_temperature(self, dev_sn: str):
-        _count = self._timestamp // self._temperature_log_interval
+        _count = self.timestamp // self._temperature_log_interval
         if _count > self._temperature_log_counter[dev_sn]:
             self._temperature_log_counter[dev_sn] = _count
             sensor = self.enabled_devices[dev_sn].depth_sensor

@@ -23,7 +23,7 @@ def test_device_init(args: argparse.Namespace):
     N = 100
     t = time.time()
     for _ in tqdm.tqdm(range(N)):
-        rsw.initialize()
+        rsw.initialize(verbose=False)
         rsw.stop()
 
     printout(f"Finished in {(time.time()-t)/N}", 'i')
