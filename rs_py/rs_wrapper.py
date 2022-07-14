@@ -114,6 +114,10 @@ def get_parser() -> argparse.ArgumentParser:
                         type=str2bool,
                         default=False,
                         help='save using key = "c" ')
+    parser.add_argument('--rs-save-data',
+                        type=str2bool,
+                        default=True,
+                        help='Whether to save data')
     parser.add_argument('--rs-save-path',
                         type=str,
                         default='/data/realsense',
@@ -144,6 +148,10 @@ def get_parser() -> argparse.ArgumentParser:
                         # default='192.168.1.216',  # 101 WLAN
                         # default='192.168.1.11',  # 102 WLAN
                         help='ip address')
+    parser.add_argument('--rs-test-init-runtime',
+                        type=str2bool,
+                        default=False,
+                        help='test the runtime of device initialization.')
     return parser
 
 
@@ -336,22 +344,24 @@ class RealsenseWrapper:
 
         # Save paths
         self.timestamp_mode = None
+        self.save_stacked = False
         self.storage_paths_per_dev = {}
-        self.save_stacked = arg.rs_save_stacked
-        if arg.rs_save_path is not None:
-            storage_paths_fn = partial(
-                StoragePaths, base_path=arg.rs_save_path)
-        else:
-            storage_paths_fn = StoragePaths
-        for sn, _ in self.available_devices:
-            _storage_path = storage_paths_fn(sn)
-            if not arg.rs_save_color:
-                _storage_path.color = None
-                _storage_path.color_metadata = None
-            if not arg.rs_save_depth:
-                _storage_path.depth = None
-                _storage_path.depth_metadata = None
-            self.storage_paths_per_dev[sn] = _storage_path
+        if arg.rs_save_data:
+            self.save_stacked = arg.rs_save_stacked
+            if arg.rs_save_path is not None:
+                storage_paths_fn = partial(
+                    StoragePaths, base_path=arg.rs_save_path)
+            else:
+                storage_paths_fn = StoragePaths
+            for sn, _ in self.available_devices:
+                _storage_path = storage_paths_fn(sn)
+                if not arg.rs_save_color:
+                    _storage_path.color = None
+                    _storage_path.color_metadata = None
+                if not arg.rs_save_depth:
+                    _storage_path.depth = None
+                    _storage_path.depth_metadata = None
+                self.storage_paths_per_dev[sn] = _storage_path
 
         # internal variables
         self._key = -1
@@ -532,13 +542,20 @@ class RealsenseWrapper:
 
         return frames
 
-    def stop(self) -> None:
-        """Stops the devices. """
+    def stop(self, device_sn: Optional[str] = None) -> None:
+        """Stops the devices.
+
+        Args:
+            device_sn (Optional[str]): If given, stops only that device.
+        """
         if len(self.enabled_devices) == 0:
             print("[WARN] : No devices are enabled...")
         else:
-            for _, dev in self.enabled_devices.items():
-                dev.pipeline.stop()
+            if device_sn is not None:
+                self.enabled_devices[device_sn].pipeline.stop()
+            else:
+                for _, dev in self.enabled_devices.items():
+                    dev.pipeline.stop()
 
 # [UTIL FUNCTIONS] *************************************************************
 
