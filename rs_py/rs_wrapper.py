@@ -407,8 +407,7 @@ class RealsenseWrapper:
 
             # Check which timestamp is available.
             if len(self.storage_paths_per_dev) > 0:
-                self._query_timestamp_mode(
-                    pipeline, pipeline_profile, device_sn)
+                self._query_timestamp_mode(device_sn)
 
         print("[INFO] : Initialized RealSense devices...")
 
@@ -676,29 +675,28 @@ class RealsenseWrapper:
 
 # [PRIVATE FUNCTIONS] **********************************************************
 
-    def _query_timestamp_mode(self,
-                              pipeline: rs.pipeline,
-                              profile: rs.pipeline_profile,
-                              device_sn: str):
+    def _query_timestamp_mode(self, device_sn: str):
+        pipeline_profile = self.enabled_devices[device_sn].pipeline_profile
+        pipeline = self.enabled_devices[device_sn].pipeline
         wait_flag = True
         while wait_flag:
-            streams = profile.get_streams()
+            streams = pipeline_profile.get_streams()
             frameset = pipeline.poll_for_frames()
             if frameset.size() == len(streams):
                 wait_flag = False
         fmv = rs.frame_metadata_value
-        if frameset.supports_frame_metadata(fmv.time_of_arrival):
-            self.timestamp_mode = fmv.time_of_arrival
-            print(f'[INFO] : time_of_arrival is being used...')
-        # if frameset.supports_frame_metadata(fmv.backend_timestamp):
-        #     self.timestamp_mode = fmv.backend_timestamp
-        #     print(f'[INFO] : backend_timestamp is being used...')
-        elif frameset.supports_frame_metadata(fmv.sensor_timestamp):
+        if frameset.supports_frame_metadata(fmv.sensor_timestamp):
             self.timestamp_mode = fmv.sensor_timestamp
             print(f'[INFO] : sensor_timestamp is being used...')
         elif frameset.supports_frame_metadata(fmv.frame_timestamp):
             self.timestamp_mode = fmv.frame_timestamp
             print(f'[INFO] : frame_timestamp is being used...')
+        # elif frameset.supports_frame_metadata(fmv.backend_timestamp):
+        #     self.timestamp_mode = fmv.backend_timestamp
+        #     print(f'[INFO] : backend_timestamp is being used...')
+        elif frameset.supports_frame_metadata(fmv.time_of_arrival):
+            self.timestamp_mode = fmv.time_of_arrival
+            print(f'[INFO] : time_of_arrival is being used...')
         else:
             self.storage_paths_per_dev.pop(device_sn)
             print('[WARN] : Both sensor_timestamp/frame_timestamp '
