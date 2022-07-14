@@ -306,6 +306,8 @@ class RealsenseWrapper:
         elif arg.rs_use_one_dev_only:
             self.available_devices = self.available_devices[0:1]
 
+        self.available_devices = sorted(self.available_devices)
+
         # serial numbers of enabled devices
         self.enabled_devices = {}
         self.calib_data = {}
@@ -327,7 +329,7 @@ class RealsenseWrapper:
         # Save paths
         self.timestamp_mode = None
         self.storage_paths_per_dev = {}
-        self.save_stacked = arg.save_stacked
+        self.save_stacked = arg.rs_save_stacked
         if arg.rs_save_path is not None:
             storage_paths_fn = partial(
                 StoragePaths, base_path=arg.rs_save_path)
