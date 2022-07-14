@@ -49,13 +49,18 @@ def run_devices(args: argparse.Namespace):
 
         while True:
 
-            if c % args.rs_fps == 0:
-                printout(f"Step {c:8d}", 'i')
-
             frames = rsw.step(
                 display=args.rs_display_frame,
                 display_and_save_with_key=args.rs_save_with_key
             )
+
+            if c % args.rs_fps == 0:
+                printout(
+                    f"Step {c:8d} :: "
+                    f"{[i['color_timestamp'] for i in frames.values()]} :: "
+                    f"{[i['depth_timestamp'] for i in frames.values()]}",
+                    'i'
+                )
 
             if not len(frames) > 0:
                 printout(f"Empty...", 'w')

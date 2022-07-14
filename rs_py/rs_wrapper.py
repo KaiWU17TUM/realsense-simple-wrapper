@@ -398,6 +398,7 @@ class RealsenseWrapper:
                 depth quality. Defaults to True.
             verbose (bool): Whether to printout infos. Defaults to True.
         """
+        printout(f"Initializing RealSense devices {device_sn}", 'i')
         self.configure_stream(device_sn,
                               self.stream_config_depth,
                               self.stream_config_color)
@@ -431,7 +432,7 @@ class RealsenseWrapper:
         # Camera info
         if verbose:
             self._print_camera_info(pipeline_profile)
-        printout(f"Initialized RealSense devices...", 'i')
+        printout(f"Initialized RealSense devices {device_sn}", 'i')
 
     def initialize(self,
                    enable_ir_emitter: bool = True,
