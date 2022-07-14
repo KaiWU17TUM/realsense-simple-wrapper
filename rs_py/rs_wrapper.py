@@ -357,6 +357,7 @@ class RealsenseWrapper:
         self._key = -1
         self._timestamp = 0
         self._temperature_log_interval = 300
+        self._temperature_log_counter = 0
 
 # [MAIN FUNCTIONS] *************************************************************
 
@@ -483,8 +484,7 @@ class RealsenseWrapper:
                                 storage_paths=None if self.save_stacked else storage_paths,  # noqa
                                 save_colormap=save_depth_colormap
                             )
-                            if (int(self._timestamp) // self._temperature_log_interval == 1):  # noqa
-                                self._print_camera_temperature(dev.d_sensor)
+                            self._print_camera_temperature(dev.d_sensor)
 
                     self._save_timestamp(frame_dict, storage_paths)
 
@@ -886,11 +886,13 @@ class RealsenseWrapper:
             print(f'USB type      : not available', e)
         print("========================================")
 
-    @staticmethod
-    def _print_camera_temperature(sensor):
-        if sensor.supports(rs.option.asic_temperature):
-            temp = sensor.get_option(rs.option.asic_temperature)
-            printout(f"Temperature ASIC : {temp}", 'i')
-        if sensor.supports(rs.option.projector_temperature):
-            temp = sensor.get_option(rs.option.projector_temperature)
-            printout(f"Temperature Projector : {temp}", 'i')
+    def _print_camera_temperature(self, sensor):
+        if self._timestamp > self._temperature_log_counter:
+            if self._timestamp // self._temperature_log_interval > 1:
+                self._temperature_log_counter = self._timestamp
+                if sensor.supports(rs.option.asic_temperature):
+                    temp = sensor.get_option(rs.option.asic_temperature)
+                    printout(f"Temperature ASIC : {temp}", 'i')
+                if sensor.supports(rs.option.projector_temperature):
+                    temp = sensor.get_option(rs.option.projector_temperature)
+                    printout(f"Temperature Projector : {temp}", 'i')
