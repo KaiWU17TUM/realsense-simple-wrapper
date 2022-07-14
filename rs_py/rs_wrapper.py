@@ -362,6 +362,51 @@ class RealsenseWrapper:
 
 # [MAIN FUNCTIONS] *************************************************************
 
+    def initialize_device(self,
+                          device_sn: str,
+                          enable_ir_emitter: bool = True) -> None:
+        """Initializes a single device pipeline and starts it.
+
+        Args:
+            dev_sn (str): Device to start.
+            enable_ir_emitter (bool, optional): Enable the IR for beter
+                depth quality. Defaults to True.
+        """
+        self.configure_stream(device_sn,
+                              self.stream_config_depth,
+                              self.stream_config_color)
+        # Pipeline
+        if self.network:
+            pipeline = rs.pipeline(self.ctx)
+        else:
+            pipeline = rs.pipeline()
+        # Cfg
+        cfg = self._rs_cfg[device_sn]
+        if not self.network:
+            cfg.enable_device(device_sn)
+        check = cfg.can_resolve(pipeline)
+        print(f"[INFO] : 'cfg' usable with 'pipeline' : {check}")
+        # Pipeline
+        pipeline_profile = pipeline.start(cfg)
+        color_sensor = pipeline_profile.get_device().first_color_sensor()
+        depth_sensor = pipeline_profile.get_device().first_depth_sensor()
+        # IR for depth
+        if enable_ir_emitter:
+            if depth_sensor.supports(rs.option.emitter_enabled):
+                depth_sensor.set_option(rs.option.emitter_enabled,
+                                        1 if enable_ir_emitter else 0)
+                # depth_sensor.set_option(rs.option.laser_power, 330)
+        # Stored the enabled devices
+        self.enabled_devices[device_sn] = \
+            Device(pipeline, pipeline_profile, color_sensor, depth_sensor)
+        # Check which timestamp is available.
+        if len(self.storage_paths_per_dev) > 0:
+            self._query_timestamp_mode(device_sn)
+        # Camera info
+        self._print_camera_info(pipeline_profile)
+
+        print("[INFO] : Initialized RealSense devices...")
+
     def initialize(self, enable_ir_emitter: bool = True) -> None:
         """Initializes the device pipelines and starts them.
 
@@ -370,45 +415,7 @@ class RealsenseWrapper:
                 depth quality. Defaults to True.
         """
         for device_sn, product_line in self.available_devices:
-            self.configure_stream(device_sn,
-                                  self.stream_config_depth,
-                                  self.stream_config_color)
-
-            # Pipeline
-            if self.network:
-                pipeline = rs.pipeline(self.ctx)
-            else:
-                pipeline = rs.pipeline()
-
-            cfg = self._rs_cfg[device_sn]
-
-            if not self.network:
-                cfg.enable_device(device_sn)
-
-            check = cfg.can_resolve(pipeline)
-            print(f"[INFO] : 'cfg' usable with 'pipeline' : {check}")
-
-            pipeline_profile = pipeline.start(cfg)
-            color_sensor = pipeline_profile.get_device().first_color_sensor()
-            depth_sensor = pipeline_profile.get_device().first_depth_sensor()
-
-            # IR for depth
-            if enable_ir_emitter:
-                if depth_sensor.supports(rs.option.emitter_enabled):
-                    depth_sensor.set_option(rs.option.emitter_enabled,
-                                            1 if enable_ir_emitter else 0)
-                    # depth_sensor.set_option(rs.option.laser_power, 330)
-
-            # Stored the enabled devices
-            self.enabled_devices[device_sn] = \
-                Device(pipeline, pipeline_profile, color_sensor, depth_sensor)
-
-            self._print_camera_info(pipeline_profile)
-
-            # Check which timestamp is available.
-            if len(self.storage_paths_per_dev) > 0:
-                self._query_timestamp_mode(device_sn)
-
+            self.initialize_device(device_sn, enable_ir_emitter)
         print("[INFO] : Initialized RealSense devices...")
 
     def step(self,
