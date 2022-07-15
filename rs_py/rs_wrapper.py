@@ -827,16 +827,18 @@ class RealsenseWrapper:
             elif frame_dict[ct] == self._timestamp_per_dev[device_sn][ct]:
                 reset = True
             else:
-                raise ValueError(
-                    "Current color_timestamp is smaller than previous value")
+                raise ValueError(f"Current color_timestamp is smaller than "
+                                 f"previous value : {frame_dict[ct]} < "
+                                 f"{self._timestamp_per_dev[device_sn][ct]}")
         if frame_dict.get(dt, None) is not None:
             if frame_dict[dt] > self._timestamp_per_dev[device_sn][dt]:
                 self._timestamp_per_dev[device_sn][dt] = frame_dict[dt]
             elif frame_dict[dt] == self._timestamp_per_dev[device_sn][dt]:
                 reset = True
             else:
-                raise ValueError(
-                    "Current depth_timestamp is smaller than previous value")
+                raise ValueError(f"Current depth_timestamp is smaller than "
+                                 f"previous value : {frame_dict[dt]} < "
+                                 f"{self._timestamp_per_dev[device_sn][dt]}")
         if reset:
             self.stop(device_sn=device_sn)
             self.initialize_device(device_sn=device_sn)
@@ -876,12 +878,12 @@ class RealsenseWrapper:
             # save frame
             filedir = storage_paths.depth
             if filedir is not None:
-                arr1 = np.uint8(frame_dict['depth_framedata'] >> 8)
-                arr2 = np.uint8(frame_dict['depth_framedata'])
-                np.save(os.path.join(filedir, f'{ts}_arr1'), arr1)
-                np.save(os.path.join(filedir, f'{ts}_arr2'), arr2)
-                # np.save(os.path.join(filedir, f'{ts}'),
-                #         frame_dict['depth_framedata'])
+                # arr1 = np.uint8(frame_dict['depth_framedata'] >> 8)
+                # arr2 = np.uint8(frame_dict['depth_framedata'])
+                # np.save(os.path.join(filedir, f'{ts}_arr1'), arr1)
+                # np.save(os.path.join(filedir, f'{ts}_arr2'), arr2)
+                np.save(os.path.join(filedir, f'{ts}'),
+                        frame_dict['depth_framedata'])
             # save depth colormap
             if save_colormap:
                 # Apply colormap on depth image

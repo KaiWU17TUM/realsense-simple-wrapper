@@ -278,9 +278,9 @@ def data_process_fn(**kwargs):
 if __name__ == "__main__":
 
     PATH = sys.argv[1]
-    SYNC = sys.argv[2]
-    FPS = sys.argv[3]
-    SCALE = sys.argv[4]
+    SYNC = int(sys.argv[2])
+    FPS = int(sys.argv[3])
+    SCALE = int(sys.argv[4])
 
     # PATH = '/code/realsense-simple-wrapper/output/calibration_848_480'
     # SYNC = 1
