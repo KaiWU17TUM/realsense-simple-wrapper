@@ -534,30 +534,7 @@ class RealsenseWrapper:
 
         # Save data as a stacked array
         if self.save_stacked:
-            color_framedata_list = []
-            color_timestamp_list = []
-            color_metadata_dict = {}
-            depth_framedata_list = []
-            depth_timestamp_list = []
-            depth_metadata_dict = {}
-            for device_sn, frame_dict in frames.items():
-                color_framedata_list.append(frame_dict['color_framedata'])
-                color_timestamp_list.append(str(frame_dict['color_timestamp']))
-                color_metadata_dict[device_sn] = frame_dict['color_metadata']
-                depth_framedata_list.append(frame_dict['depth_framedata'])
-                depth_timestamp_list.append(str(frame_dict['depth_timestamp']))
-                depth_metadata_dict[device_sn] = frame_dict['depth_metadata']
-            _frame_dict = {}
-            _frame_dict['color_framedata'] = np.hstack(color_framedata_list)
-            _frame_dict['color_timestamp'] = "_".join(color_timestamp_list)
-            _frame_dict['color_metadata'] = color_metadata_dict
-            _frame_dict['depth_framedata'] = np.hstack(depth_framedata_list)
-            _frame_dict['depth_timestamp'] = "_".join(depth_timestamp_list)
-            _frame_dict['depth_metadata'] = depth_metadata_dict
-            storage = self.storage_paths_per_dev[self.available_devices[0][0]]
-            self._save_color_framedata(_frame_dict, storage)
-            self._save_depth_framedata(_frame_dict, storage,
-                                       save_depth_colormap)
+            self._save_stacked_framedata(frames, save_depth_colormap)
 
         if display > 0:
             if self._display_rs_data(frames, display):
@@ -890,13 +867,14 @@ class RealsenseWrapper:
             if frame_dict[dt] > self._timestamp_per_dev[device_sn][dt]:
                 self._timestamp_per_dev[device_sn][dt] = frame_dict[dt]
             elif frame_dict[dt] == self._timestamp_per_dev[device_sn][dt]:
-                reset = True
+                if self._poll_counter_per_dev[device_sn][0] > 5:
+                    reset = True
             else:
                 raise ValueError(f"Current depth_timestamp is smaller than "
                                  f"previous value : {frame_dict[dt]} < "
                                  f"{self._timestamp_per_dev[device_sn][dt]}")
         if reset:
-            printout("Reseting device with frozen timestamp...", 'w')
+            printout("Resetting device with frozen timestamp...", 'w')
             self.stop(device_sn=device_sn)
             time.sleep(0.5)
             self.initialize_device(device_sn=device_sn)
@@ -958,6 +936,38 @@ class RealsenseWrapper:
             if filedir is not None:
                 with open(os.path.join(filedir, f"{ts}.json"), 'w') as json_f:
                     json.dump(frame_dict['depth_metadata'], json_f, indent=4)
+
+    def _save_stacked_framedata(self, frames: dict, save_depth_colormap: bool):
+        color_framedata_list = []
+        color_timestamp_list = []
+        color_metadata_dict = {}
+        depth_framedata_list = []
+        depth_timestamp_list = []
+        depth_metadata_dict = {}
+        _counter = 0
+        for device_sn, frame_dict in frames.items():
+            if len(frame_dict) == 0:
+                continue
+            _counter += 1
+            color_framedata_list.append(frame_dict['color_framedata'])
+            color_timestamp_list.append(str(frame_dict['color_timestamp']))
+            color_metadata_dict[device_sn] = frame_dict['color_metadata']
+            depth_framedata_list.append(frame_dict['depth_framedata'])
+            depth_timestamp_list.append(str(frame_dict['depth_timestamp']))
+            depth_metadata_dict[device_sn] = frame_dict['depth_metadata']
+        if _counter > 0:
+            _frame_dict = {}
+            _frame_dict['color_framedata'] = np.hstack(color_framedata_list)  # noqa
+            _frame_dict['color_timestamp'] = "_".join(color_timestamp_list)
+            _frame_dict['color_metadata'] = color_metadata_dict
+            _frame_dict['depth_framedata'] = np.hstack(
+                depth_framedata_list)
+            _frame_dict['depth_timestamp'] = "_".join(depth_timestamp_list)
+            _frame_dict['depth_metadata'] = depth_metadata_dict
+            storage = self.storage_paths_per_dev[self.available_devices[0][0]]  # noqa
+            self._save_color_framedata(_frame_dict, storage)
+            self._save_depth_framedata(_frame_dict, storage,
+                                       save_depth_colormap)
 
     def _display_rs_data(self, frames: dict, scale: int) -> bool:
         terminate = False
