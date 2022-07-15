@@ -529,15 +529,16 @@ class RealsenseWrapper:
                 depth_framedata_list.append(frame_dict['depth_framedata'])
                 depth_timestamp_list.append(str(frame_dict['depth_timestamp']))
                 depth_metadata_dict[dev_sn] = frame_dict['depth_metadata']
-            frame_dict['color_framedata'] = np.hstack(color_framedata_list)
-            frame_dict['color_timestamp'] = "_".join(color_timestamp_list)
-            frame_dict['color_metadata'] = color_metadata_dict
-            frame_dict['depth_framedata'] = np.hstack(depth_framedata_list)
-            frame_dict['depth_timestamp'] = "_".join(depth_timestamp_list)
-            frame_dict['depth_metadata'] = depth_metadata_dict
+            _frame_dict = {}
+            _frame_dict['color_framedata'] = np.hstack(color_framedata_list)
+            _frame_dict['color_timestamp'] = "_".join(color_timestamp_list)
+            _frame_dict['color_metadata'] = color_metadata_dict
+            _frame_dict['depth_framedata'] = np.hstack(depth_framedata_list)
+            _frame_dict['depth_timestamp'] = "_".join(depth_timestamp_list)
+            _frame_dict['depth_metadata'] = depth_metadata_dict
             storage = self.storage_paths_per_dev[self.available_devices[0][0]]
-            self._save_color_framedata(frame_dict, storage)
-            self._save_depth_framedata(frame_dict, storage,
+            self._save_color_framedata(_frame_dict, storage)
+            self._save_depth_framedata(_frame_dict, storage,
                                        save_depth_colormap)
 
         if display > 0:
