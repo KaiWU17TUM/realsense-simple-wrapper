@@ -21,6 +21,9 @@ from rs_py import rs
 from rs_py import rsnet
 
 
+RESET_LIMIT = 10
+
+
 def read_metadata(frame: rs.frame) -> dict:
     _FRAME_METADATA_VALUE_LIST = [
         rs.frame_metadata_value.actual_exposure,
@@ -727,8 +730,9 @@ class RealsenseWrapper:
                 time.time() - self._poll_counter_per_dev[device_sn][1])
         else:
             self._poll_counter_per_dev[device_sn][0] = 0
-        if self._poll_counter_per_dev[device_sn][0] > 5:
-            printout("resetting device after no frames for 5s", 'w')
+        if self._poll_counter_per_dev[device_sn][0] > RESET_LIMIT:
+            printout(
+                f"resetting device after no frames for {RESET_LIMIT}s", 'w')
             self.stop(device_sn=device_sn)
             time.sleep(1)
             self.initialize_device(device_sn=device_sn)
@@ -861,7 +865,9 @@ class RealsenseWrapper:
             if frame_dict[ct] > self._timestamp_per_dev[device_sn][ct]:
                 self._timestamp_per_dev[device_sn][ct] = frame_dict[ct]
             elif frame_dict[ct] == self._timestamp_per_dev[device_sn][ct]:
-                if self._poll_counter_per_dev[device_sn][0] > 5:
+                printout(f"resetting device after 'color_timestamp' frozen "
+                         f"for {RESET_LIMIT}s", 'w')
+                if self._poll_counter_per_dev[device_sn][0] > RESET_LIMIT:
                     reset = True
             else:
                 printout(f"Current color_timestamp is smaller than "
@@ -872,7 +878,9 @@ class RealsenseWrapper:
             if frame_dict[dt] > self._timestamp_per_dev[device_sn][dt]:
                 self._timestamp_per_dev[device_sn][dt] = frame_dict[dt]
             elif frame_dict[dt] == self._timestamp_per_dev[device_sn][dt]:
-                if self._poll_counter_per_dev[device_sn][0] > 5:
+                printout(f"resetting device after 'depth_timestamp' frozen "
+                         f"for {RESET_LIMIT}s", 'w')
+                if self._poll_counter_per_dev[device_sn][0] > RESET_LIMIT:
                     reset = True
             else:
                 printout(f"Current depth_timestamp is smaller than "
