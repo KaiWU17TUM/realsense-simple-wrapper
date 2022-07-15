@@ -375,6 +375,8 @@ class RealsenseWrapper:
             sn: {'color_timestamp': 0, 'depth_timestamp': 0}
             for sn, _ in self.available_devices
         }
+        self._poll_counter_per_dev = {sn: [0, 0]  # [time elapsed, current time]
+                                      for sn, _ in self.available_devices}
 
     @property
     def timestamp(self):
@@ -486,20 +488,11 @@ class RealsenseWrapper:
 
                 streams = dev.pipeline_profile.get_streams()
 
-                try:
-                    frameset = dev.pipeline.wait_for_frames(3000)  # ms
-                except Exception as e:
-                    printout(e, 'w')
-                    printout("resetting device after waiting for 3000ms", 'w')
-                    self.stop(device_sn=device_sn)
-                    time.sleep(0.5)
-                    self.initialize_device(device_sn=device_sn)
-                    try:
-                        frameset = dev.pipeline.wait_for_frames(3000)  # ms
-                    except Exception as e:
-                        printout(e, 'w')
-                        printout("resetting device did not work, skip step", 'w')  # noqa
-                        frames[device_sn] = {}
+                frameset = self._get_frameset_with_poll(device_sn)
+
+                if frameset is None:
+                    frames[device_sn] = {}
+                    continue
 
                 # TODO: the if check if needed only for 'poll_for_frames'
                 if frameset.size() == len(streams):
@@ -728,6 +721,43 @@ class RealsenseWrapper:
         printout(f"Saved camera calibration data...", 'i')
 
 # [PRIVATE FUNCTIONS] **********************************************************
+
+    def _get_frameset_with_wait(self, device_sn: str) -> rs.composite_frame:
+        dev = self.enabled_devices[device_sn]
+        try:
+            frameset = dev.pipeline.wait_for_frames(3000)  # ms
+        except Exception as e:
+            printout(e, 'w')
+            printout("resetting device after waiting for 3000ms", 'w')
+            self.stop(device_sn=device_sn)
+            time.sleep(0.5)
+            self.initialize_device(device_sn=device_sn)
+            try:
+                frameset = dev.pipeline.wait_for_frames(3000)  # ms
+            except Exception as e:
+                printout(e, 'w')
+                printout("resetting device did not work, skip step", 'w')
+                frameset = None
+        return frameset
+
+    def _get_frameset_with_poll(self, device_sn: str) -> rs.composite_frame:
+        frameset = self.enabled_devices[device_sn].pipeline.poll_for_frames()
+        if frameset.size() == 0:
+            self._poll_counter_per_dev[device_sn][0] += (
+                time.time() - self._poll_counter_per_dev[device_sn][1])
+        else:
+            self._poll_counter_per_dev[device_sn][0] = 0
+        if self._poll_counter_per_dev[device_sn][0] > 5:
+            printout("resetting device after no frames for 5s", 'w')
+            self.stop(device_sn=device_sn)
+            time.sleep(0.5)
+            self.initialize_device(device_sn=device_sn)
+            self._poll_counter_per_dev[device_sn][0] = 0
+        self._poll_counter_per_dev[device_sn][1] = time.time()
+        if self._poll_counter_per_dev[device_sn][0] > 1:
+            return None
+        else:
+            return frameset
 
     def _get_storage_paths(self,
                            device_sn: str,
