@@ -59,8 +59,8 @@ def run_devices(args: argparse.Namespace):
             if c % args.rs_fps == 0:
                 printout(
                     f"Step {c:8d} :: "
-                    f"{[i['color_timestamp'] for i in frames.values()]} :: "
-                    f"{[i['depth_timestamp'] for i in frames.values()]}",
+                    f"{[i.get('color_timestamp', None) for i in frames.values()]} :: "  # noqa
+                    f"{[i.get('depth_timestamp', None) for i in frames.values()]}",  # noqa
                     'i'
                 )
 
