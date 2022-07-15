@@ -283,13 +283,13 @@ class RealsenseWrapper:
 
     def __init__(self,
                  arg: argparse.Namespace,
-                 dev_sn: Optional[str] = None,
+                 device_sn: Optional[str] = None,
                  ctx: Optional[rs.context] = None) -> None:
         """Initializes the RealsenseWrapper class object.
 
         Args:
             arg (argparse.Namespace): argument parsed from cli.
-            dev_sn (Optional[str], optional): If not None, only the device
+            device_sn (Optional[str], optional): If not None, only the device
                 with this sn will be used. Defaults to None.
             ctx
         """
@@ -310,15 +310,15 @@ class RealsenseWrapper:
             printout("Local mode", 'i')
             self.network = False
             self.ctx = ctx if ctx is not None else rs.context()
-            if dev_sn is None:
+            if device_sn is None:
                 self.available_devices = enumerate_connected_devices(self.ctx)
             else:
-                self.available_devices = [(dev_sn, 'D400')]
+                self.available_devices = [(device_sn, 'D400')]
 
         # available devices
-        if dev_sn is not None:
+        if device_sn is not None:
             self.available_devices = [
-                i for i in self.available_devices if i[0] == dev_sn]
+                i for i in self.available_devices if i[0] == device_sn]
         elif arg.rs_use_one_dev_only:
             self.available_devices = self.available_devices[0:1]
 
@@ -393,7 +393,7 @@ class RealsenseWrapper:
         """Initializes a single device pipeline and starts it.
 
         Args:
-            dev_sn (str): Device to start.
+            device_sn (str): Device to start.
             enable_ir_emitter (bool, optional): Enable the IR for beter
                 depth quality. Defaults to True.
             verbose (bool): Whether to printout infos. Defaults to True.
@@ -412,17 +412,27 @@ class RealsenseWrapper:
         if not self.network:
             cfg.enable_device(device_sn)
         check = cfg.can_resolve(pipeline)
-        printout(f"'cfg' usable with 'pipeline' : {check}", 'i')
+        if verbose:
+            printout(f"'cfg' usable with 'pipeline' : {check}", 'i')
         # Pipeline
         pipeline_profile = pipeline.start(cfg)
+        if verbose:
+            printout(f"{device_sn} pipeline started...", 'i')
         color_sensor = pipeline_profile.get_device().first_color_sensor()
+        if verbose:
+            printout(f"{device_sn} color_sensor is available...", 'i')
         depth_sensor = pipeline_profile.get_device().first_depth_sensor()
+        if verbose:
+            printout(f"{device_sn} depth_sensor is available...", 'i')
         # IR for depth
         if enable_ir_emitter:
             if depth_sensor.supports(rs.option.emitter_enabled):
                 depth_sensor.set_option(rs.option.emitter_enabled,
                                         1 if enable_ir_emitter else 0)
                 # depth_sensor.set_option(rs.option.laser_power, 330)
+
+                if verbose:
+                    printout(f"{device_sn} ir emitter enabled...", 'i')
         # Stored the enabled devices
         self.enabled_devices[device_sn] = \
             Device(pipeline, pipeline_profile, color_sensor, depth_sensor)
@@ -469,20 +479,34 @@ class RealsenseWrapper:
         frames = {}
         while len(frames) < len(self.enabled_devices.items()):
 
-            for dev_sn, dev in self.enabled_devices.items():
+            for device_sn, dev in self.enabled_devices.items():
 
                 storage_paths = self._get_storage_paths(
-                    dev_sn, display_and_save_with_key)
+                    device_sn, display_and_save_with_key)
 
                 streams = dev.pipeline_profile.get_streams()
-                frameset = dev.pipeline.poll_for_frames()
 
+                try:
+                    frameset = dev.pipeline.wait_for_frames(3000)  # ms
+                except Exception as e:
+                    printout(e, 'w')
+                    printout("resetting device after waiting for 3000ms", 'w')
+                    self.stop(device_sn=device_sn)
+                    self.initialize_device(device_sn=device_sn)
+                    try:
+                        frameset = dev.pipeline.wait_for_frames(3000)  # ms
+                    except Exception as e:
+                        printout(e, 'w')
+                        printout("resetting device did not work, skip step", 'w')  # noqa
+                        frames[device_sn] = {}
+
+                # TODO: the if check if needed only for 'poll_for_frames'
                 if frameset.size() == len(streams):
 
                     self.timestamp = time.time()
 
                     frame_dict = {}
-                    frame_dict['calib'] = self.calib_data.get(dev_sn, {})
+                    frame_dict['calib'] = self.calib_data.get(device_sn, {})
 
                     # In the rs_net version, this returns zeros for depth frame
                     aligned_frameset = self._align.process(frameset)
@@ -503,16 +527,16 @@ class RealsenseWrapper:
                                 storage_paths=None if self.save_stacked else storage_paths,  # noqa
                                 save_colormap=save_depth_colormap
                             )
-                            self._print_camera_temperature(dev_sn)
+                            self._print_camera_temperature(device_sn)
                         else:
                             raise ValueError(f"Unsupported stream : {st}")
 
-                    frames[dev_sn] = frame_dict
+                    frames[device_sn] = frame_dict
 
                     self._save_timestamp(frame_dict, storage_paths)
 
                     self._reset_device_with_frozen_timestamp(
-                        frame_dict, dev_sn)
+                        frame_dict, device_sn)
 
         # Save data as a stacked array
         if self.save_stacked:
@@ -522,13 +546,13 @@ class RealsenseWrapper:
             depth_framedata_list = []
             depth_timestamp_list = []
             depth_metadata_dict = {}
-            for dev_sn, frame_dict in frames.items():
+            for device_sn, frame_dict in frames.items():
                 color_framedata_list.append(frame_dict['color_framedata'])
                 color_timestamp_list.append(str(frame_dict['color_timestamp']))
-                color_metadata_dict[dev_sn] = frame_dict['color_metadata']
+                color_metadata_dict[device_sn] = frame_dict['color_metadata']
                 depth_framedata_list.append(frame_dict['depth_framedata'])
                 depth_timestamp_list.append(str(frame_dict['depth_timestamp']))
-                depth_metadata_dict[dev_sn] = frame_dict['depth_metadata']
+                depth_metadata_dict[device_sn] = frame_dict['depth_metadata']
             _frame_dict = {}
             _frame_dict['color_framedata'] = np.hstack(color_framedata_list)
             _frame_dict['color_timestamp'] = "_".join(color_timestamp_list)
@@ -614,11 +638,11 @@ class RealsenseWrapper:
         frames = {}
         for _ in range(num_frames):
             while len(frames) < len(self.enabled_devices.items()):
-                for dev_sn, dev in self.enabled_devices.items():
+                for device_sn, dev in self.enabled_devices.items():
                     streams = dev.pipeline_profile.get_streams()
                     frameset = dev.pipeline.poll_for_frames()
                     if frameset.size() == len(streams):
-                        frames[dev_sn] = {}
+                        frames[device_sn] = {}
         printout(f"Finished capturing dummy frames...", 'i')
 
     def save_calibration(self) -> None:
@@ -629,9 +653,9 @@ class RealsenseWrapper:
             return
 
         calib_config = CalibrationConfig()
-        for dev_sn, dev in self.enabled_devices.items():
+        for device_sn, dev in self.enabled_devices.items():
 
-            storage_paths = self._get_storage_paths(dev_sn, False)
+            storage_paths = self._get_storage_paths(device_sn, False)
             if storage_paths is None:
                 continue
 
@@ -639,10 +663,10 @@ class RealsenseWrapper:
             if os.path.isfile(storage_paths.calib):
                 save_path = storage_paths.calib
             else:
-                filename = f'dev{dev_sn}_calib.txt'
+                filename = f'dev{device_sn}_calib.txt'
                 save_path = os.path.join(storage_paths.calib, filename)
 
-            calib_config.device_sn.append(dev_sn)
+            calib_config.device_sn.append(device_sn)
 
             profile = dev.pipeline_profile
 
@@ -698,7 +722,7 @@ class RealsenseWrapper:
                 'translation': extr.translation
             })
 
-            calib_config.save(save_path, dev_sn)
+            calib_config.save(save_path, device_sn)
 
         printout(f"Saved camera calibration data...", 'i')
 
@@ -841,6 +865,7 @@ class RealsenseWrapper:
                                  f"previous value : {frame_dict[dt]} < "
                                  f"{self._timestamp_per_dev[device_sn][dt]}")
         if reset:
+            printout("Reseting device with frozen timestamp...", 'w')
             self.stop(device_sn=device_sn)
             self.initialize_device(device_sn=device_sn)
             self._timestamp_per_dev[device_sn][ct] = 0
@@ -904,7 +929,7 @@ class RealsenseWrapper:
 
     def _display_rs_data(self, frames: dict, scale: int) -> bool:
         terminate = False
-        for dev_sn, data_dict in frames.items():
+        for device_sn, data_dict in frames.items():
             # Render images
             depth_colormap = cv2.applyColorMap(
                 cv2.convertScaleAbs(data_dict['depth_framedata'], alpha=0.03),
@@ -927,8 +952,8 @@ class RealsenseWrapper:
                                 images_overlapped))
             images = cv2.resize(images, (images.shape[1]//scale,
                                          images.shape[0]//scale))
-            cv2.namedWindow(f'{dev_sn}', cv2.WINDOW_AUTOSIZE)
-            cv2.imshow(f'{dev_sn}', images)
+            cv2.namedWindow(f'{device_sn}', cv2.WINDOW_AUTOSIZE)
+            cv2.imshow(f'{device_sn}', images)
             self._key = cv2.waitKey(30)
             # Press esc or 'q' to close the image window
             if self._key & 0xFF == ord('q') or self._key == 27:
@@ -964,14 +989,14 @@ class RealsenseWrapper:
             print(f'USB type      : not available', e)
         print("========================================")
 
-    def _print_camera_temperature(self, dev_sn: str):
+    def _print_camera_temperature(self, device_sn: str):
         _count = self.timestamp // self._temperature_log_interval
-        if _count > self._temperature_log_counter[dev_sn]:
-            self._temperature_log_counter[dev_sn] = _count
-            sensor = self.enabled_devices[dev_sn].depth_sensor
+        if _count > self._temperature_log_counter[device_sn]:
+            self._temperature_log_counter[device_sn] = _count
+            sensor = self.enabled_devices[device_sn].depth_sensor
             if sensor.supports(rs.option.asic_temperature):
                 temp = sensor.get_option(rs.option.asic_temperature)
-                printout(f"{dev_sn} Temperature ASIC : {temp}", 'i')
+                printout(f"{device_sn} Temperature ASIC : {temp}", 'i')
             if sensor.supports(rs.option.projector_temperature):
                 temp = sensor.get_option(rs.option.projector_temperature)
-                printout(f"{dev_sn} Temperature Projector : {temp}", 'i')
+                printout(f"{device_sn} Temperature Projector : {temp}", 'i')
