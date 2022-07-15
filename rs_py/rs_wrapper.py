@@ -865,9 +865,9 @@ class RealsenseWrapper:
             if frame_dict[ct] > self._timestamp_per_dev[device_sn][ct]:
                 self._timestamp_per_dev[device_sn][ct] = frame_dict[ct]
             elif frame_dict[ct] == self._timestamp_per_dev[device_sn][ct]:
-                printout(f"resetting device after 'color_timestamp' frozen "
-                         f"for {RESET_LIMIT}s", 'w')
                 if self._poll_counter_per_dev[device_sn][0] > RESET_LIMIT:
+                    printout(f"resetting device after 'color_timestamp' frozen "
+                             f"for {RESET_LIMIT}s", 'w')
                     reset = True
             else:
                 printout(f"Current color_timestamp is smaller than "
@@ -878,9 +878,9 @@ class RealsenseWrapper:
             if frame_dict[dt] > self._timestamp_per_dev[device_sn][dt]:
                 self._timestamp_per_dev[device_sn][dt] = frame_dict[dt]
             elif frame_dict[dt] == self._timestamp_per_dev[device_sn][dt]:
-                printout(f"resetting device after 'depth_timestamp' frozen "
-                         f"for {RESET_LIMIT}s", 'w')
                 if self._poll_counter_per_dev[device_sn][0] > RESET_LIMIT:
+                    printout(f"resetting device after 'depth_timestamp' frozen "
+                             f"for {RESET_LIMIT}s", 'w')
                     reset = True
             else:
                 printout(f"Current depth_timestamp is smaller than "
@@ -962,6 +962,8 @@ class RealsenseWrapper:
         _counter = 0
         for device_sn, frame_dict in frames.items():
             if len(frame_dict) == 0:
+                color_timestamp_list.append("NA")
+                depth_timestamp_list.append("NA")
                 continue
             _counter += 1
             color_framedata_list.append(frame_dict['color_framedata'])
