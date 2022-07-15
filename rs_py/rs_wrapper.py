@@ -492,6 +492,7 @@ class RealsenseWrapper:
                     printout(e, 'w')
                     printout("resetting device after waiting for 3000ms", 'w')
                     self.stop(device_sn=device_sn)
+                    time.sleep(0.5)
                     self.initialize_device(device_sn=device_sn)
                     try:
                         frameset = dev.pipeline.wait_for_frames(3000)  # ms
@@ -867,6 +868,7 @@ class RealsenseWrapper:
         if reset:
             printout("Reseting device with frozen timestamp...", 'w')
             self.stop(device_sn=device_sn)
+            time.sleep(0.5)
             self.initialize_device(device_sn=device_sn)
             self._timestamp_per_dev[device_sn][ct] = 0
             self._timestamp_per_dev[device_sn][dt] = 0
@@ -996,7 +998,7 @@ class RealsenseWrapper:
             sensor = self.enabled_devices[device_sn].depth_sensor
             if sensor.supports(rs.option.asic_temperature):
                 temp = sensor.get_option(rs.option.asic_temperature)
-                printout(f"{device_sn} Temperature ASIC : {temp}", 'i')
+                printout(f"{device_sn} Temperature ASIC      : {temp}", 'i')
             if sensor.supports(rs.option.projector_temperature):
                 temp = sensor.get_option(rs.option.projector_temperature)
                 printout(f"{device_sn} Temperature Projector : {temp}", 'i')
