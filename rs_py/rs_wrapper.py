@@ -316,13 +316,12 @@ class RealsenseWrapper:
                 self.available_devices = [(device_sn, 'D400')]
 
         # available devices
+        self.available_devices = sorted(self.available_devices)
         if device_sn is not None:
             self.available_devices = [
                 i for i in self.available_devices if i[0] == device_sn]
         elif arg.rs_use_one_dev_only:
             self.available_devices = self.available_devices[0:1]
-
-        self.available_devices = sorted(self.available_devices)
 
         # serial numbers of enabled devices
         self.enabled_devices = {}
@@ -615,6 +614,8 @@ class RealsenseWrapper:
                     if frameset.size() == len(streams):
                         frames[device_sn] = {}
         printout(f"Finished capturing dummy frames...", 'i')
+        self._poll_counter_per_dev = {sn: [0, 0]  # [time elapsed, current time]
+                                      for sn, _ in self.available_devices}
 
     def save_calibration(self) -> None:
         """Saves camera calibration. """

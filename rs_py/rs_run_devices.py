@@ -1,6 +1,8 @@
 import argparse
 import time
 import tqdm
+import sys
+import os
 
 from rs_py import printout
 from rs_py import get_rs_parser
@@ -71,6 +73,9 @@ def run_devices(args: argparse.Namespace):
                 break
 
     except Exception as e:
+        exc_type, exc_obj, exc_tb = sys.exc_info()
+        fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+        print(exc_type, fname, exc_tb.tb_lineno)
         printout(f"{e}", 'e')
         printout(f"Stopping RealSense devices...", 'i')
         rsw.stop()
