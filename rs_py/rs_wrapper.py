@@ -528,8 +528,10 @@ class RealsenseWrapper:
 
                     self._save_timestamp(frame_dict, storage_paths)
 
-                    self._reset_device_with_frozen_timestamp(
+                    status = self._reset_device_with_frozen_timestamp(
                         frame_dict, device_sn)
+                    if status:
+                        frames[device_sn] = {}
 
         # Save data as a stacked array
         if self.save_stacked:
@@ -708,7 +710,7 @@ class RealsenseWrapper:
             printout(e, 'w')
             printout("resetting device after waiting for 3000ms", 'w')
             self.stop(device_sn=device_sn)
-            time.sleep(0.5)
+            time.sleep(1)
             self.initialize_device(device_sn=device_sn)
             try:
                 frameset = dev.pipeline.wait_for_frames(3000)  # ms
@@ -728,7 +730,7 @@ class RealsenseWrapper:
         if self._poll_counter_per_dev[device_sn][0] > 5:
             printout("resetting device after no frames for 5s", 'w')
             self.stop(device_sn=device_sn)
-            time.sleep(0.5)
+            time.sleep(1)
             self.initialize_device(device_sn=device_sn)
             self._poll_counter_per_dev[device_sn][0] = 0
         self._poll_counter_per_dev[device_sn][1] = time.time()
@@ -851,7 +853,7 @@ class RealsenseWrapper:
 
     def _reset_device_with_frozen_timestamp(self,
                                             frame_dict: dict,
-                                            device_sn: str):
+                                            device_sn: str) -> bool:
         ct = 'color_timestamp'
         dt = 'depth_timestamp'
         reset = False
@@ -859,11 +861,13 @@ class RealsenseWrapper:
             if frame_dict[ct] > self._timestamp_per_dev[device_sn][ct]:
                 self._timestamp_per_dev[device_sn][ct] = frame_dict[ct]
             elif frame_dict[ct] == self._timestamp_per_dev[device_sn][ct]:
-                reset = True
+                if self._poll_counter_per_dev[device_sn][0] > 5:
+                    reset = True
             else:
-                raise ValueError(f"Current color_timestamp is smaller than "
-                                 f"previous value : {frame_dict[ct]} < "
-                                 f"{self._timestamp_per_dev[device_sn][ct]}")
+                printout(f"Current color_timestamp is smaller than "
+                         f"previous value : {frame_dict[ct]} < "
+                         f"{self._timestamp_per_dev[device_sn][ct]}", 'w')
+                reset = True
         if frame_dict.get(dt, None) is not None:
             if frame_dict[dt] > self._timestamp_per_dev[device_sn][dt]:
                 self._timestamp_per_dev[device_sn][dt] = frame_dict[dt]
@@ -871,16 +875,18 @@ class RealsenseWrapper:
                 if self._poll_counter_per_dev[device_sn][0] > 5:
                     reset = True
             else:
-                raise ValueError(f"Current depth_timestamp is smaller than "
-                                 f"previous value : {frame_dict[dt]} < "
-                                 f"{self._timestamp_per_dev[device_sn][dt]}")
+                printout(f"Current depth_timestamp is smaller than "
+                         f"previous value : {frame_dict[dt]} < "
+                         f"{self._timestamp_per_dev[device_sn][dt]}", 'w')
+                reset = True
         if reset:
             printout("Resetting device with frozen timestamp...", 'w')
             self.stop(device_sn=device_sn)
-            time.sleep(0.5)
+            time.sleep(1)
             self.initialize_device(device_sn=device_sn)
             self._timestamp_per_dev[device_sn][ct] = 0
             self._timestamp_per_dev[device_sn][dt] = 0
+        return reset
 
     def _save_color_framedata(self,
                               frame_dict: dict,
