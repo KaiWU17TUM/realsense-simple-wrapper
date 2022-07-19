@@ -151,10 +151,6 @@ def get_parser() -> argparse.ArgumentParser:
                         # default='192.168.1.216',  # 101 WLAN
                         # default='192.168.1.11',  # 102 WLAN
                         help='ip address')
-    parser.add_argument('--rs-test-init-runtime',
-                        type=str2bool,
-                        default=False,
-                        help='test the runtime of device initialization.')
     return parser
 
 

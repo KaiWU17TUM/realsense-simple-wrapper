@@ -7,6 +7,20 @@ import os
 from rs_py import printout
 from rs_py import get_rs_parser
 from rs_py import RealsenseWrapper
+from rs_py import str2bool
+
+
+def get_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description='Run RealSense devices.')
+    parser.add_argument('--rs-test-init-runtime',
+                        type=str2bool,
+                        default=False,
+                        help='test the runtime of device initialization.')
+    parser.add_argument('--rs-test-hardware-reset-runtime',
+                        type=str2bool,
+                        default=False,
+                        help='test the runtime of hardware reset.')
+    return parser
 
 
 def test_device_init(args: argparse.Namespace):
@@ -22,11 +36,33 @@ def test_device_init(args: argparse.Namespace):
     rsw.dummy_capture(args.rs_fps * 5)
     rsw.stop()
 
-    N = 100
+    N = 10
     t = time.time()
     for _ in tqdm.tqdm(range(N)):
         rsw.initialize(verbose=False)
         rsw.stop()
+
+    printout(f"Finished in {(time.time()-t)/N}", 'i')
+
+
+def test_hardware_reset_runtime(args: argparse.Namespace):
+    """Runs test on hardware reset.
+
+    Args:
+        args (Namespace): args from cli.
+    """
+    args.save_data = False
+    rsw = RealsenseWrapper(args, args.rs_dev)
+    rsw.initialize()
+    rsw.set_ir_laser_power(args.rs_laser_power)
+    rsw.dummy_capture(args.rs_fps * 5)
+
+    N = 10
+    t = time.time()
+    for _ in tqdm.tqdm(range(N)):
+        dev = rsw.ctx.query_devices()[0]
+        dev.hardware_reset()
+        rsw.initialize(verbose=False)
 
     printout(f"Finished in {(time.time()-t)/N}", 'i')
 
@@ -88,7 +124,7 @@ def run_devices(args: argparse.Namespace):
 
 
 if __name__ == "__main__":
-    args = get_rs_parser().parse_args()
+    args, remain_args = get_rs_parser().parse_known_args()
     print("========================================")
     print(">>>>> args <<<<<")
     print("========================================")
@@ -96,7 +132,10 @@ if __name__ == "__main__":
         print(f"{k} : {v}")
     print("========================================")
 
-    if args.rs_test_init_runtime:
+    args_local, _ = get_parser().parse_known_args(remain_args)
+    if args_local.rs_test_init_runtime:
         test_device_init(args)
+    elif args_local.rs_test_hardware_reset_runtime:
+        test_hardware_reset_runtime(args)
     else:
         run_devices(args)
