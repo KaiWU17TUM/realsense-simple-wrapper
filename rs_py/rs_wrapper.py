@@ -21,7 +21,7 @@ from rs_py import rs
 from rs_py import rsnet
 
 
-RESET_LIMIT = 10
+RESET_LIMIT = 5
 
 
 def read_metadata(frame: rs.frame) -> dict:
@@ -461,6 +461,87 @@ class RealsenseWrapper:
         for device_sn, product_line in self.available_devices:
             self.initialize_device(device_sn, enable_ir_emitter, verbose)
 
+    def step_per_device(self,
+                        device_sn: str,
+                        frames: dict,
+                        display_and_save_with_key: bool = False,
+                        save_depth_colormap: bool = False) -> dict:
+        """Gets the frames streamed from an enabled rs device.
+
+        Args:
+            device_sn (str): device serial number.
+
+        Returns:
+            dict: {serial_number: {data_type: data}}.
+                data_type = color, depth, timestamp, calib
+        """
+        # 1. skips if the frame from that device is already taken
+        if device_sn in frames:
+            return frames
+
+        storage_paths = self._get_storage_paths(
+            device_sn, display_and_save_with_key)
+
+        streams = self.enabled_devices[device_sn].pipeline_profile.get_streams(
+        )
+
+        # 2. skips if the device is restarted due to empty frame
+        frameset, status = self._get_frameset_with_poll(device_sn)
+        if status:
+            if device_sn in frames:
+                frames.pop(device_sn)
+            self._reset_device_with_empty_frames(device_sn, status)
+            return frames
+
+        # 3. frameset is empty for more than (1)s, skip the current step.
+        if frameset is None:
+            frames[device_sn] = {}
+            return frames
+
+        # TODO: remove???
+        # the if check is needed only for 'poll_for_frames'
+        if frameset.size() == len(streams):
+
+            self.timestamp = time.time()
+
+            frame_dict = {}
+            frame_dict['calib'] = self.calib_data.get(device_sn, {})
+
+            # In the rs_net version, this returns zeros for depth frame
+            aligned_frameset = self._align.process(frameset)
+            # aligned_frameset = frameset
+
+            for stream in streams:
+                st = stream.stream_type()
+                if st == rs.stream.color:
+                    frame_dict, framedata = self._get_color_stream(
+                        frameset=aligned_frameset,
+                        frame_dict=frame_dict,
+                        storage_paths=None if self.save_stacked else storage_paths,  # noqa
+                    )
+                elif st == rs.stream.depth:
+                    frame_dict, framedata = self._get_depth_stream(
+                        frameset=aligned_frameset,
+                        frame_dict=frame_dict,
+                        storage_paths=None if self.save_stacked else storage_paths,  # noqa
+                        save_colormap=save_depth_colormap
+                    )
+                    self._print_camera_temperature(device_sn)
+                else:
+                    raise ValueError(f"Unsupported stream : {st}")
+
+            frames[device_sn] = frame_dict
+
+            self._save_timestamp(frame_dict, storage_paths)
+
+            # 4. if reset due to time freeze, skip the current step.
+            status = self._reset_device_with_frozen_timestamp(
+                frame_dict, device_sn)
+            if status:
+                frames[device_sn] = {}
+
+        return frames
+
     def step(self,
              display: int = 0,
              display_and_save_with_key: bool = False,
@@ -473,7 +554,7 @@ class RealsenseWrapper:
                 0 = no display, 1 = display scale
 
         Returns:
-            dict: Empty dict or {serial_number: {data_type: data}}.
+            dict: {serial_number: {data_type: data}}.
                 data_type = color, depth, timestamp, calib
         """
         if len(self.enabled_devices) == 0:
@@ -482,59 +563,11 @@ class RealsenseWrapper:
 
         frames = {}
         while len(frames) < len(self.enabled_devices.items()):
-
-            for device_sn, dev in self.enabled_devices.items():
-
-                storage_paths = self._get_storage_paths(
-                    device_sn, display_and_save_with_key)
-
-                streams = dev.pipeline_profile.get_streams()
-
-                frameset = self._get_frameset_with_poll(device_sn)
-
-                if frameset is None:
-                    frames[device_sn] = {}
-                    continue
-
-                # TODO: the if check if needed only for 'poll_for_frames'
-                if frameset.size() == len(streams):
-
-                    self.timestamp = time.time()
-
-                    frame_dict = {}
-                    frame_dict['calib'] = self.calib_data.get(device_sn, {})
-
-                    # In the rs_net version, this returns zeros for depth frame
-                    aligned_frameset = self._align.process(frameset)
-                    # aligned_frameset = frameset
-
-                    for stream in streams:
-                        st = stream.stream_type()
-                        if st == rs.stream.color:
-                            frame_dict, framedata = self._get_color_stream(
-                                frameset=aligned_frameset,
-                                frame_dict=frame_dict,
-                                storage_paths=None if self.save_stacked else storage_paths,  # noqa
-                            )
-                        elif st == rs.stream.depth:
-                            frame_dict, framedata = self._get_depth_stream(
-                                frameset=aligned_frameset,
-                                frame_dict=frame_dict,
-                                storage_paths=None if self.save_stacked else storage_paths,  # noqa
-                                save_colormap=save_depth_colormap
-                            )
-                            self._print_camera_temperature(device_sn)
-                        else:
-                            raise ValueError(f"Unsupported stream : {st}")
-
-                    frames[device_sn] = frame_dict
-
-                    self._save_timestamp(frame_dict, storage_paths)
-
-                    status = self._reset_device_with_frozen_timestamp(
-                        frame_dict, device_sn)
-                    if status:
-                        frames[device_sn] = {}
+            for device_sn, _ in self.enabled_devices.items():
+                frames = self.step_per_device(device_sn,
+                                              frames,
+                                              display_and_save_with_key,
+                                              save_depth_colormap)
 
         # Save data as a stacked array
         if self.save_stacked:
@@ -713,7 +746,7 @@ class RealsenseWrapper:
             printout(e, 'w')
             printout("resetting device after waiting for 3000ms", 'w')
             self.stop(device_sn=device_sn)
-            time.sleep(1)
+            time.sleep(5)
             self.initialize_device(device_sn=device_sn)
             try:
                 frameset = dev.pipeline.wait_for_frames(3000)  # ms
@@ -724,6 +757,7 @@ class RealsenseWrapper:
         return frameset
 
     def _get_frameset_with_poll(self, device_sn: str) -> rs.composite_frame:
+        reset = False
         frameset = self.enabled_devices[device_sn].pipeline.poll_for_frames()
         if frameset.size() == 0:
             self._poll_counter_per_dev[device_sn][0] += (
@@ -731,17 +765,26 @@ class RealsenseWrapper:
         else:
             self._poll_counter_per_dev[device_sn][0] = 0
         if self._poll_counter_per_dev[device_sn][0] > RESET_LIMIT:
+            reset = True
+        self._poll_counter_per_dev[device_sn][1] = time.time()
+        # to prevent the same frame from being resaved until the RESET_LIMIT
+        if self._poll_counter_per_dev[device_sn][0] > 1:
+            return None, reset
+        else:
+            return frameset, reset
+
+    def _reset_device_with_empty_frames(self,
+                                        device_sn: str,
+                                        reset: bool
+                                        ) -> Tuple[rs.composite_frame, bool]:
+        if reset:
             printout(
                 f"resetting device after no frames for {RESET_LIMIT}s", 'w')
             self.stop(device_sn=device_sn)
-            time.sleep(1)
+            time.sleep(5)
             self.initialize_device(device_sn=device_sn)
             self._poll_counter_per_dev[device_sn][0] = 0
-        self._poll_counter_per_dev[device_sn][1] = time.time()
-        if self._poll_counter_per_dev[device_sn][0] > 1:
-            return None
-        else:
-            return frameset
+            self._poll_counter_per_dev[device_sn][1] = time.time()
 
     def _get_storage_paths(self,
                            device_sn: str,
@@ -848,6 +891,12 @@ class RealsenseWrapper:
         return frame_dict, framedata
 
     def _save_timestamp(self, frame_dict: dict, storage_paths: StoragePaths):
+        """Saves the timestamp.
+
+        Args:
+            frame_dict (dict): Dictionary containing framedata.
+            storage_paths (StoragePaths): Obj containing the storage paths.
+        """
         if storage_paths is not None:
             if storage_paths.save:
                 ts_file = storage_paths.timestamp_file
@@ -858,6 +907,16 @@ class RealsenseWrapper:
     def _reset_device_with_frozen_timestamp(self,
                                             frame_dict: dict,
                                             device_sn: str) -> bool:
+        """Resets the device if the timestamp is frozen, i.e., device keeps
+        returning the same frame.
+
+        Args:
+            frame_dict (dict): Dictionary containing framedata.
+            device_sn (str): rs camera serial number.
+
+        Returns:
+            bool: Whether the device has been resetted.
+        """
         ct = 'color_timestamp'
         dt = 'depth_timestamp'
         reset = False
@@ -890,7 +949,7 @@ class RealsenseWrapper:
         if reset:
             printout("Resetting device with frozen timestamp...", 'w')
             self.stop(device_sn=device_sn)
-            time.sleep(1)
+            time.sleep(5)
             self.initialize_device(device_sn=device_sn)
             self._timestamp_per_dev[device_sn][ct] = 0
             self._timestamp_per_dev[device_sn][dt] = 0
@@ -898,7 +957,13 @@ class RealsenseWrapper:
 
     def _save_color_framedata(self,
                               frame_dict: dict,
-                              storage_paths: StoragePaths):
+                              storage_paths: StoragePaths) -> None:
+        """Save color framedata.
+
+        Args:
+            frame_dict (dict): Dictionary containing framedata.
+            storage_paths (StoragePaths): Obj containing the storage paths.
+        """
         ts = frame_dict['color_timestamp']
         # No storage
         if storage_paths is None:
@@ -919,7 +984,15 @@ class RealsenseWrapper:
     def _save_depth_framedata(self,
                               frame_dict: dict,
                               storage_paths: StoragePaths,
-                              save_colormap: bool = False):
+                              save_colormap: bool = False) -> None:
+        """Save depth framedata.
+
+        Args:
+            frame_dict (dict): Dictionary containing framedata.
+            storage_paths (StoragePaths): Obj containing the storage paths.
+            save_colormap (bool, optional): If True, saves the depth data
+                converted to colormap. Defaults to False.
+        """
         ts = frame_dict['depth_timestamp']
         # No storage
         if storage_paths is None:
@@ -952,7 +1025,16 @@ class RealsenseWrapper:
                 with open(os.path.join(filedir, f"{ts}.json"), 'w') as json_f:
                     json.dump(frame_dict['depth_metadata'], json_f, indent=4)
 
-    def _save_stacked_framedata(self, frames: dict, save_depth_colormap: bool):
+    def _save_stacked_framedata(self,
+                                frames: dict,
+                                save_depth_colormap: bool = False) -> None:
+        """Saves frame data from multiple devices in a stacked manner.
+
+        Args:
+            frames (dict): Dictionary containing framedata per device.
+            save_depth_colormap (bool): If True, saves the depth data converted
+                to colormap. Defaults to False.
+        """
         color_framedata_list = []
         color_timestamp_list = []
         color_metadata_dict = {}
@@ -986,8 +1068,17 @@ class RealsenseWrapper:
             self._save_depth_framedata(_frame_dict, storage,
                                        save_depth_colormap)
 
-    def _display_rs_data(self, frames: dict, scale: int) -> bool:
-        terminate = False
+    def _display_rs_data(self, frames: dict, scale: int = 1) -> bool:
+        """Displays both color and depth data from frame.
+
+        Args:
+            frames (dict): Dictionary containing frame data.
+            scale (int): Scale of the displayed image. Defaults to 1.
+
+        Returns:
+            bool: If True, the 'q' button is pressed.
+        """
+        q_press = False
         for device_sn, data_dict in frames.items():
             # Render images
             depth_colormap = cv2.applyColorMap(
@@ -1018,11 +1109,11 @@ class RealsenseWrapper:
             if self._key & 0xFF == ord('q') or self._key == 27:
                 cv2.destroyAllWindows()
                 cv2.waitKey(5)
-                terminate = True
+                q_press = True
 
-        return terminate
+        return q_press
 
-    def _print_camera_info(self, profile: rs.pipeline_profile):
+    def _print_camera_info(self, profile: rs.pipeline_profile) -> None:
         """Prints out info about the camera
 
         Args:
@@ -1048,7 +1139,12 @@ class RealsenseWrapper:
             print(f'USB type      : not available', e)
         print("========================================")
 
-    def _print_camera_temperature(self, device_sn: str):
+    def _print_camera_temperature(self, device_sn: str) -> None:
+        """Prints out camera temperature.
+
+        Args:
+            device_sn (str): rs camera serial number.
+        """
         _count = self.timestamp // self._temperature_log_interval
         if _count > self._temperature_log_counter[device_sn]:
             self._temperature_log_counter[device_sn] = _count
