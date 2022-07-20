@@ -3,6 +3,7 @@ import time
 import tqdm
 import sys
 import os
+import subprocess
 
 from rs_py import printout
 from rs_py import get_rs_parser
@@ -51,6 +52,8 @@ def test_hardware_reset_runtime(args: argparse.Namespace):
     Args:
         args (Namespace): args from cli.
     """
+    ip = args.rs_ip
+    args.rs_ip = None
     args.save_data = False
     rsw = RealsenseWrapper(args, args.rs_dev)
     rsw.initialize()
@@ -60,8 +63,20 @@ def test_hardware_reset_runtime(args: argparse.Namespace):
     N = 10
     t = time.time()
     for _ in tqdm.tqdm(range(N)):
-        dev = rsw.ctx.query_devices()[0]
-        dev.hardware_reset()
+        for _, dev in rsw.enabled_devices.items():
+            dev.pipeline_profile.get_device().hardware_reset()
+            time.sleep(3)
+            process = subprocess.Popen([
+                './realsense-simple-wrapper/scripts/pi4_client.sh',
+                'start',
+                ip,
+                'realsense'
+            ],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE
+            )
+            stdout, stderr = process.communicate()
+            print(stdout, stderr)
         rsw.initialize(verbose=False)
 
     printout(f"Finished in {(time.time()-t)/N}", 'i')
