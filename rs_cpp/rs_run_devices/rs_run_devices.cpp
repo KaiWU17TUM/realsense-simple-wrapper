@@ -23,10 +23,10 @@ int main(int argc, char *argv[])
 try
 {
 
-    if (argc != 5 && argc != 6)
+    if (argc != 6 && argc != 7)
     {
-        std::cout << "[ERROR] : Please enter fps, height, width, save path, {ipaddress}" << std::endl;
-        throw std::invalid_argument("There should be 4 or 5 arguments");
+        std::cerr << "Please enter fps, height, width, color format, depth format, save path, {ipaddress}" << std::endl;
+        throw std::invalid_argument("There should be 6 or 7 arguments");
     }
 
     // Intialize the wrapper
@@ -43,6 +43,7 @@ try
     {
         std::string i_str = pad_zeros(std::to_string(i), num_zeros_to_pad);
         rs2_dev.step(i_str);
+        std::cout << i << std::endl;
     }
     return EXIT_SUCCESS;
 }

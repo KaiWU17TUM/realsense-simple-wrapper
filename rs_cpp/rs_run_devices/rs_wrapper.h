@@ -65,13 +65,6 @@ bool framedata_to_bin(const rs2::frame &frm, const std::string &filename);
 void metadata_to_csv(const rs2::frame &frm, const std::string &filename);
 
 /**
- * @brief Creates the required directories to save data
- *
- */
-void create_directories(const char *device_sn,
-                        const char *base_path);
-
-/**
  * @brief Creates a holder to collect important rs variables.
  *
  */
@@ -105,7 +98,13 @@ public:
     std::string color_metadata;
     std::string depth_metadata;
     storagepaths();
-    void create_directories(const char *device_sn, const char *base_path);
+
+    /**
+     * @brief Creates the required directories to save data
+     *
+     */
+    void create_directories(const std::string &device_sn,
+                            const std::string &base_path);
 };
 
 // class storagepaths
@@ -251,7 +250,7 @@ class rs2wrapper : public rs2args
 {
     // Device data
     std::shared_ptr<rs2::context> ctx;
-    std::vector<std::vector<const char *>> available_devices;
+    std::vector<std::vector<std::string>> available_devices;
     std::map<std::string, device> enabled_devices;
     // std::map calib_data;
 
@@ -315,7 +314,7 @@ public:
 
     void save_calib();
 
-    void configure_stream(const char *device_sn,
+    void configure_stream(const std::string &device_sn,
                           const stream_config &stream_config_color,
                           const stream_config &stream_config_depth);
 

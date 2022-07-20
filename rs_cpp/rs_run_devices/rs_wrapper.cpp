@@ -1,5 +1,6 @@
 #include "utils.h"
 #include "rs_wrapper.h"
+#include <bitset>
 
 // doesnt work in the class init.
 rs2::align align_to_depth(RS2_STREAM_DEPTH);
@@ -7,12 +8,16 @@ rs2::align align_to_color(RS2_STREAM_COLOR);
 
 int num_zeros_to_pad = NUM_ZEROS_TO_PAD;
 
-void storagepaths::create_directories(const char *device_sn,
-                                      const char *base_path)
+storagepaths::storagepaths()
+{
+}
+
+void storagepaths::create_directories(const std::string &device_sn,
+                                      const std::string &base_path)
 {
     std::string path;
     // Base
-    path = std::string(base_path);
+    path = base_path;
     mkdir(path.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
     // Device
     path.append("/");
@@ -52,6 +57,61 @@ rs2wrapper::rs2wrapper(int argc,
     // context grabs the usb resources of the cameras.
     ctx = std::make_shared<rs2::context>(context);
 
+    // Get available devices
+    if (network())
+    {
+        print("Network mode", 0);
+        rs2::net_device dev((std::string)ip());
+        print("Network device found", 0);
+        dev.add_to(*ctx);
+        // pipe = rs2::pipeline(ctx);
+        std::vector<std::string> available_device;
+        available_device.push_back(dev.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER));
+        available_device.push_back(ip());
+        available_devices.push_back(available_device);
+    }
+    else
+    {
+        print("Local mode", 0);
+        if (single_device_sn == "-1")
+        {
+            for (auto &&dev : ctx->query_devices())
+            {
+                auto serial = dev.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER);
+                auto product_line = dev.get_info(RS2_CAMERA_INFO_PRODUCT_LINE);
+                std::vector<std::string> available_device;
+                available_device.push_back(serial);
+                available_device.push_back(product_line);
+                available_devices.push_back(available_device);
+                print("found : " + std::string(serial));
+            }
+        }
+        else
+        {
+            std::vector<std::string> available_device;
+            available_device.push_back(single_device_sn.c_str());
+            available_device.push_back("D400");
+            available_devices.push_back(available_device);
+            print("using : " + std::string(single_device_sn.c_str()));
+        }
+    }
+
+    // Sort the devices.
+    std::sort(available_devices.begin(), available_devices.end(),
+              [](const std::vector<std::string> &a,
+                 const std::vector<std::string> &b)
+              {
+                  return a[0] < b[0];
+              });
+
+    // storage
+    for (auto &&available_device : available_devices)
+    {
+        storagepaths _storagepaths;
+        _storagepaths.create_directories(available_device[0], save_path());
+        storagepaths_perdev[available_device[0]] = _storagepaths;
+    }
+
     // stream
     stream_config_color.stream_type = RS2_STREAM_COLOR;
     stream_config_color.width = width();
@@ -81,65 +141,10 @@ rs2::pipeline rs2wrapper::initialize_pipeline(const std::shared_ptr<rs2::context
 
 void rs2wrapper::initialize(bool enable_ir_emitter, bool verbose)
 {
-    // Get available devices
-    if (network())
-    {
-        print("Network mode", 0);
-        rs2::net_device dev((std::string)ip());
-        print("Network device found", 0);
-        dev.add_to(*ctx);
-        // pipe = rs2::pipeline(ctx);
-        std::vector<const char *> available_device;
-        available_device.push_back(dev.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER));
-        available_device.push_back(ip());
-        available_devices.push_back(available_device);
-    }
-    else
-    {
-        print("Local mode", 0);
-        if (single_device_sn != "-1")
-        {
-            for (auto &&dev : ctx->query_devices())
-            {
-                auto serial = dev.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER);
-                auto product_line = dev.get_info(RS2_CAMERA_INFO_PRODUCT_LINE);
-                std::vector<const char *> available_device;
-                available_device.push_back(serial);
-                available_device.push_back(product_line);
-                available_devices.push_back(available_device);
-            }
-        }
-        else
-        {
-            std::vector<const char *> available_device;
-            available_device.push_back(single_device_sn.c_str());
-            available_device.push_back("D400");
-            available_devices.push_back(available_device);
-        }
-    }
-
-    // Sort the devices.
-    std::sort(available_devices.begin(), available_devices.end(),
-              [](const std::vector<const char *> &a,
-                 const std::vector<const char *> &b)
-              {
-                  return a[0] < b[0];
-              });
-
-    // storage
     for (auto &&available_device : available_devices)
     {
-        storagepaths _storagepaths;
-        _storagepaths.create_directories(available_device[0], save_path());
-        storagepaths_perdev[available_device[0]] = _storagepaths;
-    }
-
-    // main init
-    for (auto &&available_device : available_devices)
-    {
-        const char *device_sn = available_device[0];
+        const std::string device_sn = available_device[0];
         device dev;
-
         print("Initializing RealSense devices " + std::string(device_sn), 0);
 
         // 1. pipeline
@@ -150,7 +155,7 @@ void rs2wrapper::initialize(bool enable_ir_emitter, bool verbose)
         configure_stream(device_sn, stream_config_color, stream_config_depth);
         rs2::config cfg = rs_cfg[device_sn];
         if (!network())
-            cfg.enable_device(device_sn);
+            cfg.enable_device(std::string(device_sn));
         bool check = cfg.can_resolve(pipe);
         if (check)
             print("'cfg' usable with 'pipeline' : True", 0);
@@ -193,9 +198,6 @@ void rs2wrapper::initialize(bool enable_ir_emitter, bool verbose)
         // 6. enabled devices
         enabled_devices[device_sn] = dev;
         print_camera_infos(dev.pipeline_profile);
-
-        // Create save directory
-        create_directories(device_sn, save_path());
 
         print("Initialized RealSense devices " + std::string(device_sn), 0);
     }
@@ -334,7 +336,7 @@ void rs2wrapper::save_calib()
     }
 }
 
-void rs2wrapper::configure_stream(const char *device_sn,
+void rs2wrapper::configure_stream(const std::string &device_sn,
                                   const stream_config &stream_config_color,
                                   const stream_config &stream_config_depth)
 {
