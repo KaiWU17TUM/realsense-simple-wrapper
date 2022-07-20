@@ -10,6 +10,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
+#include <algorithm>
+#include <vector>
 #include <map>
 #include <time.h>
 #include <cstdlib>
@@ -63,6 +65,65 @@ bool framedata_to_bin(const rs2::frame &frm, const std::string &filename);
 void metadata_to_csv(const rs2::frame &frm, const std::string &filename);
 
 /**
+ * @brief Creates the required directories to save data
+ *
+ */
+void create_directories(const char *device_sn,
+                        const char *base_path);
+
+/**
+ * @brief Creates a holder to collect important rs variables.
+ *
+ */
+struct device
+{
+    std::shared_ptr<rs2::pipeline> pipeline;
+    std::shared_ptr<rs2::pipeline_profile> pipeline_profile;
+    std::shared_ptr<rs2::color_sensor> color_sensor;
+    std::shared_ptr<rs2::depth_sensor> depth_sensor;
+};
+
+struct stream_config
+{
+    rs2_stream stream_type = RS2_STREAM_COLOR;
+    // rs2_stream stream_type = RS2_STREAM_DEPTH;
+    int width = 848;
+    int height = 480;
+    rs2_format format = RS2_FORMAT_BGR8;
+    // rs2_format format = RS2_FORMAT_YUYV;
+    // rs2_format format = RS2_FORMAT_Z16;
+    int framerate = 30;
+};
+
+class storagepaths
+{
+public:
+    bool save = true;
+    std::string calib;
+    std::string color;
+    std::string depth;
+    std::string color_metadata;
+    std::string depth_metadata;
+    storagepaths();
+    void create_directories(const char *device_sn, const char *base_path);
+};
+
+// class storagepaths
+// {
+
+// public:
+//     bool save = true;
+//     std::string calib;
+//     std::string color;
+//     std::string depth;
+//     std::string color_metadata;
+//     std::string depth_metadata;
+
+//     storagepaths(const char *device_sn,
+//                  const char *base_path);
+// };
+
+/**
  * @brief Class that contains the arguments for the rs2wrapper class.
  *
  */
@@ -70,6 +131,12 @@ class rs2args
 {
     int _argc;
     char **_argv;
+
+    std::map<const char *, rs2_format> _SUPPORTED_FORMATS{
+        {"z16", RS2_FORMAT_Z16},
+        {"bgr8", RS2_FORMAT_BGR8},
+        {"rgb8", RS2_FORMAT_RGB8},
+        {"yuyv", RS2_FORMAT_YUYV}};
 
 public:
     /**
@@ -110,6 +177,20 @@ public:
     {
         return atoi(_argv[3]);
     }
+    rs2_format color_format()
+    {
+        if (_SUPPORTED_FORMATS.find(_argv[4]) == _SUPPORTED_FORMATS.end())
+            return _SUPPORTED_FORMATS[_argv[4]];
+        else
+            throw std::invalid_argument("rs color format unknown");
+    }
+    rs2_format depth_format()
+    {
+        if (_SUPPORTED_FORMATS.find(_argv[5]) == _SUPPORTED_FORMATS.end())
+            return _SUPPORTED_FORMATS[_argv[5]];
+        else
+            throw std::invalid_argument("rs depth format unknown");
+    }
     /**
      * @brief Path to save the frames.
      *
@@ -117,16 +198,16 @@ public:
      */
     const char *save_path()
     {
-        return _argv[4];
+        return _argv[6];
     }
     /**
      * @brief IP address of the remote realsense device (optional).
      *
-     * @return std::string
+     * @return const char*
      */
-    std::string ip()
+    const char *ip()
     {
-        return (std::string)_argv[5];
+        return _argv[7];
     }
     /**
      * @brief Checks whether the realsense device is connected over the network.
@@ -136,7 +217,7 @@ public:
      */
     bool network()
     {
-        if (_argc == 6)
+        if (_argc == 8)
             return true;
         else
             return false;
@@ -145,7 +226,7 @@ public:
      * @brief Prints out the arguments from 'rs2args' class that is used for the 'rs2wrapper' class.
      *
      */
-    void info()
+    void print_args()
     {
         std::cout << "========================================" << std::endl;
         std::cout << ">>>>> rs2args <<<<<" << std::endl;
@@ -154,7 +235,10 @@ public:
         std::cout << "Height     : " << height() << std::endl;
         std::cout << "Width      : " << width() << std::endl;
         std::cout << "Save Path  : " << save_path() << std::endl;
-        std::cout << "IP Address : " << ip() << std::endl;
+        if (network())
+            std::cout << "IP Address : " << ip() << std::endl;
+        else
+            std::cout << "IP Address : " << std::endl;
         std::cout << "========================================" << std::endl;
     }
 };
@@ -165,21 +249,27 @@ public:
  */
 class rs2wrapper : public rs2args
 {
+    // Device data
+    std::shared_ptr<rs2::context> ctx;
+    std::vector<std::vector<const char *>> available_devices;
+    std::map<std::string, device> enabled_devices;
+    // std::map calib_data;
 
-    rs2::config cfg;
-    rs2::pipeline pipe;
-    rs2::pipeline_profile profile;
+    std::string single_device_sn = "-1";
+
+    // RS align method
+    // rs2::align align = align_to_color;
+
+    // Configurations
+    std::map<std::string, rs2::config> rs_cfg;
+    stream_config stream_config_color;
+    stream_config stream_config_depth;
+
+    // Paths for saving data
+    std::map<std::string, storagepaths> storagepaths_perdev;
 
     // Declare depth colorizer for pretty visualization of depth data
     rs2::colorizer color_map;
-
-    // Paths for saving data
-    std::map<std::string, std::string> path_map{
-        {"Color", ""},
-        {"Depth", ""},
-        {"MetaColor", ""},
-        {"MetaDepth", ""},
-        {"Calib", ""}};
 
 public:
     /**
@@ -187,19 +277,26 @@ public:
      *
      * @param argc Number of arguments.
      * @param argv Arguments in an array of char*.
+     * @param ctx rs context.
+     * @param device_sn Device serial number to be used.
      */
-    rs2wrapper(int argc, char *argv[]);
-    /**
-     * @brief Creates the required directories to save data
-     *
-     */
-    void create_directories(const char *device_sn,
-                            const char *base_path);
+    rs2wrapper(int argc,
+               char *argv[],
+               rs2::context context,
+               std::string device_sn = "-1");
+
     /**
      * @brief Initialize the realsense devices.
      *
      */
-    void initialize();
+    void initialize(bool enable_ir_emitter = true, bool verbose = true);
+    /**
+     * @brief Initialize the pipeline.
+     *
+     * @param ctx
+     * @return rs2::pipeline
+     */
+    rs2::pipeline initialize_pipeline(const std::shared_ptr<rs2::context> context);
     /**
      * @brief Flushes N initial frames o give autoexposure, etc. a chance to settle.
      *
@@ -217,4 +314,10 @@ public:
     void step(const std::string &save_file_prefix);
 
     void save_calib();
+
+    void configure_stream(const char *device_sn,
+                          const stream_config &stream_config_color,
+                          const stream_config &stream_config_depth);
+
+    void print_camera_infos(const std::shared_ptr<rs2::pipeline_profile> profile);
 };
