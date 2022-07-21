@@ -15,7 +15,7 @@
 #include <iostream> // Terminal IO
 #include <sstream>  // Stringstreams
 
-#include <tclap/CmdLine.h>
+// #include <tclap/CmdLine.h>
 
 #include "utils.h"
 #include "rs_wrapper.h"
@@ -26,10 +26,10 @@ int main(int argc, char *argv[])
 try
 {
 
-    if (argc != 6 && argc != 7)
+    if (argc != 7 && argc != 8)
     {
-        std::cerr << "Please enter fps, height, width, color format, depth format, save path, {ipaddress}" << std::endl;
-        throw std::invalid_argument("There should be 6 or 7 arguments");
+        std::cerr << "Please enter steps, fps, height, width, color format, depth format, save path, {ipaddress}" << std::endl;
+        throw std::invalid_argument("There should be 7 or 8 arguments");
     }
 
     // Intialize the wrapper
@@ -42,7 +42,7 @@ try
     rs2_dev.initial_flush();
 
     int num_zeros_to_pad = NUM_ZEROS_TO_PAD;
-    for (auto i = 0; i < rs2_dev.fps() * 10; ++i)
+    for (auto i = 0; i < rs2_dev.fps() * rs2_dev.steps(); ++i)
     {
         std::string i_str = pad_zeros(std::to_string(i), num_zeros_to_pad);
         std::string o_str = "";

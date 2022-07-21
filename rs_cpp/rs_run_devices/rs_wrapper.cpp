@@ -252,6 +252,7 @@ void rs2wrapper::initialize(const bool &enable_ir_emitter,
         // 6. enabled devices
         enabled_devices[device_sn] = dev;
         print_camera_infos(dev.pipeline_profile);
+        print_camera_temperature(device_sn);
 
         if (storagepaths_perdev.size() > 0)
             query_timestamp_mode(std::string(device_sn));
@@ -302,9 +303,14 @@ void rs2wrapper::step(std::string &output_msg)
                     for (auto &&stream : streams)
                     {
                         if (stream.stream_type() == RS2_STREAM_COLOR)
+                        {
                             save_color_stream(device_sn, aligned_frameset, color_timestamp);
+                        }
                         else if (stream.stream_type() == RS2_STREAM_DEPTH)
+                        {
                             save_depth_stream(device_sn, aligned_frameset, depth_timestamp);
+                            print_camera_temperature(device_sn);
+                        }
                     }
 
                     save_timestamp(device_sn,
@@ -315,7 +321,7 @@ void rs2wrapper::step(std::string &output_msg)
                     output_msg += device_sn + "::" +
                                   std::to_string(global_timestamp_diff) + "::" +
                                   std::to_string(color_timestamp) + "::" +
-                                  std::to_string(depth_timestamp) + "::";
+                                  std::to_string(depth_timestamp) + "  ";
 
                     counter += 1;
                 }
@@ -538,17 +544,21 @@ void rs2wrapper::print_camera_infos(const std::shared_ptr<rs2::pipeline_profile>
 
 void rs2wrapper::print_camera_temperature(const std::string &device_sn)
 {
+    int c = *enabled_devices[device_sn].camera_temp_printout_counter;
+    if (c >= camera_temp_printout_interval || c == -1)
     {
+    	*enabled_devices[device_sn].camera_temp_printout_counter = 0;
         auto dss = enabled_devices[device_sn].depth_sensor;
         if (dss->supports(RS2_OPTION_ASIC_TEMPERATURE))
         {
             auto temp = dss->get_option(RS2_OPTION_ASIC_TEMPERATURE);
-            print("{device_sn} Temperature ASIC      : " + std::to_string(temp), 0);
+            print(device_sn + " Temperature ASIC      : " + std::to_string(temp), 0);
         }
         if (dss->supports(RS2_OPTION_PROJECTOR_TEMPERATURE))
         {
             auto temp = dss->get_option(RS2_OPTION_PROJECTOR_TEMPERATURE);
-            print("{device_sn} Temperature Projector : " + std::to_string(temp), 0);
+            print(device_sn + " Temperature Projector : " + std::to_string(temp), 0);
         }
     }
+    *enabled_devices[device_sn].camera_temp_printout_counter += 1;
 }

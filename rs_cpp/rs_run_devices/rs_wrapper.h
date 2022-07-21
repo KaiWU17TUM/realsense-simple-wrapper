@@ -64,6 +64,7 @@ struct device
     std::shared_ptr<rs2::pipeline_profile> pipeline_profile;
     std::shared_ptr<rs2::color_sensor> color_sensor;
     std::shared_ptr<rs2::depth_sensor> depth_sensor;
+    std::shared_ptr<int> camera_temp_printout_counter = std::make_shared<int>(-1);
 };
 
 struct stream_config
@@ -119,13 +120,22 @@ public:
         _argv = argv;
     }
     /**
+     * @brief Steps to run the realsense device.
+     *
+     * @return int
+     */
+    int steps()
+    {
+        return atoi(_argv[1]);
+    }
+    /**
      * @brief FPS of the realsense device.
      *
      * @return int
      */
     int fps()
     {
-        return atoi(_argv[1]);
+        return atoi(_argv[2]);
     }
     /**
      * @brief Height of the realsense frames.
@@ -134,7 +144,7 @@ public:
      */
     int height()
     {
-        return atoi(_argv[2]);
+        return atoi(_argv[3]);
     }
     /**
      * @brief Width of the realsense frames.
@@ -143,19 +153,19 @@ public:
      */
     int width()
     {
-        return atoi(_argv[3]);
+        return atoi(_argv[4]);
     }
     rs2_format color_format()
     {
-        if (_SUPPORTED_FORMATS.count(std::string(_argv[4])))
-            return _SUPPORTED_FORMATS[std::string(_argv[4])];
+        if (_SUPPORTED_FORMATS.count(std::string(_argv[5])))
+            return _SUPPORTED_FORMATS[std::string(_argv[5])];
         else
             throw std::invalid_argument("rs color format unknown");
     }
     rs2_format depth_format()
     {
-        if (_SUPPORTED_FORMATS.count(std::string(_argv[5])))
-            return _SUPPORTED_FORMATS[std::string(_argv[5])];
+        if (_SUPPORTED_FORMATS.count(std::string(_argv[6])))
+            return _SUPPORTED_FORMATS[std::string(_argv[6])];
         else
             throw std::invalid_argument("rs depth format unknown");
     }
@@ -166,7 +176,7 @@ public:
      */
     const char *save_path()
     {
-        return _argv[6];
+        return _argv[7];
     }
     /**
      * @brief IP address of the remote realsense device (optional).
@@ -175,7 +185,7 @@ public:
      */
     const char *ip()
     {
-        return _argv[7];
+        return _argv[8];
     }
     /**
      * @brief Checks whether the realsense device is connected over the network.
@@ -185,7 +195,7 @@ public:
      */
     bool network()
     {
-        if (_argc == 8)
+        if (_argc == 9)
             return true;
         else
             return false;
@@ -237,6 +247,7 @@ class rs2wrapper : public rs2args
     std::map<std::string, storagepaths> storagepaths_perdev;
 
     // Timestamp data
+    int camera_temp_printout_interval = 3600;
     rs2_frame_metadata_value timestamp_mode = RS2_FRAME_METADATA_TIME_OF_ARRIVAL;
     std::chrono::steady_clock::time_point global_timestamp_start = std::chrono::steady_clock::now();
 
