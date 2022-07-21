@@ -15,6 +15,8 @@
 #include <iostream> // Terminal IO
 #include <sstream>  // Stringstreams
 
+#include <tclap/CmdLine.h>
+
 #include "utils.h"
 #include "rs_wrapper.h"
 

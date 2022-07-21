@@ -7,12 +7,88 @@ rs2::align align_to_color(RS2_STREAM_COLOR);
 
 int num_zeros_to_pad = NUM_ZEROS_TO_PAD;
 
+std::string pad_zeros(const std::string &in_str, const size_t &num_zeros)
+{
+    std::string out_str =
+        std::string(num_zeros - std::min(num_zeros, in_str.length()), '0') +
+        in_str;
+    return out_str;
+}
+
+std::string filename_prefix_with_timestamp(const rs2::frame &frm,
+                                           const std::string &prefix,
+                                           const size_t &num_zeros)
+{
+    std::string _prefix;
+    if (frm.supports_frame_metadata(RS2_FRAME_METADATA_SENSOR_TIMESTAMP))
+    {
+        _prefix = std::to_string(frm.get_frame_metadata(RS2_FRAME_METADATA_SENSOR_TIMESTAMP));
+        _prefix = pad_zeros(_prefix, num_zeros);
+    }
+    else if (frm.supports_frame_metadata(RS2_FRAME_METADATA_FRAME_TIMESTAMP))
+    {
+        _prefix = std::to_string(frm.get_frame_metadata(RS2_FRAME_METADATA_FRAME_TIMESTAMP));
+        _prefix = pad_zeros(_prefix, num_zeros);
+    }
+    else if (frm.supports_frame_metadata(RS2_FRAME_METADATA_FRAME_TIMESTAMP))
+    {
+        _prefix = std::to_string(frm.get_frame_metadata(RS2_FRAME_METADATA_FRAME_TIMESTAMP));
+        _prefix = pad_zeros(_prefix, num_zeros);
+    }
+    else
+    {
+        _prefix = prefix;
+    }
+    return _prefix;
+}
+
+bool framedata_to_bin(const rs2::frame &frm, const std::string &filename)
+{
+    bool ret = false;
+    rs2::video_frame image = frm.as<rs2::video_frame>();
+    if (image)
+    {
+        std::ofstream outfile(filename, std::ofstream::binary);
+        outfile.write(static_cast<const char *>(image.get_data()),
+                      image.get_height() * image.get_stride_in_bytes());
+        outfile.close();
+        ret = true;
+    }
+    return ret;
+}
+
+void metadata_to_csv(const rs2::frame &frm, const std::string &filename)
+{
+    std::ofstream csv;
+    csv.open(filename);
+
+    csv << "Stream,"
+        << rs2_stream_to_string(frm.get_profile().stream_type())
+        << "\nAttribute,Value\n";
+
+    rs2_frame_metadata_value metadata_idx;
+    for (size_t i = 0; i < RS2_FRAME_METADATA_COUNT; i++)
+    {
+        metadata_idx = (rs2_frame_metadata_value)i;
+        if (frm.supports_frame_metadata(metadata_idx))
+        {
+            // rs2_metadata_type => long long.
+            rs2_metadata_type metadata = frm.get_frame_metadata(metadata_idx);
+            csv << rs2_frame_metadata_to_string(metadata_idx)
+                << ","
+                << metadata
+                << "\n";
+        }
+    }
+    csv.close();
+}
+
 storagepaths::storagepaths()
 {
 }
 
-void storagepaths::create_directories(const std::string &device_sn,
-                                      const std::string &base_path)
+void storagepaths::create(const std::string &device_sn,
+                          const std::string &base_path)
 {
     std::string path;
     // Base
@@ -22,27 +98,42 @@ void storagepaths::create_directories(const std::string &device_sn,
     path.append("/");
     path.append(device_sn);
     mkdir(path.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
-    // System time
+    // System time , trial
     time_t current_time;
     time(&current_time);
     path.append("/");
     path.append(std::to_string(current_time));
     mkdir(path.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
     // Calib
-    calib = path + "/Calib";
+    calib = path + "/calib";
     mkdir(calib.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
+    // Timestamp
+    timestamp = path + "/timestamp";
+    mkdir(timestamp.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
     // Color
-    color = path + "/Color";
+    color = path + "/color";
     mkdir(color.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
-    color_metadata = path + "/MetaColor";
+    color_metadata = path + "/color_metadata";
     mkdir(color_metadata.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
     // Depth
-    depth = path + "/Depth";
+    depth = path + "/depth";
     mkdir(depth.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
-    depth_metadata = path + "/MetaDepth";
+    depth_metadata = path + "/depth_metadata";
     mkdir(depth_metadata.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
 }
 
+void storagepaths::show()
+{
+    print("calib : " + calib, 0);
+    print("color : " + color, 0);
+    print("depth : " + depth, 0);
+    print("color_metadata : " + color_metadata, 0);
+    print("depth_metadata : " + depth_metadata, 0);
+}
+
+/*******************************************************************************
+ * rs2wrapper PUBLIC FUNCTIONS
+ ******************************************************************************/
 rs2wrapper::rs2wrapper(int argc,
                        char *argv[],
                        rs2::context context,
@@ -63,11 +154,12 @@ rs2wrapper::rs2wrapper(int argc,
         rs2::net_device dev((std::string)ip());
         print("Network device found", 0);
         dev.add_to(*ctx);
-        // pipe = rs2::pipeline(ctx);
+        auto serial = dev.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER);
         std::vector<std::string> available_device;
-        available_device.push_back(dev.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER));
+        available_device.push_back(serial);
         available_device.push_back(ip());
         available_devices.push_back(available_device);
+        print("using : " + std::string(serial));
     }
     else
     {
@@ -107,38 +199,27 @@ rs2wrapper::rs2wrapper(int argc,
     for (auto &&available_device : available_devices)
     {
         storagepaths _storagepaths;
-        _storagepaths.create_directories(available_device[0], save_path());
+        _storagepaths.create(available_device[0], save_path());
         storagepaths_perdev[available_device[0]] = _storagepaths;
     }
 
     // stream
-    stream_config_color.stream_type = RS2_STREAM_COLOR;
-    stream_config_color.width = width();
-    stream_config_color.height = height();
-    stream_config_color.format = color_format();
-    stream_config_color.framerate = fps();
-    stream_config_depth.stream_type = RS2_STREAM_DEPTH;
-    stream_config_depth.width = width();
-    stream_config_depth.height = height();
-    stream_config_depth.format = depth_format();
-    stream_config_depth.framerate = fps();
-}
-
-rs2::pipeline rs2wrapper::initialize_pipeline(const std::shared_ptr<rs2::context> context)
-{
-    if (network())
     {
-        rs2::pipeline pipe(*ctx);
-        return pipe;
-    }
-    else
-    {
-        rs2::pipeline pipe;
-        return pipe;
+        stream_config_color.stream_type = RS2_STREAM_COLOR;
+        stream_config_color.width = width();
+        stream_config_color.height = height();
+        stream_config_color.format = color_format();
+        stream_config_color.framerate = fps();
+        stream_config_depth.stream_type = RS2_STREAM_DEPTH;
+        stream_config_depth.width = width();
+        stream_config_depth.height = height();
+        stream_config_depth.format = depth_format();
+        stream_config_depth.framerate = fps();
     }
 }
 
-void rs2wrapper::initialize(bool enable_ir_emitter, bool verbose)
+void rs2wrapper::initialize(const bool &enable_ir_emitter,
+                            const bool &verbose)
 {
     for (auto &&available_device : available_devices)
     {
@@ -198,6 +279,9 @@ void rs2wrapper::initialize(bool enable_ir_emitter, bool verbose)
         enabled_devices[device_sn] = dev;
         print_camera_infos(dev.pipeline_profile);
 
+        if (storagepaths_perdev.size() > 0)
+            query_timestamp_mode(std::string(device_sn));
+
         print("Initialized RealSense devices " + std::string(device_sn), 0);
     }
 }
@@ -218,49 +302,37 @@ void rs2wrapper::step(const std::string &save_file_prefix)
 {
     for (const auto &enabled_device : enabled_devices)
     {
-        auto device_sn = enabled_device.first;
-        auto dev = enabled_device.second;
+        std::string device_sn = enabled_device.first;
+        device dev = enabled_device.second;
+        std::vector<rs2::stream_profile> streams = dev.pipeline_profile->get_streams();
+
         // Loop through the set of frames from the camera.
-        for (auto &&frame : dev.pipeline->wait_for_frames())
+        rs2::frameset frameset;
+        rs2_metadata_type color_timestamp = 0;
+        rs2_metadata_type depth_timestamp = 0;
+
+        if (dev.pipeline->poll_for_frames(&frameset))
         {
-            // We can only save video frames as pngs, so we skip the rest
-            if (auto vf = frame.as<rs2::video_frame>())
+            if (frameset.size() == streams.size())
             {
-                std::string prefix = filename_prefix_with_timestamp(
-                    vf, save_file_prefix, num_zeros_to_pad);
+                time(&global_timestamp);
 
-                rs2::stream_profile vfsp = vf.get_profile();
-                std::string stream_name = vfsp.stream_name();
-
-                if (stream_name == "Color")
+                rs2::frameset aligned_frameset = align_to_color.process(frameset);
+                for (auto &&stream : streams)
                 {
-                    // Record per-frame metadata for UVC streams
-                    std::string csv_file =
-                        storagepaths_perdev[device_sn].color_metadata + "/" +
-                        prefix + ".csv";
-                    metadata_to_csv(vf, csv_file);
-                    // Write images to disk
-                    std::string png_file =
-                        storagepaths_perdev[device_sn].color + "/" +
-                        prefix + ".bin";
-                    framedata_to_bin(frame, png_file);
-                }
-                else if (stream_name == "Depth")
-                {
-                    // Record per-frame metadata for UVC streams
-                    std::string csv_file =
-                        storagepaths_perdev[device_sn].depth_metadata + "/" +
-                        prefix + ".csv";
-                    metadata_to_csv(vf, csv_file);
-                    // Write images to disk
-                    std::string png_file =
-                        storagepaths_perdev[device_sn].depth + "/" +
-                        prefix + ".bin";
-                    framedata_to_bin(frame, png_file);
+                    if (stream.stream_type() == RS2_STREAM_COLOR)
+                    {
+                        rs2::frame aligned_frame = aligned_frameset.first_or_default(RS2_STREAM_COLOR);
+                        save_stream(device_sn, aligned_frame, color_timestamp);
+                    }
+                    else if (stream.stream_type() == RS2_STREAM_DEPTH)
+                    {
+                        rs2::frame aligned_frame = aligned_frameset.first_or_default(RS2_STREAM_DEPTH);
+                        save_stream(device_sn, aligned_frame, depth_timestamp);
+                    }
                 }
 
-                rs2_intrinsics intrinsics = vfsp.as<rs2::video_stream_profile>().get_intrinsics();
-                rs2_extrinsics extrinsics = vfsp.get_extrinsics_to(vfsp);
+                save_timestamp(device_sn, color_timestamp, depth_timestamp);
             }
         }
     }
@@ -277,16 +349,12 @@ void rs2wrapper::save_calib()
         csv.open(csv_file);
 
         // Intrinsics of color & depth frames
-        rs2::stream_profile profile_color =
-            dev.pipeline_profile->get_stream(RS2_STREAM_COLOR);
-        rs2_intrinsics intr_color =
-            profile_color.as<rs2::video_stream_profile>().get_intrinsics();
+        rs2::stream_profile profile_color = dev.pipeline_profile->get_stream(RS2_STREAM_COLOR);
+        rs2_intrinsics intr_color = profile_color.as<rs2::video_stream_profile>().get_intrinsics();
         // Fetch stream profile for depth stream
         // Downcast to video_stream_profile and fetch intrinsics
-        rs2::stream_profile profile_depth =
-            dev.pipeline_profile->get_stream(RS2_STREAM_DEPTH);
-        rs2_intrinsics intr_depth =
-            profile_depth.as<rs2::video_stream_profile>().get_intrinsics();
+        rs2::stream_profile profile_depth = dev.pipeline_profile->get_stream(RS2_STREAM_DEPTH);
+        rs2_intrinsics intr_depth = profile_depth.as<rs2::video_stream_profile>().get_intrinsics();
 
         // Extrinsic matrix from color sensor to Depth sensor
         rs2_extrinsics extr = profile_color.as<rs2::video_stream_profile>().get_extrinsics_to(profile_depth);
@@ -335,6 +403,61 @@ void rs2wrapper::save_calib()
     }
 }
 
+/*******************************************************************************
+ * rs2wrapper PRIVATAE FUNCTIONS
+ ******************************************************************************/
+rs2::pipeline rs2wrapper::initialize_pipeline(const std::shared_ptr<rs2::context> context)
+{
+    if (network())
+    {
+        rs2::pipeline pipe(*ctx);
+        return pipe;
+    }
+    else
+    {
+        rs2::pipeline pipe;
+        return pipe;
+    }
+}
+
+void rs2wrapper::query_timestamp_mode(const std::string &device_sn)
+{
+    for (auto &&frame : enabled_devices[device_sn].pipeline->wait_for_frames())
+    {
+        if (auto vf = frame.as<rs2::video_frame>())
+        {
+            if (vf.supports_frame_metadata(RS2_FRAME_METADATA_SENSOR_TIMESTAMP))
+                timestamp_mode = RS2_FRAME_METADATA_SENSOR_TIMESTAMP;
+            else if (vf.supports_frame_metadata(RS2_FRAME_METADATA_FRAME_TIMESTAMP))
+                timestamp_mode = RS2_FRAME_METADATA_FRAME_TIMESTAMP;
+            else if (vf.supports_frame_metadata(RS2_FRAME_METADATA_TIME_OF_ARRIVAL))
+                timestamp_mode = RS2_FRAME_METADATA_FRAME_TIMESTAMP;
+            break;
+        }
+    }
+}
+
+void rs2wrapper::save_timestamp(const std::string &device_sn,
+                                const rs2_metadata_type &color_timestamp,
+                                const rs2_metadata_type &depth_timestamp)
+{
+    auto save_path = storagepaths_perdev[device_sn].timestamp + "/timestamp.txt";
+    std::fstream filestream;
+    filestream.open(save_path, std::fstream::in | std::fstream::out | std::fstream::app);
+    // If file does not exist, Create new file
+    if (!filestream)
+    {
+        filestream.open(save_path, std::fstream::in | std::fstream::out | std::fstream::trunc);
+    }
+    filestream << global_timestamp
+               << "::"
+               << color_timestamp
+               << "::"
+               << depth_timestamp
+               << "\n";
+    filestream.close();
+}
+
 void rs2wrapper::configure_stream(const std::string &device_sn,
                                   const stream_config &stream_config_color,
                                   const stream_config &stream_config_depth)
@@ -351,6 +474,20 @@ void rs2wrapper::configure_stream(const std::string &device_sn,
                       stream_config_depth.format,
                       stream_config_depth.framerate);
     rs_cfg[device_sn] = cfg;
+}
+
+void rs2wrapper::save_stream(const std::string &device_sn,
+                             const rs2::frame &frame,
+                             rs2_metadata_type &timestamp)
+{
+    timestamp = frame.get_frame_metadata(timestamp_mode);
+    std::string filename = pad_zeros(std::to_string(timestamp), 12);
+    // Record per-frame metadata for UVC streams
+    std::string csv_file = storagepaths_perdev[device_sn].depth_metadata + "/" + filename + ".csv";
+    metadata_to_csv(frame, csv_file);
+    // Write images to disk
+    std::string png_file = storagepaths_perdev[device_sn].depth + "/" + filename + ".bin";
+    framedata_to_bin(frame, png_file);
 }
 
 void rs2wrapper::print_camera_infos(const std::shared_ptr<rs2::pipeline_profile> profile)
@@ -387,73 +524,19 @@ void rs2wrapper::print_camera_infos(const std::shared_ptr<rs2::pipeline_profile>
     std::cout << "========================================" << std::endl;
 }
 
-std::string pad_zeros(const std::string &in_str, const size_t &num_zeros)
+void rs2wrapper::print_camera_temperature(const std::string &device_sn)
 {
-    std::string out_str =
-        std::string(num_zeros - std::min(num_zeros, in_str.length()), '0') +
-        in_str;
-    return out_str;
-}
-
-std::string filename_prefix_with_timestamp(const rs2::frame &frm,
-                                           const std::string &prefix,
-                                           const size_t &num_zeros)
-{
-    std::string _prefix;
-    if (frm.supports_frame_metadata(RS2_FRAME_METADATA_SENSOR_TIMESTAMP))
     {
-        _prefix = std::to_string(frm.get_frame_metadata(RS2_FRAME_METADATA_SENSOR_TIMESTAMP));
-        _prefix = pad_zeros(_prefix, num_zeros);
-    }
-    else if (frm.supports_frame_metadata(RS2_FRAME_METADATA_FRAME_TIMESTAMP))
-    {
-        _prefix = std::to_string(frm.get_frame_metadata(RS2_FRAME_METADATA_FRAME_TIMESTAMP));
-        _prefix = pad_zeros(_prefix, num_zeros);
-    }
-    else
-    {
-        _prefix = prefix;
-    }
-    return _prefix;
-}
-
-void metadata_to_csv(const rs2::frame &frm, const std::string &filename)
-{
-    std::ofstream csv;
-    csv.open(filename);
-
-    csv << "Stream,"
-        << rs2_stream_to_string(frm.get_profile().stream_type())
-        << "\nAttribute,Value\n";
-
-    rs2_frame_metadata_value metadata_idx;
-    for (size_t i = 0; i < RS2_FRAME_METADATA_COUNT; i++)
-    {
-        metadata_idx = (rs2_frame_metadata_value)i;
-        if (frm.supports_frame_metadata(metadata_idx))
+        auto dss = enabled_devices[device_sn].depth_sensor;
+        if (dss->supports(RS2_OPTION_ASIC_TEMPERATURE))
         {
-            // rs2_metadata_type => long long.
-            rs2_metadata_type metadata = frm.get_frame_metadata(metadata_idx);
-            csv << rs2_frame_metadata_to_string(metadata_idx)
-                << ","
-                << metadata
-                << "\n";
+            auto temp = dss->get_option(RS2_OPTION_ASIC_TEMPERATURE);
+            print("{device_sn} Temperature ASIC      : " + std::to_string(temp), 0);
+        }
+        if (dss->supports(RS2_OPTION_PROJECTOR_TEMPERATURE))
+        {
+            auto temp = dss->get_option(RS2_OPTION_PROJECTOR_TEMPERATURE);
+            print("{device_sn} Temperature Projector : " + std::to_string(temp), 0);
         }
     }
-    csv.close();
-}
-
-bool framedata_to_bin(const rs2::frame &frm, const std::string &filename)
-{
-    bool ret = false;
-    rs2::video_frame image = frm.as<rs2::video_frame>();
-    if (image)
-    {
-        std::ofstream outfile(filename, std::ofstream::binary);
-        outfile.write(static_cast<const char *>(image.get_data()),
-                      image.get_height() * image.get_stride_in_bytes());
-        outfile.close();
-        ret = true;
-    }
-    return ret;
 }

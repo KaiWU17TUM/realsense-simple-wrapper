@@ -78,13 +78,10 @@ struct device
 
 struct stream_config
 {
-    rs2_stream stream_type = RS2_STREAM_COLOR;
-    // rs2_stream stream_type = RS2_STREAM_DEPTH;
+    rs2_stream stream_type = RS2_STREAM_COLOR; // RS2_STREAM_DEPTH;
     int width = 848;
     int height = 480;
-    rs2_format format = RS2_FORMAT_BGR8;
-    // rs2_format format = RS2_FORMAT_YUYV;
-    // rs2_format format = RS2_FORMAT_Z16;
+    rs2_format format = RS2_FORMAT_BGR8; // RS2_FORMAT_YUYV; // RS2_FORMAT_Z16;
     int framerate = 30;
 };
 
@@ -92,19 +89,16 @@ class storagepaths
 {
 public:
     bool save = true;
+    std::string timestamp;
     std::string calib;
     std::string color;
     std::string depth;
     std::string color_metadata;
     std::string depth_metadata;
     storagepaths();
-
-    /**
-     * @brief Creates the required directories to save data
-     *
-     */
-    void create_directories(const std::string &device_sn,
-                            const std::string &base_path);
+    void create(const std::string &device_sn,
+                const std::string &base_path);
+    void show();
 };
 
 /**
@@ -252,8 +246,42 @@ class rs2wrapper : public rs2args
     // Paths for saving data
     std::map<std::string, storagepaths> storagepaths_perdev;
 
+    // Timestamp data
+    rs2_frame_metadata_value timestamp_mode = RS2_FRAME_METADATA_TIME_OF_ARRIVAL;
+    time_t global_timestamp;
+
     // Declare depth colorizer for pretty visualization of depth data
     rs2::colorizer color_map;
+
+    /**
+     * @brief Initialize the pipeline.
+     *
+     * @param ctx rs2::context object.
+     */
+    rs2::pipeline initialize_pipeline(const std::shared_ptr<rs2::context> context);
+
+    /**
+     * @brief configures the rs stream.
+     *
+     * @param device_sn
+     * @param stream_config_color
+     * @param stream_config_depth
+     */
+    void configure_stream(const std::string &device_sn,
+                          const stream_config &stream_config_color,
+                          const stream_config &stream_config_depth);
+    void save_stream(const std::string &device_sn,
+                     const rs2::frame &frame,
+                     rs2_metadata_type &timestamp);
+
+    void query_timestamp_mode(const std::string &device_sn);
+
+    void save_timestamp(const std::string &device_sn,
+                        const rs2_metadata_type &color_timestamp,
+                        const rs2_metadata_type &depth_timestamp);
+
+    void print_camera_infos(const std::shared_ptr<rs2::pipeline_profile> profile);
+    void print_camera_temperature(const std::string &device_sn);
 
 public:
     /**
@@ -272,20 +300,19 @@ public:
     /**
      * @brief Initialize the realsense devices.
      *
+     * @param enable_ir_emitter Whether to use the ir emmiter.
+     * @param verbose Whether to printout infos.
      */
-    void initialize(bool enable_ir_emitter = true, bool verbose = true);
-    /**
-     * @brief Initialize the pipeline.
-     *
-     * @param ctx
-     * @return rs2::pipeline
-     */
-    rs2::pipeline initialize_pipeline(const std::shared_ptr<rs2::context> context);
+    void initialize(const bool &enable_ir_emitter = true,
+                    const bool &verbose = true);
+
     /**
      * @brief Flushes N initial frames o give autoexposure, etc. a chance to settle.
      *
+     * @param num_frames N frames to flush.
      */
     void initial_flush(const int &num_frames = 30);
+
     /**
      * @brief Collects a set of frames and postprocesses them.
      *
@@ -297,11 +324,9 @@ public:
      */
     void step(const std::string &save_file_prefix);
 
+    /**
+     * @brief Saves the camera calibration data.
+     *
+     */
     void save_calib();
-
-    void configure_stream(const std::string &device_sn,
-                          const stream_config &stream_config_color,
-                          const stream_config &stream_config_depth);
-
-    void print_camera_infos(const std::shared_ptr<rs2::pipeline_profile> profile);
 };
