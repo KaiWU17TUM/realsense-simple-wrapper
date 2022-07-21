@@ -15,33 +15,6 @@ std::string pad_zeros(const std::string &in_str, const size_t &num_zeros)
     return out_str;
 }
 
-std::string filename_prefix_with_timestamp(const rs2::frame &frm,
-                                           const std::string &prefix,
-                                           const size_t &num_zeros)
-{
-    std::string _prefix;
-    if (frm.supports_frame_metadata(RS2_FRAME_METADATA_SENSOR_TIMESTAMP))
-    {
-        _prefix = std::to_string(frm.get_frame_metadata(RS2_FRAME_METADATA_SENSOR_TIMESTAMP));
-        _prefix = pad_zeros(_prefix, num_zeros);
-    }
-    else if (frm.supports_frame_metadata(RS2_FRAME_METADATA_FRAME_TIMESTAMP))
-    {
-        _prefix = std::to_string(frm.get_frame_metadata(RS2_FRAME_METADATA_FRAME_TIMESTAMP));
-        _prefix = pad_zeros(_prefix, num_zeros);
-    }
-    else if (frm.supports_frame_metadata(RS2_FRAME_METADATA_FRAME_TIMESTAMP))
-    {
-        _prefix = std::to_string(frm.get_frame_metadata(RS2_FRAME_METADATA_FRAME_TIMESTAMP));
-        _prefix = pad_zeros(_prefix, num_zeros);
-    }
-    else
-    {
-        _prefix = prefix;
-    }
-    return _prefix;
-}
-
 bool framedata_to_bin(const rs2::frame &frm, const std::string &filename)
 {
     bool ret = false;
@@ -247,6 +220,7 @@ void rs2wrapper::initialize(const bool &enable_ir_emitter,
         dev.pipeline_profile = std::make_shared<rs2::pipeline_profile>(profile);
         if (verbose)
             print("pipeline started...", 0);
+        std::this_thread::sleep_for(std::chrono::milliseconds(3000));
 
         // 4. sensors
         std::vector<rs2::sensor> sensors = profile.get_device().query_sensors();
@@ -298,41 +272,46 @@ void rs2wrapper::initial_flush(const int &num_frames)
     }
 }
 
-void rs2wrapper::step(const std::string &save_file_prefix)
+void rs2wrapper::step(std::string &output_msg)
 {
-    for (const auto &enabled_device : enabled_devices)
+    size_t counter = 0;
+    while (counter < enabled_devices.size())
     {
-        std::string device_sn = enabled_device.first;
-        device dev = enabled_device.second;
-        std::vector<rs2::stream_profile> streams = dev.pipeline_profile->get_streams();
-
-        // Loop through the set of frames from the camera.
-        rs2::frameset frameset;
-        rs2_metadata_type color_timestamp = 0;
-        rs2_metadata_type depth_timestamp = 0;
-
-        if (dev.pipeline->poll_for_frames(&frameset))
+        for (const auto &enabled_device : enabled_devices)
         {
-            if (frameset.size() == streams.size())
+            std::string device_sn = enabled_device.first;
+            device dev = enabled_device.second;
+            std::vector<rs2::stream_profile> streams = dev.pipeline_profile->get_streams();
+
+            // Loop through the set of frames from the camera.
+            rs2::frameset frameset;
+            rs2_metadata_type color_timestamp = 0;
+            rs2_metadata_type depth_timestamp = 0;
+
+            if (dev.pipeline->poll_for_frames(&frameset))
             {
-                time(&global_timestamp);
-
-                rs2::frameset aligned_frameset = align_to_color.process(frameset);
-                for (auto &&stream : streams)
+                if (frameset.size() == streams.size())
                 {
-                    if (stream.stream_type() == RS2_STREAM_COLOR)
-                    {
-                        rs2::frame aligned_frame = aligned_frameset.first_or_default(RS2_STREAM_COLOR);
-                        save_stream(device_sn, aligned_frame, color_timestamp);
-                    }
-                    else if (stream.stream_type() == RS2_STREAM_DEPTH)
-                    {
-                        rs2::frame aligned_frame = aligned_frameset.first_or_default(RS2_STREAM_DEPTH);
-                        save_stream(device_sn, aligned_frame, depth_timestamp);
-                    }
-                }
+                    time(&global_timestamp);
 
-                save_timestamp(device_sn, color_timestamp, depth_timestamp);
+                    rs2::frameset aligned_frameset = align_to_color.process(frameset);
+                    for (auto &&stream : streams)
+                    {
+                        if (stream.stream_type() == RS2_STREAM_COLOR)
+                            save_color_stream(device_sn, aligned_frameset, color_timestamp);
+                        else if (stream.stream_type() == RS2_STREAM_DEPTH)
+                            save_depth_stream(device_sn, aligned_frameset, depth_timestamp);
+                    }
+
+                    save_timestamp(device_sn, color_timestamp, depth_timestamp);
+
+                    output_msg = device_sn + "::" +
+                                 std::to_string(global_timestamp) + "::" +
+                                 std::to_string(color_timestamp) + "::" +
+                                 std::to_string(depth_timestamp);
+
+                    counter += 1;
+                }
             }
         }
     }
@@ -476,10 +455,26 @@ void rs2wrapper::configure_stream(const std::string &device_sn,
     rs_cfg[device_sn] = cfg;
 }
 
-void rs2wrapper::save_stream(const std::string &device_sn,
-                             const rs2::frame &frame,
-                             rs2_metadata_type &timestamp)
+void rs2wrapper::save_color_stream(const std::string &device_sn,
+                                   const rs2::frameset &frameset,
+                                   rs2_metadata_type &timestamp)
 {
+    rs2::frame frame = frameset.first_or_default(RS2_STREAM_COLOR);
+    timestamp = frame.get_frame_metadata(timestamp_mode);
+    std::string filename = pad_zeros(std::to_string(timestamp), 12);
+    // Record per-frame metadata for UVC streams
+    std::string csv_file = storagepaths_perdev[device_sn].color_metadata + "/" + filename + ".csv";
+    metadata_to_csv(frame, csv_file);
+    // Write images to disk
+    std::string png_file = storagepaths_perdev[device_sn].color + "/" + filename + ".bin";
+    framedata_to_bin(frame, png_file);
+}
+
+void rs2wrapper::save_depth_stream(const std::string &device_sn,
+                                   const rs2::frameset &frameset,
+                                   rs2_metadata_type &timestamp)
+{
+    rs2::frame frame = frameset.first_or_default(RS2_STREAM_DEPTH);
     timestamp = frame.get_frame_metadata(timestamp_mode);
     std::string filename = pad_zeros(std::to_string(timestamp), 12);
     // Record per-frame metadata for UVC streams

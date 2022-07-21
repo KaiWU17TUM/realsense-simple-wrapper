@@ -45,8 +45,10 @@ try
     for (auto i = 0; i < rs2_dev.fps() * 10; ++i)
     {
         std::string i_str = pad_zeros(std::to_string(i), num_zeros_to_pad);
-        rs2_dev.step(i_str);
-        print("Step " + i_str, 0);
+        std::string o_str = "";
+        rs2_dev.step(o_str);
+        if (i % rs2_dev.fps() == 0)
+            print("Step " + i_str + "   " + o_str, 0);
     }
     return EXIT_SUCCESS;
 }

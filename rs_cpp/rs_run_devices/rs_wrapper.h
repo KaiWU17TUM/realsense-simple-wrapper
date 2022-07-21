@@ -10,6 +10,8 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 
+#include <chrono>
+#include <thread>
 #include <algorithm>
 #include <vector>
 #include <map>
@@ -31,18 +33,6 @@
  * @return std::string
  */
 std::string pad_zeros(const std::string &in_str, const size_t &num_zeros);
-
-/**
- * @brief Update prefix with timestamp from rs2 metadata.
- *
- * @param frm An instance of rs2::frame .
- * @param prefix Default prefix.
- * @param num_zeros number of zeros to pad
- * @return std::string
- */
-std::string filename_prefix_with_timestamp(const rs2::frame &frm,
-                                           const std::string &prefix,
-                                           const size_t &num_zeros);
 
 /**
  * @brief Save raw frame data into a binary file.
@@ -270,9 +260,12 @@ class rs2wrapper : public rs2args
     void configure_stream(const std::string &device_sn,
                           const stream_config &stream_config_color,
                           const stream_config &stream_config_depth);
-    void save_stream(const std::string &device_sn,
-                     const rs2::frame &frame,
-                     rs2_metadata_type &timestamp);
+    void save_color_stream(const std::string &device_sn,
+                           const rs2::frameset &frameset,
+                           rs2_metadata_type &timestamp);
+    void save_depth_stream(const std::string &device_sn,
+                           const rs2::frameset &frameset,
+                           rs2_metadata_type &timestamp);
 
     void query_timestamp_mode(const std::string &device_sn);
 
@@ -320,9 +313,9 @@ public:
      * saves the color & depth (as colormap) images as png,
      * and their metadata as csv.
      *
-     * @param save_file_prefix Prefix for the save file.
+     * @param output_msg Output message for debugging.
      */
-    void step(const std::string &save_file_prefix);
+    void step(std::string &output_msg);
 
     /**
      * @brief Saves the camera calibration data.
