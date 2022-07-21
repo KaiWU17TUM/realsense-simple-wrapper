@@ -44,11 +44,14 @@ try
     int num_zeros_to_pad = NUM_ZEROS_TO_PAD;
     for (auto i = 0; i < rs2_dev.fps() * rs2_dev.steps(); ++i)
     {
+        bool reset = false;
         std::string i_str = pad_zeros(std::to_string(i), num_zeros_to_pad);
         std::string o_str = "";
-        rs2_dev.step(o_str);
+        rs2_dev.step(o_str, reset);
         if (i % rs2_dev.fps() == 0)
             print("Step " + i_str + "   " + o_str, 0);
+        if (reset)
+            rs2_dev.reset_device_with_frozen_timestamp();
     }
     return EXIT_SUCCESS;
 }

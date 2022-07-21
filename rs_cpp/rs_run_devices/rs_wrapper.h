@@ -64,7 +64,11 @@ struct device
     std::shared_ptr<rs2::pipeline_profile> pipeline_profile;
     std::shared_ptr<rs2::color_sensor> color_sensor;
     std::shared_ptr<rs2::depth_sensor> depth_sensor;
-    std::shared_ptr<int> camera_temp_printout_counter = std::make_shared<int>(-1);
+    rs2_metadata_type color_timestamp = 0;
+    rs2_metadata_type depth_timestamp = 0;
+    rs2_metadata_type color_reset_counter = 0;
+    rs2_metadata_type depth_reset_counter = 0;
+    int camera_temp_printout_counter = -1;
 };
 
 struct stream_config
@@ -311,6 +315,10 @@ public:
     void initialize(const bool &enable_ir_emitter = true,
                     const bool &verbose = true);
 
+    void initialize_device(const std::string &device_sn,
+                           const bool &enable_ir_emitter = true,
+                           const bool &verbose = true);
+
     /**
      * @brief Flushes N initial frames o give autoexposure, etc. a chance to settle.
      *
@@ -327,7 +335,12 @@ public:
      *
      * @param output_msg Output message for debugging.
      */
-    void step(std::string &output_msg);
+    void step(std::string &output_msg, bool &reset);
+
+    void stop(const std::string &device_sn);
+
+    void reset_device_with_frozen_timestamp();
+    void reset_device_with_frozen_timestamp(const std::string &device_sn);
 
     /**
      * @brief Saves the camera calibration data.
