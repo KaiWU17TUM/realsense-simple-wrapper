@@ -131,7 +131,7 @@ class rs2args
     int _argc;
     char **_argv;
 
-    std::map<const char *, rs2_format> _SUPPORTED_FORMATS{
+    std::map<std::string, rs2_format> _SUPPORTED_FORMATS{
         {"z16", RS2_FORMAT_Z16},
         {"bgr8", RS2_FORMAT_BGR8},
         {"rgb8", RS2_FORMAT_RGB8},
@@ -178,15 +178,15 @@ public:
     }
     rs2_format color_format()
     {
-        if (_SUPPORTED_FORMATS.find(_argv[4]) == _SUPPORTED_FORMATS.end())
-            return _SUPPORTED_FORMATS[_argv[4]];
+        if (_SUPPORTED_FORMATS.count(std::string(_argv[4])))
+            return _SUPPORTED_FORMATS[std::string(_argv[4])];
         else
             throw std::invalid_argument("rs color format unknown");
     }
     rs2_format depth_format()
     {
-        if (_SUPPORTED_FORMATS.find(_argv[5]) == _SUPPORTED_FORMATS.end())
-            return _SUPPORTED_FORMATS[_argv[5]];
+        if (_SUPPORTED_FORMATS.count(std::string(_argv[5])))
+            return _SUPPORTED_FORMATS[std::string(_argv[5])];
         else
             throw std::invalid_argument("rs depth format unknown");
     }
