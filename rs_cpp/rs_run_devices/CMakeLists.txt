@@ -5,7 +5,14 @@ cmake_minimum_required(VERSION 3.1.0)
 
 project(RealsenseWrapperRunDevices)
 
-add_executable(rs_run_devices rs_run_devices.cpp rs_wrapper.h rs_wrapper.cpp utils.h)
+add_executable(rs_run_devices 
+               rs_run_devices.cpp 
+               rs_wrapper.h 
+               rs_wrapper.cpp 
+               utils.h
+               utils.cpp)
 set_property(TARGET rs_run_devices PROPERTY CXX_STANDARD 11)
 target_link_libraries(rs_run_devices ${DEPENDENCIES} realsense2 realsense2-net)
-include_directories(~/librealsense/common ~/librealsense/third-party ~/librealsense/third-party/tclap/include)
+include_directories(~/librealsense/common 
+                    ~/librealsense/third-party 
+                    ~/librealsense/third-party/tclap/include)

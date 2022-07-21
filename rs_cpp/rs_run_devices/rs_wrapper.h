@@ -107,21 +107,6 @@ public:
                             const std::string &base_path);
 };
 
-// class storagepaths
-// {
-
-// public:
-//     bool save = true;
-//     std::string calib;
-//     std::string color;
-//     std::string depth;
-//     std::string color_metadata;
-//     std::string depth_metadata;
-
-//     storagepaths(const char *device_sn,
-//                  const char *base_path);
-// };
-
 /**
  * @brief Class that contains the arguments for the rs2wrapper class.
  *

@@ -15,6 +15,7 @@
 #include <iostream> // Terminal IO
 #include <sstream>  // Stringstreams
 
+#include "utils.h"
 #include "rs_wrapper.h"
 
 // This sample captures 30 frames and writes the last frame to disk.
@@ -43,7 +44,7 @@ try
     {
         std::string i_str = pad_zeros(std::to_string(i), num_zeros_to_pad);
         rs2_dev.step(i_str);
-        std::cout << i << std::endl;
+        print("Step " + i_str, 0);
     }
     return EXIT_SUCCESS;
 }

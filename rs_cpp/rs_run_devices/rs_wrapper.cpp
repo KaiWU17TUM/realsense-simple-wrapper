@@ -1,6 +1,5 @@
 #include "utils.h"
 #include "rs_wrapper.h"
-#include <bitset>
 
 // doesnt work in the class init.
 rs2::align align_to_depth(RS2_STREAM_DEPTH);
@@ -189,7 +188,7 @@ void rs2wrapper::initialize(bool enable_ir_emitter, bool verbose)
         {
             if (dev.depth_sensor->supports(RS2_OPTION_EMITTER_ENABLED))
             {
-                // TODO
+                // TODO: add arg for this.
                 dev.depth_sensor->set_option(RS2_OPTION_EMITTER_ENABLED, 1);
                 print("ir emitter enabled...", 0);
             }
