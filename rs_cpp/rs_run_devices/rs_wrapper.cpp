@@ -275,6 +275,7 @@ void rs2wrapper::initial_flush(const int &num_frames)
 
 void rs2wrapper::step(std::string &output_msg)
 {
+    std::vector<std::pair<std::string, std::string>> output_msg_list;
     size_t counter = 0;
     while (counter < enabled_devices.size())
     {
@@ -318,16 +319,22 @@ void rs2wrapper::step(std::string &output_msg)
                                    color_timestamp,
                                    depth_timestamp);
 
-                    output_msg += device_sn + "::" +
-                                  std::to_string(global_timestamp_diff) + "::" +
-                                  std::to_string(color_timestamp) + "::" +
-                                  std::to_string(depth_timestamp) + "  ";
+                    std::string _output_msg =
+                        device_sn + "::" +
+                        std::to_string(global_timestamp_diff) + "::" +
+                        std::to_string(color_timestamp) + "::" +
+                        std::to_string(depth_timestamp) + "  ";
+                    std::pair<std::string, std::string> msg(device_sn, _output_msg);
+                    output_msg_list.push_back(msg);
 
                     counter += 1;
                 }
             }
         }
     }
+    std::sort(output_msg_list.begin(), output_msg_list.end());
+    for (const auto &_output_msg : output_msg_list)
+        output_msg += _output_msg.second;
 }
 
 void rs2wrapper::save_calib()
@@ -547,7 +554,7 @@ void rs2wrapper::print_camera_temperature(const std::string &device_sn)
     int c = *enabled_devices[device_sn].camera_temp_printout_counter;
     if (c >= camera_temp_printout_interval || c == -1)
     {
-    	*enabled_devices[device_sn].camera_temp_printout_counter = 0;
+        *enabled_devices[device_sn].camera_temp_printout_counter = 0;
         auto dss = enabled_devices[device_sn].depth_sensor;
         if (dss->supports(RS2_OPTION_ASIC_TEMPERATURE))
         {
