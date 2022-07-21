@@ -220,7 +220,7 @@ void rs2wrapper::initialize(const bool &enable_ir_emitter,
         dev.pipeline_profile = std::make_shared<rs2::pipeline_profile>(profile);
         if (verbose)
             print("pipeline started...", 0);
-        std::this_thread::sleep_for(std::chrono::milliseconds(3000));
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 
         // 4. sensors
         std::vector<rs2::sensor> sensors = profile.get_device().query_sensors();
@@ -292,7 +292,11 @@ void rs2wrapper::step(std::string &output_msg)
             {
                 if (frameset.size() == streams.size())
                 {
-                    time(&global_timestamp);
+                    auto global_timestamp_now = std::chrono::steady_clock::now();
+                    std::int64_t global_timestamp_diff =
+                        std::chrono::duration_cast<std::chrono::nanoseconds>(
+                            global_timestamp_now - global_timestamp_start)
+                            .count();
 
                     rs2::frameset aligned_frameset = align_to_color.process(frameset);
                     for (auto &&stream : streams)
@@ -303,12 +307,15 @@ void rs2wrapper::step(std::string &output_msg)
                             save_depth_stream(device_sn, aligned_frameset, depth_timestamp);
                     }
 
-                    save_timestamp(device_sn, color_timestamp, depth_timestamp);
+                    save_timestamp(device_sn,
+                                   global_timestamp_diff,
+                                   color_timestamp,
+                                   depth_timestamp);
 
-                    output_msg = device_sn + "::" +
-                                 std::to_string(global_timestamp) + "::" +
-                                 std::to_string(color_timestamp) + "::" +
-                                 std::to_string(depth_timestamp);
+                    output_msg += device_sn + "::" +
+                                  std::to_string(global_timestamp_diff) + "::" +
+                                  std::to_string(color_timestamp) + "::" +
+                                  std::to_string(depth_timestamp) + "::";
 
                     counter += 1;
                 }
@@ -406,17 +413,27 @@ void rs2wrapper::query_timestamp_mode(const std::string &device_sn)
         if (auto vf = frame.as<rs2::video_frame>())
         {
             if (vf.supports_frame_metadata(RS2_FRAME_METADATA_SENSOR_TIMESTAMP))
+            {
+                print("using RS2_FRAME_METADATA_SENSOR_TIMESTAMP");
                 timestamp_mode = RS2_FRAME_METADATA_SENSOR_TIMESTAMP;
+            }
             else if (vf.supports_frame_metadata(RS2_FRAME_METADATA_FRAME_TIMESTAMP))
+            {
+                print("using RS2_FRAME_METADATA_FRAME_TIMESTAMP");
                 timestamp_mode = RS2_FRAME_METADATA_FRAME_TIMESTAMP;
+            }
             else if (vf.supports_frame_metadata(RS2_FRAME_METADATA_TIME_OF_ARRIVAL))
+            {
+                print("using RS2_FRAME_METADATA_TIME_OF_ARRIVAL");
                 timestamp_mode = RS2_FRAME_METADATA_FRAME_TIMESTAMP;
+            }
             break;
         }
     }
 }
 
 void rs2wrapper::save_timestamp(const std::string &device_sn,
+                                const std::int64_t &global_timestamp,
                                 const rs2_metadata_type &color_timestamp,
                                 const rs2_metadata_type &depth_timestamp)
 {

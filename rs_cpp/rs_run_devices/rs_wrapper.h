@@ -238,7 +238,7 @@ class rs2wrapper : public rs2args
 
     // Timestamp data
     rs2_frame_metadata_value timestamp_mode = RS2_FRAME_METADATA_TIME_OF_ARRIVAL;
-    time_t global_timestamp;
+    std::chrono::steady_clock::time_point global_timestamp_start = std::chrono::steady_clock::now();
 
     // Declare depth colorizer for pretty visualization of depth data
     rs2::colorizer color_map;
@@ -270,6 +270,7 @@ class rs2wrapper : public rs2args
     void query_timestamp_mode(const std::string &device_sn);
 
     void save_timestamp(const std::string &device_sn,
+                        const std::int64_t &global_timestamp,
                         const rs2_metadata_type &color_timestamp,
                         const rs2_metadata_type &depth_timestamp);
 
