@@ -15,13 +15,25 @@
 #include <iostream> // Terminal IO
 #include <sstream>  // Stringstreams
 
-// #include <tclap/CmdLine.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <signal.h>
 
+// #include <tclap/CmdLine.h>
 #include "utils.h"
 #include "rs_wrapper.h"
 
+volatile sig_atomic_t stop;
+
+void inthand(int signum)
+{
+    stop = 1;
+    print("ctrl + c detected", 1);
+}
+
 int main(int argc, char *argv[])
 {
+
     if (argc != 7 && argc != 8)
     {
         std::cerr << "Please enter steps, fps, height, width, color format, depth format, save path, {ipaddress}" << std::endl;
@@ -29,11 +41,11 @@ int main(int argc, char *argv[])
         return EXIT_FAILURE;
     }
 
+    signal(SIGINT, inthand);
+    stop = 0;
+
     try
     {
-        // Intialize the wrapper
-        // Declare RealSense pipeline, encapsulating the actual device and sensors
-        // Start streaming with args defined configuration
         rs2::context ctx;
         rs2wrapper rs2_dev(argc, argv, ctx);
 
@@ -45,13 +57,22 @@ int main(int argc, char *argv[])
         rs2_dev.flush_frames();
 
         int num_zeros_to_pad = NUM_ZEROS_TO_PAD;
-        for (auto i = 0; i < rs2_dev.fps() * rs2_dev.steps(); ++i)
+        // for (auto i = 0; i < rs2_dev.fps() * rs2_dev.steps(); ++i)
+        int i = 0;
+        while (!stop)
         {
             std::string i_str = pad_zeros(std::to_string(i), num_zeros_to_pad);
             std::string o_str = "";
+
             rs2_dev.step(o_str);
+
             if (i % rs2_dev.fps() == 0)
                 print("Step " + i_str + "   " + o_str, 0);
+
+            if (i >= rs2_dev.fps() * rs2_dev.steps())
+                break;
+            else
+                i++;
         }
         rs2_dev.stop();
         return EXIT_SUCCESS;

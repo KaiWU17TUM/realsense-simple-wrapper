@@ -311,7 +311,7 @@ void rs2wrapper::step(std::string &output_msg)
                             {
                                 dev->color_reset_counter += 1;
                                 reset[device_sn] = true;
-                                print("Resetting due to same color timestamp", 1);
+                                print(device_sn + " Resetting due to same color timestamp", 1);
                             }
                             else
                             {
@@ -325,7 +325,7 @@ void rs2wrapper::step(std::string &output_msg)
                             {
                                 dev->depth_reset_counter += 1;
                                 reset[device_sn] = true;
-                                print("Resetting due to same depth timestamp", 1);
+                                print(device_sn + " Resetting due to same depth timestamp", 1);
                             }
                             else
                             {
@@ -409,14 +409,14 @@ void rs2wrapper::reset_device_with_frozen_timestamp(const std::string &device_sn
 {
     if (reset[device_sn])
     {
-        if (enabled_devices[device_sn]->color_reset_counter > 5 * 60 * fps())
+        if (enabled_devices[device_sn]->color_reset_counter > 5 * fps())
         {
             stop(device_sn);
             initialize(device_sn);
             enabled_devices[device_sn]->color_reset_counter = 0;
             enabled_devices[device_sn]->depth_reset_counter = 0;
         }
-        if (enabled_devices[device_sn]->depth_reset_counter > 5 * 60 * fps())
+        if (enabled_devices[device_sn]->depth_reset_counter > 5 * fps())
         {
             stop(device_sn);
             initialize(device_sn);
