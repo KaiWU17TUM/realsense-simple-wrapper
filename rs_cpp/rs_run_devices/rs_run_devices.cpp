@@ -43,7 +43,7 @@ try
 
     rs2_dev.initialize(true, true);
     rs2_dev.save_calib();
-    rs2_dev.initial_flush();
+    rs2_dev.flush_frames();
 
     int num_zeros_to_pad = NUM_ZEROS_TO_PAD;
     for (auto i = 0; i < rs2_dev.fps() * rs2_dev.steps(); ++i)

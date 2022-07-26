@@ -5,16 +5,6 @@
 rs2::align align_to_depth(RS2_STREAM_DEPTH);
 rs2::align align_to_color(RS2_STREAM_COLOR);
 
-int num_zeros_to_pad = NUM_ZEROS_TO_PAD;
-
-std::string pad_zeros(const std::string &in_str, const size_t &num_zeros)
-{
-    std::string out_str =
-        std::string(num_zeros - std::min(num_zeros, in_str.length()), '0') +
-        in_str;
-    return out_str;
-}
-
 bool framedata_to_bin(const rs2::frame &frm, const std::string &filename)
 {
     bool ret = false;
@@ -191,9 +181,19 @@ rs2wrapper::rs2wrapper(int argc,
     }
 }
 
-void rs2wrapper::initialize_device(const std::string &device_sn,
-                                   const bool &enable_ir_emitter,
-                                   const bool &verbose)
+void rs2wrapper::initialize(const bool &enable_ir_emitter,
+                            const bool &verbose)
+{
+    for (auto &&available_device : available_devices)
+    {
+        const std::string device_sn = available_device[0];
+        initialize(device_sn, enable_ir_emitter, verbose);
+    }
+}
+
+void rs2wrapper::initialize(const std::string &device_sn,
+                            const bool &enable_ir_emitter,
+                            const bool &verbose)
 {
     device dev;
     print("Initializing RealSense devices " + std::string(device_sn), 0);
@@ -258,26 +258,22 @@ void rs2wrapper::initialize_device(const std::string &device_sn,
     print("Initialized RealSense devices " + std::string(device_sn), 0);
 }
 
-void rs2wrapper::initialize(const bool &enable_ir_emitter,
-                            const bool &verbose)
-{
-    for (auto &&available_device : available_devices)
-    {
-        const std::string device_sn = available_device[0];
-        initialize_device(device_sn);
-    }
-}
-
-void rs2wrapper::initial_flush(const int &num_frames)
+void rs2wrapper::flush_frames(const int &num_frames)
 {
     for (const auto &enabled_device : enabled_devices)
     {
-        auto device_sn = enabled_device.first;
-        auto dev = enabled_device.second;
-        for (auto i = 0; i < num_frames; ++i)
-            dev.pipeline->wait_for_frames();
-        print("Flushed 30 initial frames...", 0);
+        std::string device_sn = enabled_device.first;
+        flush_frames(device_sn, num_frames);
     }
+}
+
+void rs2wrapper::flush_frames(const std::string &device_sn,
+                              const int &num_frames)
+{
+    device dev = enabled_devices[device_sn];
+    for (auto i = 0; i < num_frames; ++i)
+        dev.pipeline->wait_for_frames();
+    print(device_sn + " Flushed " + std::to_string(num_frames) + " initial frames...", 0);
 }
 
 void rs2wrapper::step(std::string &output_msg, bool &reset)
@@ -294,46 +290,44 @@ void rs2wrapper::step(std::string &output_msg, bool &reset)
 
             // Loop through the set of frames from the camera.
             rs2::frameset frameset;
-            rs2_metadata_type color_timestamp = 0;
-            rs2_metadata_type depth_timestamp = 0;
+            rs2_metadata_type current_color_timestamp = 0;
+            rs2_metadata_type current_depth_timestamp = 0;
 
             if (dev.pipeline->poll_for_frames(&frameset))
             {
                 if (frameset.size() == streams.size())
                 {
-                    auto global_timestamp_now = std::chrono::steady_clock::now();
-                    std::int64_t global_timestamp_diff =
-                        std::chrono::duration_cast<std::chrono::nanoseconds>(
-                            global_timestamp_now - global_timestamp_start)
-                            .count();
+                    std::int64_t global_timestamp_diff = get_timestamp_duration_ns(global_timestamp_start);
 
                     rs2::frameset aligned_frameset = align_to_color.process(frameset);
                     for (auto &&stream : streams)
                     {
                         if (stream.stream_type() == RS2_STREAM_COLOR)
                         {
-                            save_color_stream(device_sn, aligned_frameset, color_timestamp);
-                            if (dev.color_timestamp == color_timestamp)
+                            save_color_stream(device_sn, aligned_frameset, current_color_timestamp);
+                            if (dev.color_timestamp == current_color_timestamp)
                             {
                                 dev.color_reset_counter += 1;
                                 reset = true;
+                                print("Resetting due to same color timestamp", 1);
                             }
                             else
                             {
-                                dev.color_timestamp = color_timestamp;
+                                dev.color_timestamp = current_color_timestamp;
                             }
                         }
                         else if (stream.stream_type() == RS2_STREAM_DEPTH)
                         {
-                            save_depth_stream(device_sn, aligned_frameset, depth_timestamp);
-                            if (dev.depth_timestamp == depth_timestamp)
+                            save_depth_stream(device_sn, aligned_frameset, current_depth_timestamp);
+                            if (dev.depth_timestamp == current_depth_timestamp)
                             {
                                 dev.depth_reset_counter += 1;
                                 reset = true;
+                                print("Resetting due to same depth timestamp", 1);
                             }
                             else
                             {
-                                dev.depth_timestamp = depth_timestamp;
+                                dev.depth_timestamp = current_depth_timestamp;
                             }
                             print_camera_temperature(device_sn);
                         }
@@ -341,14 +335,14 @@ void rs2wrapper::step(std::string &output_msg, bool &reset)
 
                     save_timestamp(device_sn,
                                    global_timestamp_diff,
-                                   color_timestamp,
-                                   depth_timestamp);
+                                   current_color_timestamp,
+                                   current_depth_timestamp);
 
                     std::string _output_msg =
                         device_sn + "::" +
                         std::to_string(global_timestamp_diff) + "::" +
-                        std::to_string(color_timestamp) + "::" +
-                        std::to_string(depth_timestamp) + "  ";
+                        std::to_string(current_color_timestamp) + "::" +
+                        std::to_string(current_depth_timestamp) + "  ";
                     std::pair<std::string, std::string> msg(device_sn, _output_msg);
                     output_msg_list.push_back(msg);
 
@@ -360,6 +354,24 @@ void rs2wrapper::step(std::string &output_msg, bool &reset)
     std::sort(output_msg_list.begin(), output_msg_list.end());
     for (const auto &_output_msg : output_msg_list)
         output_msg += _output_msg.second;
+}
+
+void rs2wrapper::stop()
+{
+    if (enabled_devices.size() > 0)
+    {
+        for (const auto &enabled_device : enabled_devices)
+        {
+            std::string device_sn = enabled_device.first;
+            device dev = enabled_device.second;
+            dev.pipeline->stop();
+            print(device_sn + " has been stopped...", 0);
+        }
+    }
+    else
+    {
+        print("no device has not been enabled, skipping stop()...", 1);
+    }
 }
 
 void rs2wrapper::stop(const std::string &device_sn)
@@ -382,18 +394,6 @@ void rs2wrapper::stop(const std::string &device_sn)
     }
 }
 
-void rs2wrapper::reset_device_with_frozen_timestamp(const std::string &device_sn)
-{
-    if (enabled_devices[device_sn].color_reset_counter > 5 * 60 * fps())
-    {
-        initialize_device(device_sn);
-    }
-    if (enabled_devices[device_sn].depth_reset_counter > 5 * 60 * fps())
-    {
-        initialize_device(device_sn);
-    }
-}
-
 void rs2wrapper::reset_device_with_frozen_timestamp()
 {
     for (auto &&enabled_device : enabled_devices)
@@ -403,75 +403,95 @@ void rs2wrapper::reset_device_with_frozen_timestamp()
     }
 }
 
+void rs2wrapper::reset_device_with_frozen_timestamp(const std::string &device_sn)
+{
+    if (enabled_devices[device_sn].color_reset_counter > 5 * 60 * fps())
+    {
+        stop(device_sn);
+        initialize(device_sn);
+    }
+    if (enabled_devices[device_sn].depth_reset_counter > 5 * 60 * fps())
+    {
+        stop(device_sn);
+        initialize(device_sn);
+    }
+}
+
 void rs2wrapper::save_calib()
 {
     for (const auto &enabled_device : enabled_devices)
     {
-        auto device_sn = enabled_device.first;
-        auto dev = enabled_device.second;
-        std::string csv_file = storagepaths_perdev[device_sn].calib + "/calib.csv";
-        std::ofstream csv;
-        csv.open(csv_file);
-
-        // Intrinsics of color & depth frames
-        rs2::stream_profile profile_color = dev.pipeline_profile->get_stream(RS2_STREAM_COLOR);
-        rs2_intrinsics intr_color = profile_color.as<rs2::video_stream_profile>().get_intrinsics();
-        // Fetch stream profile for depth stream
-        // Downcast to video_stream_profile and fetch intrinsics
-        rs2::stream_profile profile_depth = dev.pipeline_profile->get_stream(RS2_STREAM_DEPTH);
-        rs2_intrinsics intr_depth = profile_depth.as<rs2::video_stream_profile>().get_intrinsics();
-
-        // Extrinsic matrix from color sensor to Depth sensor
-        rs2_extrinsics extr = profile_color.as<rs2::video_stream_profile>().get_extrinsics_to(profile_depth);
-
-        // Write calibration data to json file
-        csv << intr_color.width << ","
-            << intr_color.height << ","
-            << intr_color.ppx << ","
-            << intr_color.ppy << ","
-            << intr_color.fx << ","
-            << intr_color.fy << ","
-            << rs2_distortion_to_string(intr_color.model) << ",";
-        for (auto &&value : intr_color.coeffs)
-            csv << value << ",";
-        csv << "\n";
-
-        csv << intr_depth.width << ","
-            << intr_depth.height << ","
-            << intr_depth.ppx << ","
-            << intr_depth.ppy << ","
-            << intr_depth.fx << ","
-            << intr_depth.fy << ","
-            << rs2_distortion_to_string(intr_depth.model) << ",";
-        for (auto &&value : intr_depth.coeffs)
-            csv << value << ",";
-        csv << "\n";
-
-        for (auto &&value : extr.rotation)
-            csv << value << ",";
-        for (auto &&value : extr.translation)
-            csv << value << ",";
-        csv << "\n";
-
-        std::vector<rs2::sensor> sensors =
-            dev.pipeline_profile->get_device().query_sensors();
-        for (auto &&sensor : sensors)
-        {
-            if (auto dss = sensor.as<rs2::depth_stereo_sensor>())
-            {
-                csv << dss.get_depth_scale() << ","
-                    << dss.get_stereo_baseline() << ",\n";
-            }
-        }
-
-        std::cout << "[INFO] : Saved camera calibration data..." << std::endl;
+        std::string device_sn = enabled_device.first;
+        save_calib(device_sn);
     }
+}
+
+void rs2wrapper::save_calib(const std::string &device_sn)
+{
+    device dev = enabled_devices[device_sn];
+    std::string csv_file = storagepaths_perdev[device_sn].calib + "/calib.csv";
+    std::ofstream csv;
+    csv.open(csv_file);
+
+    // Intrinsics of color & depth frames
+    rs2::stream_profile profile_color = dev.pipeline_profile->get_stream(RS2_STREAM_COLOR);
+    rs2_intrinsics intr_color = profile_color.as<rs2::video_stream_profile>().get_intrinsics();
+    // Fetch stream profile for depth stream
+    // Downcast to video_stream_profile and fetch intrinsics
+    rs2::stream_profile profile_depth = dev.pipeline_profile->get_stream(RS2_STREAM_DEPTH);
+    rs2_intrinsics intr_depth = profile_depth.as<rs2::video_stream_profile>().get_intrinsics();
+
+    // Extrinsic matrix from color sensor to Depth sensor
+    rs2_extrinsics extr = profile_color.as<rs2::video_stream_profile>().get_extrinsics_to(profile_depth);
+
+    // Write calibration data to json file
+    csv << intr_color.width << ","
+        << intr_color.height << ","
+        << intr_color.ppx << ","
+        << intr_color.ppy << ","
+        << intr_color.fx << ","
+        << intr_color.fy << ","
+        << rs2_distortion_to_string(intr_color.model) << ",";
+    for (auto &&value : intr_color.coeffs)
+        csv << value << ",";
+    csv << "\n";
+
+    csv << intr_depth.width << ","
+        << intr_depth.height << ","
+        << intr_depth.ppx << ","
+        << intr_depth.ppy << ","
+        << intr_depth.fx << ","
+        << intr_depth.fy << ","
+        << rs2_distortion_to_string(intr_depth.model) << ",";
+    for (auto &&value : intr_depth.coeffs)
+        csv << value << ",";
+    csv << "\n";
+
+    for (auto &&value : extr.rotation)
+        csv << value << ",";
+    for (auto &&value : extr.translation)
+        csv << value << ",";
+    csv << "\n";
+
+    std::vector<rs2::sensor> sensors =
+        dev.pipeline_profile->get_device().query_sensors();
+    for (auto &&sensor : sensors)
+    {
+        if (auto dss = sensor.as<rs2::depth_stereo_sensor>())
+        {
+            csv << dss.get_depth_scale() << ","
+                << dss.get_stereo_baseline() << ",\n";
+        }
+    }
+
+    print(device_sn + "Saved camera calibration data...", 0);
 }
 
 std::vector<std::vector<std::string>> rs2wrapper::get_available_devices()
 {
     return available_devices;
 }
+
 std::map<std::string, device> rs2wrapper::get_enabled_devices()
 {
     return enabled_devices;

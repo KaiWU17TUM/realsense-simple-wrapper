@@ -24,17 +24,6 @@
 #define NUM_ZEROS_TO_PAD 16;
 
 /**
- * @brief pads a string with zeros.
- *
- * https://stackoverflow.com/questions/6143824/add-leading-zeros-to-string-without-sprintf
- *
- * @param in_str input string
- * @param num_zeros number of zeros to pad
- * @return std::string
- */
-std::string pad_zeros(const std::string &in_str, const size_t &num_zeros);
-
-/**
  * @brief Save raw frame data into a binary file.
  *
  * Taken from : https://github.com/IntelRealSense/librealsense/issues/1485
@@ -283,7 +272,6 @@ class rs2wrapper : public rs2args
                            rs2_metadata_type &timestamp);
 
     void query_timestamp_mode(const std::string &device_sn);
-
     void save_timestamp(const std::string &device_sn,
                         const std::int64_t &global_timestamp,
                         const rs2_metadata_type &color_timestamp,
@@ -314,17 +302,20 @@ public:
      */
     void initialize(const bool &enable_ir_emitter = true,
                     const bool &verbose = true);
-
-    void initialize_device(const std::string &device_sn,
-                           const bool &enable_ir_emitter = true,
-                           const bool &verbose = true);
+    void initialize(const std::string &device_sn,
+                    const bool &enable_ir_emitter = true,
+                    const bool &verbose = true);
 
     /**
-     * @brief Flushes N initial frames o give autoexposure, etc. a chance to settle.
+     * @brief Flushes N frames
+     *
+     * Used to discard frames at init to give autoexposure, etc. a chance to settle.
      *
      * @param num_frames N frames to flush.
      */
-    void initial_flush(const int &num_frames = 30);
+    void flush_frames(const int &num_frames = 30);
+    void flush_frames(const std::string &device_sn,
+                      const int &num_frames = 30);
 
     /**
      * @brief Collects a set of frames and postprocesses them.
@@ -337,6 +328,11 @@ public:
      */
     void step(std::string &output_msg, bool &reset);
 
+    /**
+     * @brief Stops the devices through rs2::pipeline
+     *
+     */
+    void stop();
     void stop(const std::string &device_sn);
 
     void reset_device_with_frozen_timestamp();
@@ -347,6 +343,7 @@ public:
      *
      */
     void save_calib();
+    void save_calib(const std::string &device_sn);
 
     std::vector<std::vector<std::string>> get_available_devices();
     std::map<std::string, device> get_enabled_devices();
