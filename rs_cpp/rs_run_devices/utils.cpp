@@ -27,3 +27,26 @@ std::int64_t get_timestamp_duration_ns(const std::chrono::steady_clock::time_poi
             .count();
     return timestamp_diff;
 }
+
+argparser::argparser(int &argc, char **argv)
+{
+    for (int i = 1; i < argc; ++i)
+        tokens.push_back(std::string(argv[i]));
+}
+
+std::string argparser::get_option(const std::string &option)
+{
+    std::vector<std::string>::const_iterator itr;
+    itr = std::find(tokens.begin(), tokens.end(), option);
+    if (itr != tokens.end() && ++itr != tokens.end())
+    {
+        return *itr;
+    }
+    static const std::string empty_string("");
+    return empty_string;
+}
+
+bool argparser::option_exist(const std::string &option)
+{
+    return std::find(tokens.begin(), tokens.end(), option) != tokens.end();
+}

@@ -1,6 +1,8 @@
 #include <iostream>
 #include <chrono>
 #include <thread>
+#include <algorithm>
+#include <vector>
 
 /**
  * @brief Prints out a message using cout with either INFO/WARN/ERR tags.
@@ -22,3 +24,15 @@ void print(const std::string &msg, int mode = 0);
 std::string pad_zeros(const std::string &in_str, const size_t &num_zeros);
 
 std::int64_t get_timestamp_duration_ns(const std::chrono::steady_clock::time_point &timestamp_start);
+
+// https://stackoverflow.com/questions/865668/parsing-command-line-arguments-in-c
+class argparser
+{
+private:
+    std::vector<std::string> tokens;
+
+public:
+    argparser(int &argc, char **argv);
+    std::string get_option(const std::string &option);
+    bool option_exist(const std::string &option);
+};
