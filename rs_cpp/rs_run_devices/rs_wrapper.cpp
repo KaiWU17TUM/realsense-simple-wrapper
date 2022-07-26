@@ -280,7 +280,8 @@ void rs2wrapper::flush_frames(const std::string &device_sn,
 void rs2wrapper::step(std::string &output_msg)
 {
     std::vector<std::pair<std::string, std::string>> output_msg_list;
-    std::map<std::string, int> valid_frame_check;
+    std::map<std::string, bool> valid_frame_check;
+    std::map<std::string, std::int64_t> valid_frame_counter;
     while (valid_frame_check.size() < enabled_devices.size())
     {
         for (const auto &enabled_device : enabled_devices)
@@ -311,7 +312,10 @@ void rs2wrapper::step(std::string &output_msg)
                             {
                                 dev->color_reset_counter += 1;
                                 reset[device_sn] = true;
-                                print(device_sn + " Resetting due to same color timestamp", 1);
+                                print(device_sn +
+                                          " Resetting due to same color timestamp, " +
+                                          std::to_string(dev->depth_reset_counter),
+                                      1);
                             }
                             else
                             {
@@ -326,7 +330,10 @@ void rs2wrapper::step(std::string &output_msg)
                             {
                                 dev->depth_reset_counter += 1;
                                 reset[device_sn] = true;
-                                print(device_sn + " Resetting due to same depth timestamp", 1);
+                                print(device_sn +
+                                          " Resetting due to same depth timestamp, " +
+                                          std::to_string(dev->depth_reset_counter),
+                                      1);
                             }
                             else
                             {
@@ -350,13 +357,15 @@ void rs2wrapper::step(std::string &output_msg)
                     std::pair<std::string, std::string> msg(device_sn, _output_msg);
                     output_msg_list.push_back(msg);
 
-                    valid_frame_check[device_sn] = 1;
+                    valid_frame_check[device_sn] = true;
+                    valid_frame_counter[device_sn] = 0;
                 }
             }
             else
             {
-                valid_frame_check[device_sn] += 1;
-                if (valid_frame_check[device_sn] > 5000)
+                std::int64_t global_timestamp_diff = get_timestamp_duration_ns(global_timestamp_start);
+                valid_frame_counter[device_sn] += global_timestamp_diff;
+                if (valid_frame_counter[device_sn] > 5000000000)
                     break;
             }
         }
@@ -422,6 +431,7 @@ void rs2wrapper::reset_device_with_frozen_timestamp(const std::string &device_sn
     {
         if (enabled_devices[device_sn]->color_reset_counter > 5 * fps())
         {
+            print("Reset " + device_sn + " due to color stream frame freeze");
             stop(device_sn);
             initialize(device_sn);
             enabled_devices[device_sn]->color_reset_counter = 0;
@@ -429,6 +439,7 @@ void rs2wrapper::reset_device_with_frozen_timestamp(const std::string &device_sn
         }
         if (enabled_devices[device_sn]->depth_reset_counter > 5 * fps())
         {
+            print("Reset " + device_sn + " due to depth stream frame freeze");
             stop(device_sn);
             initialize(device_sn);
             enabled_devices[device_sn]->color_reset_counter = 0;

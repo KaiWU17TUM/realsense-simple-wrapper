@@ -69,6 +69,12 @@ int main(int argc, char *argv[])
             if (i % rs2_dev.fps() == 0)
                 print("Step " + i_str + "   " + o_str, 0);
 
+            if (i % (rs2_dev.fps() * 60 * 3) == 0)
+            {
+                std::this_thread::sleep_for(std::chrono::milliseconds(500));
+                print("Pause for 500ms ...", 1);
+            }
+
             if (i >= rs2_dev.fps() * rs2_dev.steps())
                 break;
             else
