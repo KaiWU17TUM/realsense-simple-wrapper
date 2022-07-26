@@ -195,7 +195,7 @@ void rs2wrapper::initialize(const std::string &device_sn,
                             const bool &enable_ir_emitter,
                             const bool &verbose)
 {
-    std::shared_ptr<device> dev;
+    std::shared_ptr<device> dev = std::make_shared<device>();
     print("Initializing RealSense devices " + std::string(device_sn), 0);
 
     // 1. pipeline
