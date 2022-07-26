@@ -247,6 +247,9 @@ class rs2wrapper : public rs2args
     // Declare depth colorizer for pretty visualization of depth data
     rs2::colorizer color_map;
 
+    // reset frozen devices
+    std::map<std::string, bool> reset;
+
     /**
      * @brief Initialize the pipeline.
      *
@@ -326,7 +329,7 @@ public:
      *
      * @param output_msg Output message for debugging.
      */
-    void step(std::string &output_msg, std::map<std::string, bool> &reset);
+    void step(std::string &output_msg);
 
     /**
      * @brief Stops the devices through rs2::pipeline

@@ -249,6 +249,7 @@ void rs2wrapper::initialize(const std::string &device_sn,
 
     // 6. enabled devices
     enabled_devices[device_sn] = dev;
+    reset[device_sn] = false;
     print_camera_infos(dev->pipeline_profile);
     print_camera_temperature(device_sn);
 
@@ -276,7 +277,7 @@ void rs2wrapper::flush_frames(const std::string &device_sn,
     print(device_sn + " Flushed " + std::to_string(num_frames) + " initial frames...", 0);
 }
 
-void rs2wrapper::step(std::string &output_msg, std::map<std::string, bool> &reset)
+void rs2wrapper::step(std::string &output_msg)
 {
     std::vector<std::pair<std::string, std::string>> output_msg_list;
     size_t counter = 0;
@@ -406,19 +407,22 @@ void rs2wrapper::reset_device_with_frozen_timestamp()
 
 void rs2wrapper::reset_device_with_frozen_timestamp(const std::string &device_sn)
 {
-    if (enabled_devices[device_sn]->color_reset_counter > 5 * 60 * fps())
+    if (reset[device_sn])
     {
-        stop(device_sn);
-        initialize(device_sn);
-        enabled_devices[device_sn]->color_reset_counter = 0;
-        enabled_devices[device_sn]->depth_reset_counter = 0;
-    }
-    if (enabled_devices[device_sn]->depth_reset_counter > 5 * 60 * fps())
-    {
-        stop(device_sn);
-        initialize(device_sn);
-        enabled_devices[device_sn]->color_reset_counter = 0;
-        enabled_devices[device_sn]->depth_reset_counter = 0;
+        if (enabled_devices[device_sn]->color_reset_counter > 5 * 60 * fps())
+        {
+            stop(device_sn);
+            initialize(device_sn);
+            enabled_devices[device_sn]->color_reset_counter = 0;
+            enabled_devices[device_sn]->depth_reset_counter = 0;
+        }
+        if (enabled_devices[device_sn]->depth_reset_counter > 5 * 60 * fps())
+        {
+            stop(device_sn);
+            initialize(device_sn);
+            enabled_devices[device_sn]->color_reset_counter = 0;
+            enabled_devices[device_sn]->depth_reset_counter = 0;
+        }
     }
 }
 
