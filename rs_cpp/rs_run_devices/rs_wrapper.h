@@ -326,7 +326,7 @@ public:
      *
      * @param output_msg Output message for debugging.
      */
-    void step(std::string &output_msg, bool &reset);
+    void step(std::string &output_msg, std::map<std::string, bool> &reset);
 
     /**
      * @brief Stops the devices through rs2::pipeline

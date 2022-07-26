@@ -276,7 +276,7 @@ void rs2wrapper::flush_frames(const std::string &device_sn,
     print(device_sn + " Flushed " + std::to_string(num_frames) + " initial frames...", 0);
 }
 
-void rs2wrapper::step(std::string &output_msg, bool &reset)
+void rs2wrapper::step(std::string &output_msg, std::map<std::string, bool> &reset)
 {
     std::vector<std::pair<std::string, std::string>> output_msg_list;
     size_t counter = 0;
@@ -287,6 +287,7 @@ void rs2wrapper::step(std::string &output_msg, bool &reset)
             std::string device_sn = enabled_device.first;
             device dev = enabled_device.second;
             std::vector<rs2::stream_profile> streams = dev.pipeline_profile->get_streams();
+            reset[device_sn] = false;
 
             // Loop through the set of frames from the camera.
             rs2::frameset frameset;
@@ -308,7 +309,7 @@ void rs2wrapper::step(std::string &output_msg, bool &reset)
                             if (dev.color_timestamp == current_color_timestamp)
                             {
                                 dev.color_reset_counter += 1;
-                                reset = true;
+                                reset[device_sn] = true;
                                 print("Resetting due to same color timestamp", 1);
                             }
                             else
@@ -322,7 +323,7 @@ void rs2wrapper::step(std::string &output_msg, bool &reset)
                             if (dev.depth_timestamp == current_depth_timestamp)
                             {
                                 dev.depth_reset_counter += 1;
-                                reset = true;
+                                reset[device_sn] = true;
                                 print("Resetting due to same depth timestamp", 1);
                             }
                             else
@@ -489,12 +490,12 @@ void rs2wrapper::save_calib(const std::string &device_sn)
 
 std::vector<std::vector<std::string>> rs2wrapper::get_available_devices()
 {
-    return available_devices;
+    return this->available_devices;
 }
 
 std::map<std::string, device> rs2wrapper::get_enabled_devices()
 {
-    return enabled_devices;
+    return this->enabled_devices;
 }
 
 /*******************************************************************************

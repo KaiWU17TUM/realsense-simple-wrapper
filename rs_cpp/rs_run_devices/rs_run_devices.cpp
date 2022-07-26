@@ -41,6 +41,13 @@ try
     if (rs2_dev.get_available_devices().size() == 0)
         throw rs2::error("No RS device detected...");
 
+    std::map<std::string, bool> reset;
+    for (const auto &enabled_device : rs2_dev.get_enabled_devices())
+    {
+        std::string device_sn = enabled_device.first;
+        reset[device_sn] = false;
+    }
+
     rs2_dev.initialize(true, true);
     rs2_dev.save_calib();
     rs2_dev.flush_frames();
@@ -48,14 +55,18 @@ try
     int num_zeros_to_pad = NUM_ZEROS_TO_PAD;
     for (auto i = 0; i < rs2_dev.fps() * rs2_dev.steps(); ++i)
     {
-        bool reset = false;
         std::string i_str = pad_zeros(std::to_string(i), num_zeros_to_pad);
         std::string o_str = "";
         rs2_dev.step(o_str, reset);
         if (i % rs2_dev.fps() == 0)
             print("Step " + i_str + "   " + o_str, 0);
-        if (reset)
-            rs2_dev.reset_device_with_frozen_timestamp();
+        for (const auto &reset_per_dev : reset)
+        {
+            std::string device_sn = reset_per_dev.first;
+            bool reset_flag = reset_per_dev.second;
+            if (reset_flag)
+                rs2_dev.reset_device_with_frozen_timestamp(device_sn);
+        }
     }
     return EXIT_SUCCESS;
 }
