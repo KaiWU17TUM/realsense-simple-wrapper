@@ -468,6 +468,15 @@ void rs2wrapper::save_calib()
     }
 }
 
+std::vector<std::vector<std::string>> rs2wrapper::get_available_devices()
+{
+    return available_devices;
+}
+std::map<std::string, device> rs2wrapper::get_enabled_devices()
+{
+    return enabled_devices;
+}
+
 /*******************************************************************************
  * rs2wrapper PRIVATAE FUNCTIONS
  ******************************************************************************/

@@ -347,4 +347,7 @@ public:
      *
      */
     void save_calib();
+
+    std::vector<std::vector<std::string>> get_available_devices();
+    std::map<std::string, device> get_enabled_devices();
 };

@@ -37,6 +37,10 @@ try
     // Start streaming with args defined configuration
     rs2::context ctx;
     rs2wrapper rs2_dev(argc, argv, ctx);
+
+    if (rs2_dev.get_available_devices().size() == 0)
+        throw rs2::error("No RS device detected...");
+
     rs2_dev.initialize(true, true);
     rs2_dev.save_calib();
     rs2_dev.initial_flush();
