@@ -280,8 +280,8 @@ void rs2wrapper::flush_frames(const std::string &device_sn,
 void rs2wrapper::step(std::string &output_msg)
 {
     std::vector<std::pair<std::string, std::string>> output_msg_list;
-    size_t counter = 0;
-    while (counter < enabled_devices.size())
+    std::map<std::string, bool> valid_frame_check;
+    while (valid_frame_check.size() < enabled_devices.size())
     {
         for (const auto &enabled_device : enabled_devices)
         {
@@ -348,7 +348,7 @@ void rs2wrapper::step(std::string &output_msg)
                     std::pair<std::string, std::string> msg(device_sn, _output_msg);
                     output_msg_list.push_back(msg);
 
-                    counter += 1;
+                    valid_frame_check[device_sn] = true;
                 }
             }
         }
