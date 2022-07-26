@@ -356,6 +356,8 @@ void rs2wrapper::step(std::string &output_msg)
     std::sort(output_msg_list.begin(), output_msg_list.end());
     for (const auto &_output_msg : output_msg_list)
         output_msg += _output_msg.second;
+
+    reset_device_with_frozen_timestamp();
 }
 
 void rs2wrapper::stop()
