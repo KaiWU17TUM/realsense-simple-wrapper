@@ -315,6 +315,7 @@ void rs2wrapper::step(std::string &output_msg)
                             }
                             else
                             {
+                                dev->color_reset_counter = 0;
                                 dev->color_timestamp = current_color_timestamp;
                             }
                         }
@@ -329,6 +330,7 @@ void rs2wrapper::step(std::string &output_msg)
                             }
                             else
                             {
+                                dev->depth_reset_counter = 0;
                                 dev->depth_timestamp = current_depth_timestamp;
                             }
                             print_camera_temperature(device_sn);
