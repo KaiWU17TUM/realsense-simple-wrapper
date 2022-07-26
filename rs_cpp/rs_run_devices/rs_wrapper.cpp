@@ -195,12 +195,12 @@ void rs2wrapper::initialize(const std::string &device_sn,
                             const bool &enable_ir_emitter,
                             const bool &verbose)
 {
-    device dev;
+    std::shared_ptr<device> dev;
     print("Initializing RealSense devices " + std::string(device_sn), 0);
 
     // 1. pipeline
     rs2::pipeline pipe = initialize_pipeline(ctx);
-    dev.pipeline = std::make_shared<rs2::pipeline>(pipe);
+    dev->pipeline = std::make_shared<rs2::pipeline>(pipe);
 
     // 2. configure
     configure_stream(device_sn, stream_config_color, stream_config_depth);
@@ -215,7 +215,7 @@ void rs2wrapper::initialize(const std::string &device_sn,
 
     // 3. pipeline profile
     rs2::pipeline_profile profile = pipe.start(cfg);
-    dev.pipeline_profile = std::make_shared<rs2::pipeline_profile>(profile);
+    dev->pipeline_profile = std::make_shared<rs2::pipeline_profile>(profile);
     if (verbose)
         print("pipeline started...", 0);
     std::this_thread::sleep_for(std::chrono::milliseconds(1000));
@@ -226,12 +226,12 @@ void rs2wrapper::initialize(const std::string &device_sn,
     {
         if (auto css = sensor.as<rs2::color_sensor>())
         {
-            dev.color_sensor = std::make_shared<rs2::color_sensor>(css);
+            dev->color_sensor = std::make_shared<rs2::color_sensor>(css);
             print("color sensor available...", 0);
         }
         else if (auto dss = sensor.as<rs2::depth_stereo_sensor>())
         {
-            dev.depth_sensor = std::make_shared<rs2::depth_stereo_sensor>(dss);
+            dev->depth_sensor = std::make_shared<rs2::depth_stereo_sensor>(dss);
             print("depth sensor available...", 0);
         }
     }
@@ -239,17 +239,17 @@ void rs2wrapper::initialize(const std::string &device_sn,
     // 5. IR
     if (enable_ir_emitter)
     {
-        if (dev.depth_sensor->supports(RS2_OPTION_EMITTER_ENABLED))
+        if (dev->depth_sensor->supports(RS2_OPTION_EMITTER_ENABLED))
         {
             // TODO: add arg for this.
-            dev.depth_sensor->set_option(RS2_OPTION_EMITTER_ENABLED, 1);
+            dev->depth_sensor->set_option(RS2_OPTION_EMITTER_ENABLED, 1);
             print("ir emitter enabled...", 0);
         }
     }
 
     // 6. enabled devices
     enabled_devices[device_sn] = dev;
-    print_camera_infos(dev.pipeline_profile);
+    print_camera_infos(dev->pipeline_profile);
     print_camera_temperature(device_sn);
 
     if (storagepaths_perdev.size() > 0)
@@ -270,9 +270,9 @@ void rs2wrapper::flush_frames(const int &num_frames)
 void rs2wrapper::flush_frames(const std::string &device_sn,
                               const int &num_frames)
 {
-    device dev = enabled_devices[device_sn];
+    std::shared_ptr<device> dev = enabled_devices[device_sn];
     for (auto i = 0; i < num_frames; ++i)
-        dev.pipeline->wait_for_frames();
+        dev->pipeline->wait_for_frames();
     print(device_sn + " Flushed " + std::to_string(num_frames) + " initial frames...", 0);
 }
 
@@ -285,8 +285,8 @@ void rs2wrapper::step(std::string &output_msg, std::map<std::string, bool> &rese
         for (const auto &enabled_device : enabled_devices)
         {
             std::string device_sn = enabled_device.first;
-            device dev = enabled_device.second;
-            std::vector<rs2::stream_profile> streams = dev.pipeline_profile->get_streams();
+            std::shared_ptr<device> dev = enabled_device.second;
+            std::vector<rs2::stream_profile> streams = dev->pipeline_profile->get_streams();
             reset[device_sn] = false;
 
             // Loop through the set of frames from the camera.
@@ -294,7 +294,7 @@ void rs2wrapper::step(std::string &output_msg, std::map<std::string, bool> &rese
             rs2_metadata_type current_color_timestamp = 0;
             rs2_metadata_type current_depth_timestamp = 0;
 
-            if (dev.pipeline->poll_for_frames(&frameset))
+            if (dev->pipeline->poll_for_frames(&frameset))
             {
                 if (frameset.size() == streams.size())
                 {
@@ -306,29 +306,29 @@ void rs2wrapper::step(std::string &output_msg, std::map<std::string, bool> &rese
                         if (stream.stream_type() == RS2_STREAM_COLOR)
                         {
                             save_color_stream(device_sn, aligned_frameset, current_color_timestamp);
-                            if (dev.color_timestamp == current_color_timestamp)
+                            if (dev->color_timestamp == current_color_timestamp)
                             {
-                                dev.color_reset_counter += 1;
+                                dev->color_reset_counter += 1;
                                 reset[device_sn] = true;
                                 print("Resetting due to same color timestamp", 1);
                             }
                             else
                             {
-                                dev.color_timestamp = current_color_timestamp;
+                                dev->color_timestamp = current_color_timestamp;
                             }
                         }
                         else if (stream.stream_type() == RS2_STREAM_DEPTH)
                         {
                             save_depth_stream(device_sn, aligned_frameset, current_depth_timestamp);
-                            if (dev.depth_timestamp == current_depth_timestamp)
+                            if (dev->depth_timestamp == current_depth_timestamp)
                             {
-                                dev.depth_reset_counter += 1;
+                                dev->depth_reset_counter += 1;
                                 reset[device_sn] = true;
                                 print("Resetting due to same depth timestamp", 1);
                             }
                             else
                             {
-                                dev.depth_timestamp = current_depth_timestamp;
+                                dev->depth_timestamp = current_depth_timestamp;
                             }
                             print_camera_temperature(device_sn);
                         }
@@ -364,8 +364,8 @@ void rs2wrapper::stop()
         for (const auto &enabled_device : enabled_devices)
         {
             std::string device_sn = enabled_device.first;
-            device dev = enabled_device.second;
-            dev.pipeline->stop();
+            std::shared_ptr<device> dev = enabled_device.second;
+            dev->pipeline->stop();
             print(device_sn + " has been stopped...", 0);
         }
     }
@@ -381,7 +381,7 @@ void rs2wrapper::stop(const std::string &device_sn)
     {
         if (enabled_devices.count(device_sn) > 0)
         {
-            enabled_devices[device_sn].pipeline->stop();
+            enabled_devices[device_sn]->pipeline->stop();
             print(device_sn + " has been stopped...", 0);
         }
         else
@@ -406,15 +406,19 @@ void rs2wrapper::reset_device_with_frozen_timestamp()
 
 void rs2wrapper::reset_device_with_frozen_timestamp(const std::string &device_sn)
 {
-    if (enabled_devices[device_sn].color_reset_counter > 5 * 60 * fps())
+    if (enabled_devices[device_sn]->color_reset_counter > 5 * 60 * fps())
     {
         stop(device_sn);
         initialize(device_sn);
+        enabled_devices[device_sn]->color_reset_counter = 0;
+        enabled_devices[device_sn]->depth_reset_counter = 0;
     }
-    if (enabled_devices[device_sn].depth_reset_counter > 5 * 60 * fps())
+    if (enabled_devices[device_sn]->depth_reset_counter > 5 * 60 * fps())
     {
         stop(device_sn);
         initialize(device_sn);
+        enabled_devices[device_sn]->color_reset_counter = 0;
+        enabled_devices[device_sn]->depth_reset_counter = 0;
     }
 }
 
@@ -429,17 +433,17 @@ void rs2wrapper::save_calib()
 
 void rs2wrapper::save_calib(const std::string &device_sn)
 {
-    device dev = enabled_devices[device_sn];
+    std::shared_ptr<device> dev = enabled_devices[device_sn];
     std::string csv_file = storagepaths_perdev[device_sn].calib + "/calib.csv";
     std::ofstream csv;
     csv.open(csv_file);
 
     // Intrinsics of color & depth frames
-    rs2::stream_profile profile_color = dev.pipeline_profile->get_stream(RS2_STREAM_COLOR);
+    rs2::stream_profile profile_color = dev->pipeline_profile->get_stream(RS2_STREAM_COLOR);
     rs2_intrinsics intr_color = profile_color.as<rs2::video_stream_profile>().get_intrinsics();
     // Fetch stream profile for depth stream
     // Downcast to video_stream_profile and fetch intrinsics
-    rs2::stream_profile profile_depth = dev.pipeline_profile->get_stream(RS2_STREAM_DEPTH);
+    rs2::stream_profile profile_depth = dev->pipeline_profile->get_stream(RS2_STREAM_DEPTH);
     rs2_intrinsics intr_depth = profile_depth.as<rs2::video_stream_profile>().get_intrinsics();
 
     // Extrinsic matrix from color sensor to Depth sensor
@@ -474,8 +478,7 @@ void rs2wrapper::save_calib(const std::string &device_sn)
         csv << value << ",";
     csv << "\n";
 
-    std::vector<rs2::sensor> sensors =
-        dev.pipeline_profile->get_device().query_sensors();
+    std::vector<rs2::sensor> sensors = dev->pipeline_profile->get_device().query_sensors();
     for (auto &&sensor : sensors)
     {
         if (auto dss = sensor.as<rs2::depth_stereo_sensor>())
@@ -485,7 +488,7 @@ void rs2wrapper::save_calib(const std::string &device_sn)
         }
     }
 
-    print(device_sn + "Saved camera calibration data...", 0);
+    print(device_sn + " Saved camera calibration data...", 0);
 }
 
 std::vector<std::vector<std::string>> rs2wrapper::get_available_devices()
@@ -493,7 +496,7 @@ std::vector<std::vector<std::string>> rs2wrapper::get_available_devices()
     return this->available_devices;
 }
 
-std::map<std::string, device> rs2wrapper::get_enabled_devices()
+std::map<std::string, std::shared_ptr<device>> rs2wrapper::get_enabled_devices()
 {
     return this->enabled_devices;
 }
@@ -517,7 +520,7 @@ rs2::pipeline rs2wrapper::initialize_pipeline(const std::shared_ptr<rs2::context
 
 void rs2wrapper::query_timestamp_mode(const std::string &device_sn)
 {
-    for (auto &&frame : enabled_devices[device_sn].pipeline->wait_for_frames())
+    for (auto &&frame : enabled_devices[device_sn]->pipeline->wait_for_frames())
     {
         if (auto vf = frame.as<rs2::video_frame>())
         {
@@ -647,11 +650,11 @@ void rs2wrapper::print_camera_infos(const std::shared_ptr<rs2::pipeline_profile>
 
 void rs2wrapper::print_camera_temperature(const std::string &device_sn)
 {
-    int c = enabled_devices[device_sn].camera_temp_printout_counter;
+    int c = enabled_devices[device_sn]->camera_temp_printout_counter;
     if (c >= camera_temp_printout_interval || c == -1)
     {
-        enabled_devices[device_sn].camera_temp_printout_counter = 0;
-        auto dss = enabled_devices[device_sn].depth_sensor;
+        enabled_devices[device_sn]->camera_temp_printout_counter = 0;
+        auto dss = enabled_devices[device_sn]->depth_sensor;
         if (dss->supports(RS2_OPTION_ASIC_TEMPERATURE))
         {
             auto temp = dss->get_option(RS2_OPTION_ASIC_TEMPERATURE);
@@ -663,5 +666,5 @@ void rs2wrapper::print_camera_temperature(const std::string &device_sn)
             print(device_sn + " Temperature Projector : " + std::to_string(temp), 0);
         }
     }
-    enabled_devices[device_sn].camera_temp_printout_counter += 1;
+    enabled_devices[device_sn]->camera_temp_printout_counter += 1;
 }

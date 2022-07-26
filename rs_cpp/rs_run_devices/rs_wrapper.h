@@ -223,7 +223,7 @@ class rs2wrapper : public rs2args
     // Device data
     std::shared_ptr<rs2::context> ctx;
     std::vector<std::vector<std::string>> available_devices;
-    std::map<std::string, device> enabled_devices;
+    std::map<std::string, std::shared_ptr<device>> enabled_devices;
     // std::map calib_data;
 
     std::string single_device_sn = "-1";
@@ -346,5 +346,5 @@ public:
     void save_calib(const std::string &device_sn);
 
     std::vector<std::vector<std::string>> get_available_devices();
-    std::map<std::string, device> get_enabled_devices();
+    std::map<std::string, std::shared_ptr<device>> get_enabled_devices();
 };
