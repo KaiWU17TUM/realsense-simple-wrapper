@@ -339,5 +339,7 @@ public:
                       const int &num_frames = 30);
 
     std::vector<std::vector<std::string>> get_available_devices();
+    std::vector<std::string> get_available_devices_sn();
     std::map<std::string, std::shared_ptr<device>> get_enabled_devices();
+    std::vector<std::string> get_enabled_devices_sn();
 };

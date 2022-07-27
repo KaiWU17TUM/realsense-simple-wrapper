@@ -576,9 +576,19 @@ std::vector<std::vector<std::string>> rs2wrapper::get_available_devices()
     return this->available_devices;
 }
 
+std::vector<std::string> rs2wrapper::get_available_devices_sn()
+{
+    return this->available_devices_sn;
+}
+
 std::map<std::string, std::shared_ptr<device>> rs2wrapper::get_enabled_devices()
 {
     return this->enabled_devices;
+}
+
+std::vector<std::string> rs2wrapper::get_enabled_devices_sn()
+{
+    return this->enabled_devices_sn;
 }
 
 /*******************************************************************************
