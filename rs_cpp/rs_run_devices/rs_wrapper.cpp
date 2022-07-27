@@ -249,7 +249,7 @@ void rs2wrapper::initialize(const std::string &device_sn,
 
     // 6. enabled devices
     enabled_devices[device_sn] = dev;
-    reset[device_sn] = false;
+    reset_flags[device_sn] = false;
     print_camera_infos(dev->pipeline_profile);
     print_camera_temperature(device_sn);
 
@@ -289,7 +289,7 @@ void rs2wrapper::step(std::string &output_msg)
             std::string device_sn = enabled_device.first;
             std::shared_ptr<device> dev = enabled_device.second;
             std::vector<rs2::stream_profile> streams = dev->pipeline_profile->get_streams();
-            reset[device_sn] = false;
+            reset_flags[device_sn] = false;
 
             // Loop through the set of frames from the camera.
             rs2::frameset frameset;
@@ -311,7 +311,7 @@ void rs2wrapper::step(std::string &output_msg)
                             if (dev->color_timestamp == current_color_timestamp)
                             {
                                 dev->color_reset_counter += 1;
-                                reset[device_sn] = true;
+                                reset_flags[device_sn] = true;
                                 print(device_sn +
                                           " Resetting due to same color timestamp, " +
                                           std::to_string(dev->color_reset_counter),
@@ -329,7 +329,7 @@ void rs2wrapper::step(std::string &output_msg)
                             if (dev->depth_timestamp == current_depth_timestamp)
                             {
                                 dev->depth_reset_counter += 1;
-                                reset[device_sn] = true;
+                                reset_flags[device_sn] = true;
                                 print(device_sn +
                                           " Resetting due to same depth timestamp, " +
                                           std::to_string(dev->depth_reset_counter),
@@ -382,12 +382,10 @@ void rs2wrapper::stop()
 {
     if (enabled_devices.size() > 0)
     {
-        for (auto &&enabled_device : enabled_devices)
+        for (const auto &enabled_device : enabled_devices)
         {
             std::string device_sn = enabled_device.first;
-            std::shared_ptr<device> dev = enabled_device.second;
-            dev->pipeline->stop();
-            print(device_sn + " has been stopped...", 0);
+            stop(device_sn);
         }
     }
     else
@@ -398,21 +396,45 @@ void rs2wrapper::stop()
 
 void rs2wrapper::stop(const std::string &device_sn)
 {
+    if (enabled_devices.count(device_sn) > 0)
+    {
+        enabled_devices[device_sn]->pipeline->stop();
+        print(device_sn + " has been stopped...", 0);
+    }
+    else
+    {
+        print(device_sn + " is not in the list of enabled devices, skipping stop()...", 1);
+    }
+}
+
+void rs2wrapper::reset()
+{
     if (enabled_devices.size() > 0)
     {
-        if (enabled_devices.count(device_sn) > 0)
+        for (const auto &enabled_device : enabled_devices)
         {
-            enabled_devices[device_sn]->pipeline->stop();
-            print(device_sn + " has been stopped...", 0);
-        }
-        else
-        {
-            print(device_sn + " is not in the list of enabled devices, skipping stop()...", 1);
+            std::string device_sn = enabled_device.first;
+            reset(device_sn);
         }
     }
     else
     {
-        print(device_sn + " has not been enabled, skipping stop()...", 1);
+        print("no device has not been enabled, skipping reset()...", 1);
+    }
+}
+
+void rs2wrapper::reset(const std::string &device_sn)
+{
+    if (enabled_devices.count(device_sn) > 0)
+    {
+        stop(device_sn);
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        initialize(device_sn);
+        print(device_sn + " pipeline has been restarted...", 0);
+    }
+    else
+    {
+        print(device_sn + " is not in the list of enabled devices, skipping reset()...", 1);
     }
 }
 
@@ -427,23 +449,19 @@ void rs2wrapper::reset_device_with_frozen_timestamp()
 
 void rs2wrapper::reset_device_with_frozen_timestamp(const std::string &device_sn)
 {
-    if (reset[device_sn])
+    if (reset_flags[device_sn])
     {
         if (enabled_devices[device_sn]->color_reset_counter > 3 * fps())
         {
             print("Reset " + device_sn + " due to color stream frame freeze");
-            stop(device_sn);
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            initialize(device_sn);
+            reset(device_sn);
             enabled_devices[device_sn]->color_reset_counter = 0;
             enabled_devices[device_sn]->depth_reset_counter = 0;
         }
         if (enabled_devices[device_sn]->depth_reset_counter > 3 * fps())
         {
             print("Reset " + device_sn + " due to depth stream frame freeze");
-            stop(device_sn);
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            initialize(device_sn);
+            reset(device_sn);
             enabled_devices[device_sn]->color_reset_counter = 0;
             enabled_devices[device_sn]->depth_reset_counter = 0;
         }

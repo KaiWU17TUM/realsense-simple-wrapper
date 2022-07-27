@@ -230,7 +230,7 @@ class rs2wrapper : public rs2args
     rs2::colorizer color_map;
 
     // reset frozen devices
-    std::map<std::string, bool> reset;
+    std::map<std::string, bool> reset_flags;
 
     /**
      * @brief Initialize the pipeline.
@@ -319,6 +319,9 @@ public:
      */
     void stop();
     void stop(const std::string &device_sn);
+
+    void reset();
+    void reset(const std::string &device_sn);
 
     void reset_device_with_frozen_timestamp();
     void reset_device_with_frozen_timestamp(const std::string &device_sn);

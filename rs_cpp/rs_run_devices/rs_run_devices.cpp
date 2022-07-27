@@ -36,6 +36,7 @@ int main(int argc, char *argv[])
     {
         argparser args(argc, argv);
         std::vector<std::string> args_list{
+            "--steps",
             "--fps",
             "--height",
             "--width",
@@ -88,8 +89,9 @@ int main(int argc, char *argv[])
 
             if (i % (rs2_dev.fps() * 60 * 3) == 0)
             {
-                std::this_thread::sleep_for(std::chrono::milliseconds(500));
-                print("Pause for 500ms ...", 1);
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                print("Pause for 100ms ...", 1);
+                rs2_dev.reset();
             }
 
             if (i >= rs2_dev.fps() * rs2_dev.steps())
