@@ -21,7 +21,7 @@ void print(const std::string &msg, int mode = 0);
  * @param num_zeros number of zeros to pad
  * @return std::string
  */
-std::string pad_zeros(const std::string &in_str, const size_t &num_zeros);
+std::string pad_zeros(const std::string &in_str, const int &num_zeros);
 
 std::int64_t get_timestamp_duration_ns(const std::chrono::steady_clock::time_point &timestamp_start);
 

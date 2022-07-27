@@ -36,7 +36,7 @@ int main(int argc, char *argv[])
 
     {
         argparser args(argc, argv);
-        std::vector<std::string> args_list{
+        std::vector<std::string> REQUIRED_ARGS{
             "--steps",
             "--fps",
             "--height",
@@ -44,9 +44,12 @@ int main(int argc, char *argv[])
             "--color-format",
             "--depth-format",
             "--save-path",
-            // "--ip",
         };
-        for (auto &&arg : args_list)
+        std::vector<std::string> OPTIONAL_ARGS{
+            "--reset-interval",
+            "--ip",
+        };
+        for (auto &&arg : REQUIRED_ARGS)
         {
             if (!args.checkarg(arg))
             {
@@ -54,10 +57,9 @@ int main(int argc, char *argv[])
                 return EXIT_FAILURE;
             }
         }
-        if (!args.checkarg("--ip"))
-        {
-            print("--ip is not used", 1);
-        }
+        for (auto &&arg : OPTIONAL_ARGS)
+            if (!args.checkarg(arg))
+                print(arg + " is not used", 1);
     }
 
     signal(SIGINT, inthand);
@@ -76,11 +78,11 @@ int main(int argc, char *argv[])
         rs2_dev.save_calib();
         rs2_dev.flush_frames();
 
-        int num_zeros_to_pad = NUM_ZEROS_TO_PAD;
-        size_t dev_reset_loop = 0;
+        int num_zeros_to_pad = 16;
+        int dev_reset_loop = 0;
+        int reset_interval = std::stoi(rs2_dev.getarg("--reset-interval"));
         std::vector<std::string> enabled_devices_sn = rs2_dev.get_enabled_devices_sn();
 
-        // for (auto i = 0; i < rs2_dev.fps() * rs2_dev.steps(); ++i)
         int i = 1;
         while (!stop)
         {
@@ -93,13 +95,13 @@ int main(int argc, char *argv[])
             if (i % rs2_dev.fps() == 0)
                 print("Step " + i_str + "   " + o_str, 0);
 
-            // if (i % (rs2_dev.fps() * 60 * 3) == 0)
-            // {
-            //     std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            //     print("Pause for 100ms ...", 1);
-            //     rs2_dev.reset(available_devices_sn[dev_reset_loop]);
-            //     dev_reset_loop = (dev_reset_loop + 1) % enabled_devices_sn.size();
-            // }
+            if (i % (rs2_dev.fps() * 60 * reset_interval) == 0)
+            {
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                print("Pause for 100ms ...", 1);
+                rs2_dev.reset(available_devices_sn[dev_reset_loop]);
+                dev_reset_loop = (dev_reset_loop + 1) % enabled_devices_sn.size();
+            }
 
             if (i >= rs2_dev.fps() * rs2_dev.steps())
                 break;

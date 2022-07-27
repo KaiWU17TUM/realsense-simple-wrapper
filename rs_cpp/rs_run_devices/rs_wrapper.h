@@ -21,8 +21,6 @@
 #include <iostream> // Terminal IO
 #include <sstream>  // Stringstreams
 
-#define NUM_ZEROS_TO_PAD 16;
-
 /**
  * @brief Save raw frame data into a binary file.
  *
@@ -89,7 +87,7 @@ public:
  * @brief Class that contains the arguments for the rs2wrapper class.
  *
  */
-class rs2args : protected argparser
+class rs2args : public argparser
 {
 
     std::map<std::string, rs2_format> _SUPPORTED_FORMATS{

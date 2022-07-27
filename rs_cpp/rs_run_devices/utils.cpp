@@ -10,11 +10,11 @@ void print(const std::string &msg, int mode)
         std::cout << "[ERRO] : " << msg << std::endl;
 }
 
-std::string pad_zeros(const std::string &in_str, const size_t &num_zeros)
+std::string pad_zeros(const std::string &in_str, const int &num_zeros)
 {
-    std::string out_str =
-        std::string(num_zeros - std::min(num_zeros, in_str.length()), '0') +
-        in_str;
+    std::string out_str = "";
+    out_str += std::string(num_zeros - std::min(num_zeros, (int)in_str.length()), '0');
+    out_str += in_str;
     return out_str;
 }
 
