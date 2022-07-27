@@ -669,7 +669,7 @@ class RealsenseWrapper:
             if os.path.isfile(storage_paths.calib):
                 save_path = storage_paths.calib
             else:
-                filename = f'dev{device_sn}_calib.txt'
+                filename = f'dev{device_sn}_calib.json'
                 save_path = os.path.join(storage_paths.calib, filename)
 
             calib_config.device_sn.append(device_sn)
@@ -710,7 +710,9 @@ class RealsenseWrapper:
                                   0, intr_color.fy, intr_color.ppy,
                                   0, 0, 1],
                 'model': str(intr_color.model),
-                'coeffs': intr_color.coeffs
+                'coeffs': intr_color.coeffs,
+                'format': self.stream_config_color.format,
+                'fps': self.stream_config_color.fps,
             })
             calib_config.depth.append({
                 'width': intr_depth.width,
@@ -721,7 +723,9 @@ class RealsenseWrapper:
                 'model': str(intr_depth.model),
                 'coeffs': intr_depth.coeffs,
                 'depth_scale': depth_scale,
-                'depth_baseline': depth_baseline
+                'depth_baseline': depth_baseline,
+                'format': self.stream_config_depth.format,
+                'fps': self.stream_config_color.fps,
             })
             calib_config.T_color_depth.append({
                 'rotation': extr.rotation,

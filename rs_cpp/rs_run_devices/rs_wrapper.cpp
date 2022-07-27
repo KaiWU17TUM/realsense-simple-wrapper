@@ -514,6 +514,8 @@ void rs2wrapper::save_calib(const std::string &device_sn)
         << rs2_distortion_to_string(intr_color.model) << ",";
     for (auto &&value : intr_color.coeffs)
         csv << value << ",";
+    csv << color_format() << ","
+        << fps() << ",";
     csv << "\n";
 
     csv << intr_depth.width << ","
@@ -525,6 +527,8 @@ void rs2wrapper::save_calib(const std::string &device_sn)
         << rs2_distortion_to_string(intr_depth.model) << ",";
     for (auto &&value : intr_depth.coeffs)
         csv << value << ",";
+    csv << depth_format() << ","
+        << fps() << ",";
     csv << "\n";
 
     for (auto &&value : extr.rotation)
