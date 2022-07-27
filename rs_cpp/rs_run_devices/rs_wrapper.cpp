@@ -261,8 +261,7 @@ void rs2wrapper::initialize(const std::string &device_sn,
         query_timestamp_mode(std::string(device_sn));
 
     // 7. get enabled devices_sn.
-    for (auto &&enabled_device : enabled_devices)
-        enabled_devices_sn.push_back(enabled_device.first);
+    enabled_devices_sn.push_back(device_sn);
 
     print("Initialized RealSense devices " + std::string(device_sn), 0);
 }

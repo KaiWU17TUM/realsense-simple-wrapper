@@ -68,12 +68,8 @@ int main(int argc, char *argv[])
         rs2::context ctx;
         rs2wrapper rs2_dev(argc, argv, ctx);
 
-        std::vector<std::string> available_devices_sn;
-        for (auto &&available_device : rs2_dev.get_available_devices())
-            available_devices_sn.push_back(available_device[0]);
-        size_t num_dev = available_devices_sn.size();
-
-        if (num_dev == 0)
+        std::vector<std::string> available_devices_sn = rs2_dev.get_available_devices_sn();
+        if (available_devices_sn.size() == 0)
             throw rs2::error("No RS device detected...");
 
         rs2_dev.initialize(true, true);
@@ -82,6 +78,7 @@ int main(int argc, char *argv[])
 
         int num_zeros_to_pad = NUM_ZEROS_TO_PAD;
         size_t dev_reset_loop = 0;
+        std::vector<std::string> enabled_devices_sn = rs2_dev.get_enabled_devices_sn();
 
         // for (auto i = 0; i < rs2_dev.fps() * rs2_dev.steps(); ++i)
         int i = 1;
@@ -100,7 +97,7 @@ int main(int argc, char *argv[])
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
                 print("Pause for 100ms ...", 1);
                 rs2_dev.reset(available_devices_sn[dev_reset_loop]);
-                dev_reset_loop = (dev_reset_loop + 1) % num_dev;
+                dev_reset_loop = (dev_reset_loop + 1) % enabled_devices_sn.size();
             }
 
             if (i >= rs2_dev.fps() * rs2_dev.steps())
