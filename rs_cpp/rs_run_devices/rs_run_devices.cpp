@@ -33,9 +33,8 @@ void inthand(int signum)
 
 int main(int argc, char *argv[])
 {
-    argparser args(argc, argv);
-
     {
+        argparser args(argc, argv);
         std::vector<std::string> args_list{
             "--fps",
             "--height",
@@ -47,13 +46,13 @@ int main(int argc, char *argv[])
         };
         for (auto &&arg : args_list)
         {
-            if (!args.check(arg))
+            if (!args.checkarg(arg))
             {
                 print(arg + " is missing", 2);
                 return EXIT_FAILURE;
             }
         }
-        if (!args.check("--ip"))
+        if (!args.checkarg("--ip"))
         {
             print("--ip is not used", 1);
         }

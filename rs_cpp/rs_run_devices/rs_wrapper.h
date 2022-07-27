@@ -89,10 +89,8 @@ public:
  * @brief Class that contains the arguments for the rs2wrapper class.
  *
  */
-class rs2args
+class rs2args : protected argparser
 {
-    int _argc;
-    char **_argv;
 
     std::map<std::string, rs2_format> _SUPPORTED_FORMATS{
         {"z16", RS2_FORMAT_Z16},
@@ -107,10 +105,8 @@ public:
      * @param argc Number of arguments.
      * @param argv Arguments in an array of char*.
      */
-    rs2args(int argc, char *argv[])
+    rs2args(int argc, char **argv) : argparser(argc, argv)
     {
-        _argc = argc;
-        _argv = argv;
     }
     /**
      * @brief Steps to run the realsense device.
@@ -119,7 +115,7 @@ public:
      */
     int steps()
     {
-        return atoi(_argv[1]);
+        return std::stoi(getarg("--steps"));
     }
     /**
      * @brief FPS of the realsense device.
@@ -128,7 +124,7 @@ public:
      */
     int fps()
     {
-        return atoi(_argv[2]);
+        return std::stoi(getarg("--fps"));
     }
     /**
      * @brief Height of the realsense frames.
@@ -137,7 +133,7 @@ public:
      */
     int height()
     {
-        return atoi(_argv[3]);
+        return std::stoi(getarg("--height"));
     }
     /**
      * @brief Width of the realsense frames.
@@ -146,19 +142,19 @@ public:
      */
     int width()
     {
-        return atoi(_argv[4]);
+        return std::stoi(getarg("--width"));
     }
     rs2_format color_format()
     {
-        if (_SUPPORTED_FORMATS.count(std::string(_argv[5])))
-            return _SUPPORTED_FORMATS[std::string(_argv[5])];
+        if (_SUPPORTED_FORMATS.count(getarg("--color-format")))
+            return _SUPPORTED_FORMATS[getarg("--color-format")];
         else
             throw std::invalid_argument("rs color format unknown");
     }
     rs2_format depth_format()
     {
-        if (_SUPPORTED_FORMATS.count(std::string(_argv[6])))
-            return _SUPPORTED_FORMATS[std::string(_argv[6])];
+        if (_SUPPORTED_FORMATS.count(getarg("--depth-format")))
+            return _SUPPORTED_FORMATS[getarg("--depth-format")];
         else
             throw std::invalid_argument("rs depth format unknown");
     }
@@ -169,7 +165,7 @@ public:
      */
     const char *save_path()
     {
-        return _argv[7];
+        return getarg("--save-path").c_str();
     }
     /**
      * @brief IP address of the remote realsense device (optional).
@@ -178,7 +174,7 @@ public:
      */
     const char *ip()
     {
-        return _argv[8];
+        return getarg("--ip").c_str();
     }
     /**
      * @brief Checks whether the realsense device is connected over the network.
@@ -188,29 +184,15 @@ public:
      */
     bool network()
     {
-        if (_argc == 9)
+        if (checkarg("--ip"))
             return true;
         else
             return false;
     }
-    /**
-     * @brief Prints out the arguments from 'rs2args' class that is used for the 'rs2wrapper' class.
-     *
-     */
+
     void print_args()
     {
-        std::cout << "========================================" << std::endl;
-        std::cout << ">>>>> rs2args <<<<<" << std::endl;
-        std::cout << "========================================" << std::endl;
-        std::cout << "FPS        : " << fps() << std::endl;
-        std::cout << "Height     : " << height() << std::endl;
-        std::cout << "Width      : " << width() << std::endl;
-        std::cout << "Save Path  : " << save_path() << std::endl;
-        if (network())
-            std::cout << "IP Address : " << ip() << std::endl;
-        else
-            std::cout << "IP Address : " << std::endl;
-        std::cout << "========================================" << std::endl;
+        printout();
     }
 };
 

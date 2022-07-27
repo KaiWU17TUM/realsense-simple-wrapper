@@ -33,10 +33,11 @@ std::int64_t get_timestamp_duration_ns(const std::chrono::steady_clock::time_poi
  */
 class argparser
 {
-    std::vector<std::string> tokens;
+    std::vector<std::string> args;
 
 public:
-    argparser(int &argc, char **argv);
-    std::string get(const std::string &option);
-    bool check(const std::string &option);
+    argparser(int argc, char **argv);
+    std::string getarg(const std::string &option);
+    bool checkarg(const std::string &option);
+    void printout();
 };

@@ -28,17 +28,17 @@ std::int64_t get_timestamp_duration_ns(const std::chrono::steady_clock::time_poi
     return timestamp_diff;
 }
 
-argparser::argparser(int &argc, char **argv)
+argparser::argparser(int argc, char **argv)
 {
     for (int i = 1; i < argc; ++i)
-        tokens.push_back(std::string(argv[i]));
+        args.push_back(std::string(argv[i]));
 }
 
-std::string argparser::get(const std::string &option)
+std::string argparser::getarg(const std::string &option)
 {
     std::vector<std::string>::const_iterator itr;
-    itr = std::find(tokens.begin(), tokens.end(), option);
-    if (itr != tokens.end() && ++itr != tokens.end())
+    itr = std::find(args.begin(), args.end(), option);
+    if (itr != args.end() && ++itr != args.end())
     {
         return *itr;
     }
@@ -46,7 +46,17 @@ std::string argparser::get(const std::string &option)
     return empty_string;
 }
 
-bool argparser::check(const std::string &option)
+bool argparser::checkarg(const std::string &option)
 {
-    return std::find(tokens.begin(), tokens.end(), option) != tokens.end();
+    return std::find(args.begin(), args.end(), option) != args.end();
+}
+
+void argparser::printout()
+{
+    std::cout << "========================================" << std::endl;
+    std::cout << ">>>>> rs2args <<<<<" << std::endl;
+    std::cout << "========================================" << std::endl;
+    for (int i = 0; i < args.size(); i += 2)
+        print(args[i] + "  " + args[i + 1]);
+    std::cout << "========================================" << std::endl;
 }
