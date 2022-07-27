@@ -204,7 +204,9 @@ class rs2wrapper : public rs2args
 {
     // Device data
     std::shared_ptr<rs2::context> ctx;
+    std::vector<std::string> available_devices_sn;
     std::vector<std::vector<std::string>> available_devices;
+    std::vector<std::string> enabled_devices_sn;
     std::map<std::string, std::shared_ptr<device>> enabled_devices;
     // std::map calib_data;
 
@@ -291,16 +293,8 @@ public:
                     const bool &enable_ir_emitter = true,
                     const bool &verbose = true);
 
-    /**
-     * @brief Flushes N frames
-     *
-     * Used to discard frames at init to give autoexposure, etc. a chance to settle.
-     *
-     * @param num_frames N frames to flush.
-     */
-    void flush_frames(const int &num_frames = 30);
-    void flush_frames(const std::string &device_sn,
-                      const int &num_frames = 30);
+    void start();
+    void start(const std::string &device_sn);
 
     /**
      * @brief Collects a set of frames and postprocesses them.
@@ -332,6 +326,17 @@ public:
      */
     void save_calib();
     void save_calib(const std::string &device_sn);
+
+    /**
+     * @brief Flushes N frames
+     *
+     * Used to discard frames at init to give autoexposure, etc. a chance to settle.
+     *
+     * @param num_frames N frames to flush.
+     */
+    void flush_frames(const int &num_frames = 30);
+    void flush_frames(const std::string &device_sn,
+                      const int &num_frames = 30);
 
     std::vector<std::vector<std::string>> get_available_devices();
     std::map<std::string, std::shared_ptr<device>> get_enabled_devices();

@@ -158,12 +158,16 @@ rs2wrapper::rs2wrapper(int argc,
                   return a[0] < b[0];
               });
 
-    // storage
+    // get available devices_sn.
     for (auto &&available_device : available_devices)
+        available_devices_sn.push_back(available_device[0]);
+
+    // storage
+    for (auto &&device_sn : available_devices_sn)
     {
         storagepaths _storagepaths;
-        _storagepaths.create(available_device[0], save_path());
-        storagepaths_perdev[available_device[0]] = _storagepaths;
+        _storagepaths.create(device_sn, save_path());
+        storagepaths_perdev[device_sn] = _storagepaths;
     }
 
     // stream
@@ -184,9 +188,8 @@ rs2wrapper::rs2wrapper(int argc,
 void rs2wrapper::initialize(const bool &enable_ir_emitter,
                             const bool &verbose)
 {
-    for (auto &&available_device : available_devices)
+    for (auto &&device_sn : available_devices_sn)
     {
-        const std::string device_sn = available_device[0];
         initialize(device_sn, enable_ir_emitter, verbose);
     }
 }
@@ -195,8 +198,12 @@ void rs2wrapper::initialize(const std::string &device_sn,
                             const bool &enable_ir_emitter,
                             const bool &verbose)
 {
-    std::shared_ptr<device> dev = std::make_shared<device>();
     print("Initializing RealSense devices " + std::string(device_sn), 0);
+
+    // 0. enabled devices
+    std::shared_ptr<device> dev = std::make_shared<device>();
+    enabled_devices[device_sn] = dev;
+    reset_flags[device_sn] = false;
 
     // 1. pipeline
     rs2::pipeline pipe = initialize_pipeline(ctx);
@@ -213,15 +220,14 @@ void rs2wrapper::initialize(const std::string &device_sn,
     else
         print("'cfg' usable with 'pipeline' : False", 0);
 
-    // 3. pipeline profile
-    rs2::pipeline_profile profile = pipe.start(cfg);
-    dev->pipeline_profile = std::make_shared<rs2::pipeline_profile>(profile);
+    // 3. pipeline start
+    start(device_sn);
     if (verbose)
         print("pipeline started...", 0);
-    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
     // 4. sensors
-    std::vector<rs2::sensor> sensors = profile.get_device().query_sensors();
+    std::vector<rs2::sensor> sensors = dev->pipeline_profile->get_device().query_sensors();
     for (auto &&sensor : sensors)
     {
         if (auto css = sensor.as<rs2::color_sensor>())
@@ -247,34 +253,42 @@ void rs2wrapper::initialize(const std::string &device_sn,
         }
     }
 
-    // 6. enabled devices
-    enabled_devices[device_sn] = dev;
-    reset_flags[device_sn] = false;
+    // 6. infos
     print_camera_infos(dev->pipeline_profile);
     print_camera_temperature(device_sn);
 
     if (storagepaths_perdev.size() > 0)
         query_timestamp_mode(std::string(device_sn));
 
+    // 7. get enabled devices_sn.
+    for (auto &&enabled_device : enabled_devices)
+        enabled_devices_sn.push_back(enabled_device.first);
+
     print("Initialized RealSense devices " + std::string(device_sn), 0);
 }
 
-void rs2wrapper::flush_frames(const int &num_frames)
+void rs2wrapper::start()
 {
-    for (auto &&enabled_device : enabled_devices)
-    {
-        std::string device_sn = enabled_device.first;
-        flush_frames(device_sn, num_frames);
-    }
+    if (enabled_devices.size() > 0)
+        for (auto &&device_sn : enabled_devices_sn)
+            start(device_sn);
+    else
+        print("no device has not been enabled, skipping stop()...", 1);
 }
 
-void rs2wrapper::flush_frames(const std::string &device_sn,
-                              const int &num_frames)
+void rs2wrapper::start(const std::string &device_sn)
 {
+    if (enabled_devices.count(device_sn) <= 0)
+    {
+        print(device_sn + " is not in the list of enabled devices, skipping start()...", 1);
+        return;
+    }
+
+    rs2::config cfg = rs_cfg[device_sn];
     std::shared_ptr<device> dev = enabled_devices[device_sn];
-    for (auto i = 0; i < num_frames; ++i)
-        dev->pipeline->wait_for_frames();
-    print(device_sn + " Flushed " + std::to_string(num_frames) + " initial frames...", 0);
+    rs2::pipeline_profile profile = dev->pipeline->start(cfg);
+    dev->pipeline_profile = std::make_shared<rs2::pipeline_profile>(profile);
+    print(device_sn + " has been started...", 0);
 }
 
 void rs2wrapper::step(std::string &output_msg)
@@ -372,7 +386,7 @@ void rs2wrapper::step(std::string &output_msg)
     }
 
     std::sort(output_msg_list.begin(), output_msg_list.end());
-    for (const auto &_output_msg : output_msg_list)
+    for (auto &&_output_msg : output_msg_list)
         output_msg += _output_msg.second;
 
     reset_device_with_frozen_timestamp();
@@ -381,74 +395,64 @@ void rs2wrapper::step(std::string &output_msg)
 void rs2wrapper::stop()
 {
     if (enabled_devices.size() > 0)
-    {
-        for (const auto &enabled_device : enabled_devices)
-        {
-            std::string device_sn = enabled_device.first;
+        for (auto &&device_sn : enabled_devices_sn)
             stop(device_sn);
-        }
-    }
     else
-    {
         print("no device has not been enabled, skipping stop()...", 1);
-    }
 }
 
 void rs2wrapper::stop(const std::string &device_sn)
 {
-    if (enabled_devices.count(device_sn) > 0)
-    {
-        enabled_devices[device_sn]->pipeline->stop();
-        print(device_sn + " has been stopped...", 0);
-    }
-    else
+    if (enabled_devices.count(device_sn) <= 0)
     {
         print(device_sn + " is not in the list of enabled devices, skipping stop()...", 1);
+        return;
     }
+
+    enabled_devices[device_sn]->pipeline->stop();
+    print(device_sn + " has been stopped...", 0);
 }
 
 void rs2wrapper::reset()
 {
     if (enabled_devices.size() > 0)
-    {
-        for (const auto &enabled_device : enabled_devices)
-        {
-            std::string device_sn = enabled_device.first;
+        for (auto &&device_sn : enabled_devices_sn)
             reset(device_sn);
-        }
-    }
     else
-    {
         print("no device has not been enabled, skipping reset()...", 1);
-    }
 }
 
 void rs2wrapper::reset(const std::string &device_sn)
 {
-    if (enabled_devices.count(device_sn) > 0)
-    {
-        stop(device_sn);
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        initialize(device_sn);
-        print(device_sn + " pipeline has been restarted...", 0);
-    }
-    else
+    if (enabled_devices.count(device_sn) <= 0)
     {
         print(device_sn + " is not in the list of enabled devices, skipping reset()...", 1);
+        return;
     }
+
+    stop(device_sn);
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    start(device_sn);
+    print(device_sn + " pipeline has been restarted...", 0);
 }
 
 void rs2wrapper::reset_device_with_frozen_timestamp()
 {
-    for (auto &&enabled_device : enabled_devices)
-    {
-        std::string device_sn = enabled_device.first;
-        reset_device_with_frozen_timestamp(device_sn);
-    }
+    if (enabled_devices.size() > 0)
+        for (auto &&device_sn : enabled_devices_sn)
+            reset_device_with_frozen_timestamp(device_sn);
+    else
+        print("no device has not been enabled, skipping reset_device_with_frozen_timestamp()...", 1);
 }
 
 void rs2wrapper::reset_device_with_frozen_timestamp(const std::string &device_sn)
 {
+    if (enabled_devices.count(device_sn) <= 0)
+    {
+        print(device_sn + " is not in the list of enabled devices, skipping reset_device_with_frozen_timestamp()...", 1);
+        return;
+    }
+
     if (reset_flags[device_sn])
     {
         if (enabled_devices[device_sn]->color_reset_counter > 3 * fps())
@@ -470,15 +474,21 @@ void rs2wrapper::reset_device_with_frozen_timestamp(const std::string &device_sn
 
 void rs2wrapper::save_calib()
 {
-    for (const auto &enabled_device : enabled_devices)
-    {
-        std::string device_sn = enabled_device.first;
-        save_calib(device_sn);
-    }
+    if (enabled_devices.size() > 0)
+        for (auto &&device_sn : enabled_devices_sn)
+            save_calib(device_sn);
+    else
+        print("no device has not been enabled, skipping save_calib()...", 1);
 }
 
 void rs2wrapper::save_calib(const std::string &device_sn)
 {
+    if (enabled_devices.count(device_sn) <= 0)
+    {
+        print(device_sn + " is not in the list of enabled devices, skipping save_calib()...", 1);
+        return;
+    }
+
     std::shared_ptr<device> dev = enabled_devices[device_sn];
     std::string csv_file = storagepaths_perdev[device_sn].calib + "/calib.csv";
     std::ofstream csv;
@@ -535,6 +545,30 @@ void rs2wrapper::save_calib(const std::string &device_sn)
     }
 
     print(device_sn + " Saved camera calibration data...", 0);
+}
+
+void rs2wrapper::flush_frames(const int &num_frames)
+{
+    if (enabled_devices.size() > 0)
+        for (auto &&device_sn : enabled_devices_sn)
+            flush_frames(device_sn, num_frames);
+    else
+        print("no device has not been enabled, skipping flush_frames()...", 1);
+}
+
+void rs2wrapper::flush_frames(const std::string &device_sn,
+                              const int &num_frames)
+{
+    if (enabled_devices.count(device_sn) <= 0)
+    {
+        print(device_sn + " is not in the list of enabled devices, skipping flush_frames()...", 1);
+        return;
+    }
+
+    std::shared_ptr<device> dev = enabled_devices[device_sn];
+    for (auto i = 0; i < num_frames; ++i)
+        dev->pipeline->wait_for_frames();
+    print(device_sn + " Flushed " + std::to_string(num_frames) + " initial frames...", 0);
 }
 
 std::vector<std::vector<std::string>> rs2wrapper::get_available_devices()
