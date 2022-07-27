@@ -161,11 +161,11 @@ public:
     /**
      * @brief Path to save the frames.
      *
-     * @return const char*
+     * @return std::string
      */
-    const char *save_path()
+    std::string save_path()
     {
-        return getarg("--save-path").c_str();
+        return getarg("--save-path");
     }
     /**
      * @brief IP address of the remote realsense device (optional).

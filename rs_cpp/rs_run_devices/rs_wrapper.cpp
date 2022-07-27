@@ -595,13 +595,13 @@ void rs2wrapper::save_timestamp(const std::string &device_sn,
                                 const rs2_metadata_type &color_timestamp,
                                 const rs2_metadata_type &depth_timestamp)
 {
-    auto save_path = storagepaths_perdev[device_sn].timestamp + "/timestamp.txt";
+    auto _path = storagepaths_perdev[device_sn].timestamp + "/timestamp.txt";
     std::fstream filestream;
-    filestream.open(save_path, std::fstream::in | std::fstream::out | std::fstream::app);
+    filestream.open(_path, std::fstream::in | std::fstream::out | std::fstream::app);
     // If file does not exist, Create new file
     if (!filestream)
     {
-        filestream.open(save_path, std::fstream::in | std::fstream::out | std::fstream::trunc);
+        filestream.open(_path, std::fstream::in | std::fstream::out | std::fstream::trunc);
     }
     filestream << global_timestamp
                << "::"
