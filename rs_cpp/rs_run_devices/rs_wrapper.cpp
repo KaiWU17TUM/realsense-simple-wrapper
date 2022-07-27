@@ -261,7 +261,7 @@ void rs2wrapper::initialize(const std::string &device_sn,
 
 void rs2wrapper::flush_frames(const int &num_frames)
 {
-    for (const auto &enabled_device : enabled_devices)
+    for (auto &&enabled_device : enabled_devices)
     {
         std::string device_sn = enabled_device.first;
         flush_frames(device_sn, num_frames);
@@ -284,7 +284,7 @@ void rs2wrapper::step(std::string &output_msg)
     std::map<std::string, std::int64_t> valid_frame_counter;
     while (valid_frame_check.size() < enabled_devices.size())
     {
-        for (const auto &enabled_device : enabled_devices)
+        for (auto &&enabled_device : enabled_devices)
         {
             std::string device_sn = enabled_device.first;
             std::shared_ptr<device> dev = enabled_device.second;
@@ -314,12 +314,12 @@ void rs2wrapper::step(std::string &output_msg)
                                 reset[device_sn] = true;
                                 print(device_sn +
                                           " Resetting due to same color timestamp, " +
-                                          std::to_string(dev->depth_reset_counter),
+                                          std::to_string(dev->color_reset_counter),
                                       1);
                             }
                             else
                             {
-                                dev->color_reset_counter = 0;
+                                // dev->color_reset_counter = 0;
                                 dev->color_timestamp = current_color_timestamp;
                             }
                         }
@@ -337,7 +337,7 @@ void rs2wrapper::step(std::string &output_msg)
                             }
                             else
                             {
-                                dev->depth_reset_counter = 0;
+                                // dev->depth_reset_counter = 0;
                                 dev->depth_timestamp = current_depth_timestamp;
                             }
                             print_camera_temperature(device_sn);
@@ -382,7 +382,7 @@ void rs2wrapper::stop()
 {
     if (enabled_devices.size() > 0)
     {
-        for (const auto &enabled_device : enabled_devices)
+        for (auto &&enabled_device : enabled_devices)
         {
             std::string device_sn = enabled_device.first;
             std::shared_ptr<device> dev = enabled_device.second;
@@ -429,18 +429,20 @@ void rs2wrapper::reset_device_with_frozen_timestamp(const std::string &device_sn
 {
     if (reset[device_sn])
     {
-        if (enabled_devices[device_sn]->color_reset_counter > 5 * fps())
+        if (enabled_devices[device_sn]->color_reset_counter > 3 * fps())
         {
             print("Reset " + device_sn + " due to color stream frame freeze");
             stop(device_sn);
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
             initialize(device_sn);
             enabled_devices[device_sn]->color_reset_counter = 0;
             enabled_devices[device_sn]->depth_reset_counter = 0;
         }
-        if (enabled_devices[device_sn]->depth_reset_counter > 5 * fps())
+        if (enabled_devices[device_sn]->depth_reset_counter > 3 * fps())
         {
             print("Reset " + device_sn + " due to depth stream frame freeze");
             stop(device_sn);
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
             initialize(device_sn);
             enabled_devices[device_sn]->color_reset_counter = 0;
             enabled_devices[device_sn]->depth_reset_counter = 0;
