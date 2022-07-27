@@ -87,18 +87,19 @@ int main(int argc, char *argv[])
             std::string i_str = pad_zeros(std::to_string(i), num_zeros_to_pad);
             std::string o_str = "";
 
-            rs2_dev.step(o_str);
+            rs2_dev.step();
+            o_str += rs2_dev.get_output_msg();
 
             if (i % rs2_dev.fps() == 0)
                 print("Step " + i_str + "   " + o_str, 0);
 
-            if (i % (rs2_dev.fps() * 60 * 3) == 0)
-            {
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
-                print("Pause for 100ms ...", 1);
-                rs2_dev.reset(available_devices_sn[dev_reset_loop]);
-                dev_reset_loop = (dev_reset_loop + 1) % enabled_devices_sn.size();
-            }
+            // if (i % (rs2_dev.fps() * 60 * 3) == 0)
+            // {
+            //     std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            //     print("Pause for 100ms ...", 1);
+            //     rs2_dev.reset(available_devices_sn[dev_reset_loop]);
+            //     dev_reset_loop = (dev_reset_loop + 1) % enabled_devices_sn.size();
+            // }
 
             if (i >= rs2_dev.fps() * rs2_dev.steps())
                 break;

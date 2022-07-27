@@ -290,7 +290,7 @@ void rs2wrapper::start(const std::string &device_sn)
     print(device_sn + " has been started...", 0);
 }
 
-void rs2wrapper::step(std::string &output_msg)
+void rs2wrapper::step()
 {
     output_msg_list.clear();
     valid_frame_check_flag.clear();
@@ -306,10 +306,6 @@ void rs2wrapper::step(std::string &output_msg)
                 break;
         }
     }
-
-    std::sort(output_msg_list.begin(), output_msg_list.end());
-    for (auto &&_output_msg : output_msg_list)
-        output_msg += _output_msg.second;
 
     reset_with_high_reset_counter();
 }
@@ -575,6 +571,15 @@ void rs2wrapper::flush_frames(const std::string &device_sn,
     for (auto i = 0; i < num_frames; ++i)
         dev->pipeline->wait_for_frames();
     print(device_sn + " Flushed " + std::to_string(num_frames) + " initial frames...", 0);
+}
+
+std::string rs2wrapper::get_output_msg()
+{
+    std::string output_msg;
+    std::sort(output_msg_list.begin(), output_msg_list.end());
+    for (auto &&_output_msg : output_msg_list)
+        output_msg += _output_msg.second;
+    return output_msg;
 }
 
 std::vector<std::vector<std::string>> rs2wrapper::get_available_devices()

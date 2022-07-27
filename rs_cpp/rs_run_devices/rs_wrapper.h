@@ -310,9 +310,8 @@ public:
      * saves the color & depth (as colormap) images as png,
      * and their metadata as csv.
      *
-     * @param output_msg Output message for debugging.
      */
-    void step(std::string &output_msg);
+    void step();
     void step(const std::string &device_sn);
 
     /**
@@ -345,6 +344,8 @@ public:
     void flush_frames(const int &num_frames = 30);
     void flush_frames(const std::string &device_sn,
                       const int &num_frames = 30);
+
+    std::string get_output_msg();
 
     std::vector<std::vector<std::string>> get_available_devices();
     std::vector<std::string> get_available_devices_sn();
