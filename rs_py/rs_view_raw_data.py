@@ -89,9 +89,9 @@ def read_color_file(filename: str,
                     fileformat: Optional[str] = None) -> np.ndarray:
     if filename.endswith('.bin'):
         with open(filename, 'rb') as f:
-            if fileformat in ['bgr8', 'rgb8']:
+            if fileformat.lower() in ['bgr8', 'rgb8']:
                 image = np.fromfile(f, np.uint8)
-            elif fileformat in ['yuyv']:
+            elif fileformat.lower() in ['yuyv']:
                 image = np.fromfile(f, np.uint16)
                 image = _get_brg_from_yuv(image.reshape(-1))
             else:

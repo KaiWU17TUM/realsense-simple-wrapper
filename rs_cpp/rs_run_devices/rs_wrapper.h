@@ -231,8 +231,15 @@ class rs2wrapper : public rs2args
     // Declare depth colorizer for pretty visualization of depth data
     rs2::colorizer color_map;
 
-    // reset frozen devices
+    // [INTERNAL] --------------------------------------------------------------
+    // Reset frozen devices
     std::map<std::string, bool> reset_flags;
+    // Output message
+    std::vector<std::pair<std::string, std::string>> output_msg_list;
+    // Frame check
+    std::map<std::string, bool> valid_frame_check_flag;
+    std::map<std::string, std::int64_t> empty_frame_check_counter;
+    // -------------------------------------------------------------- [INTERNAL]
 
     /**
      * @brief Initialize the pipeline.
@@ -251,12 +258,12 @@ class rs2wrapper : public rs2args
     void configure_stream(const std::string &device_sn,
                           const stream_config &stream_config_color,
                           const stream_config &stream_config_depth);
-    void save_color_stream(const std::string &device_sn,
-                           const rs2::frameset &frameset,
-                           rs2_metadata_type &timestamp);
-    void save_depth_stream(const std::string &device_sn,
-                           const rs2::frameset &frameset,
-                           rs2_metadata_type &timestamp);
+    void process_color_stream(const std::string &device_sn,
+                              const rs2::frameset &frameset,
+                              rs2_metadata_type &timestamp);
+    void process_depth_stream(const std::string &device_sn,
+                              const rs2::frameset &frameset,
+                              rs2_metadata_type &timestamp);
 
     void query_timestamp_mode(const std::string &device_sn);
     void save_timestamp(const std::string &device_sn,
@@ -306,6 +313,7 @@ public:
      * @param output_msg Output message for debugging.
      */
     void step(std::string &output_msg);
+    void step(const std::string &device_sn);
 
     /**
      * @brief Stops the devices through rs2::pipeline
@@ -317,8 +325,8 @@ public:
     void reset();
     void reset(const std::string &device_sn);
 
-    void reset_device_with_frozen_timestamp();
-    void reset_device_with_frozen_timestamp(const std::string &device_sn);
+    void reset_with_high_reset_counter();
+    void reset_with_high_reset_counter(const std::string &device_sn);
 
     /**
      * @brief Saves the camera calibration data.
