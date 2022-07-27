@@ -25,14 +25,18 @@ std::string pad_zeros(const std::string &in_str, const size_t &num_zeros);
 
 std::int64_t get_timestamp_duration_ns(const std::chrono::steady_clock::time_point &timestamp_start);
 
-// https://stackoverflow.com/questions/865668/parsing-command-line-arguments-in-c
+/**
+ * @brief parses in put arguments.
+ *
+ * Taken from: https://stackoverflow.com/questions/865668/parsing-command-line-arguments-in-c
+ *
+ */
 class argparser
 {
-private:
     std::vector<std::string> tokens;
 
 public:
     argparser(int &argc, char **argv);
-    std::string get_option(const std::string &option);
-    bool option_exist(const std::string &option);
+    std::string get(const std::string &option);
+    bool check(const std::string &option);
 };

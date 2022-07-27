@@ -33,12 +33,30 @@ void inthand(int signum)
 
 int main(int argc, char *argv[])
 {
+    argparser args(argc, argv);
 
-    if (argc != 7 && argc != 8)
     {
-        std::cerr << "Please enter steps, fps, height, width, color format, depth format, save path, {ipaddress}" << std::endl;
-        std::cerr << "There should be 7 or 8 arguments" << std::endl;
-        return EXIT_FAILURE;
+        std::vector<std::string> args_list{
+            "--fps",
+            "--height",
+            "--width",
+            "--color-format",
+            "--depth-format",
+            "--save-path",
+            // "--ip",
+        };
+        for (auto &&arg : args_list)
+        {
+            if (!args.check(arg))
+            {
+                print(arg + " is missing", 2);
+                return EXIT_FAILURE;
+            }
+        }
+        if (!args.check("--ip"))
+        {
+            print("--ip is not used", 1);
+        }
     }
 
     signal(SIGINT, inthand);

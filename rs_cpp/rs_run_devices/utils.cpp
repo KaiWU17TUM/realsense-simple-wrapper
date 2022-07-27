@@ -34,7 +34,7 @@ argparser::argparser(int &argc, char **argv)
         tokens.push_back(std::string(argv[i]));
 }
 
-std::string argparser::get_option(const std::string &option)
+std::string argparser::get(const std::string &option)
 {
     std::vector<std::string>::const_iterator itr;
     itr = std::find(tokens.begin(), tokens.end(), option);
@@ -46,7 +46,7 @@ std::string argparser::get_option(const std::string &option)
     return empty_string;
 }
 
-bool argparser::option_exist(const std::string &option)
+bool argparser::check(const std::string &option)
 {
     return std::find(tokens.begin(), tokens.end(), option) != tokens.end();
 }
