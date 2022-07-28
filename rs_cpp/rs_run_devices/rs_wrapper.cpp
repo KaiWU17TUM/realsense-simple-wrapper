@@ -348,9 +348,10 @@ void rs2wrapper::step(const std::string &device_sn)
                         reset_flags[device_sn] = true;
                         auto _msg =
                             e.get_failed_function() +
-                            "(" + e.get_failed_args() + "):\n    " +
+                            "(" + e.get_failed_args() + "): " +
                             e.what();
                         print(_msg, 2);
+                        return;
                     }
                 }
                 else if (stream.stream_type() == RS2_STREAM_DEPTH)
@@ -366,9 +367,10 @@ void rs2wrapper::step(const std::string &device_sn)
                         reset_flags[device_sn] = true;
                         auto _msg =
                             e.get_failed_function() +
-                            "(" + e.get_failed_args() + "):\n    " +
+                            "(" + e.get_failed_args() + "): " +
                             e.what();
                         print(_msg, 2);
+                        return;
                     }
                 }
             }
