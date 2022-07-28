@@ -20,8 +20,8 @@
 #include <signal.h>
 
 // #include <tclap/CmdLine.h>
-#include "utils.h"
-#include "rs_wrapper.h"
+#include "utils.hpp"
+#include "rs_wrapper.hpp"
 
 volatile sig_atomic_t stop;
 

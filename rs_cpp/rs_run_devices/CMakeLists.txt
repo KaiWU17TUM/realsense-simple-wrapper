@@ -7,9 +7,9 @@ project(RealsenseWrapperRunDevices)
 
 add_executable(rs_run_devices 
                rs_run_devices.cpp 
-               rs_wrapper.h 
+               rs_wrapper.hpp 
                rs_wrapper.cpp 
-               utils.h
+               utils.hpp 
                utils.cpp)
 set_property(TARGET rs_run_devices PROPERTY CXX_STANDARD 11)
 target_link_libraries(rs_run_devices ${DEPENDENCIES} realsense2 realsense2-net)
