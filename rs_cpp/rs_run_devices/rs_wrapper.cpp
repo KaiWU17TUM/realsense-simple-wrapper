@@ -300,13 +300,17 @@ void rs2wrapper::step()
         for (auto &&device_sn : enabled_devices_sn)
         {
             step(device_sn);
+            reset_with_high_reset_counter(device_sn);
             // In case a device is not sending anything at all. (empty frame)
-            if (empty_frame_check_counter[device_sn] > 5000000000)
+            if (empty_frame_check_counter[device_sn] > 3000000000)
+            {
+                reset(device_sn);
                 break;
+            }
         }
     }
 
-    reset_with_high_reset_counter();
+    // reset_with_high_reset_counter();
 }
 
 void rs2wrapper::step(const std::string &device_sn)
@@ -452,14 +456,14 @@ void rs2wrapper::reset_with_high_reset_counter(const std::string &device_sn)
 
     if (reset_flags[device_sn])
     {
-        if (enabled_devices[device_sn]->color_reset_counter > 3 * fps())
+        if (enabled_devices[device_sn]->color_reset_counter > max_reset_counter)
         {
             print("Reset " + device_sn + " due to high color stream reset counter", 1);
             reset(device_sn);
             enabled_devices[device_sn]->color_reset_counter = 0;
             enabled_devices[device_sn]->depth_reset_counter = 0;
         }
-        if (enabled_devices[device_sn]->depth_reset_counter > 3 * fps())
+        if (enabled_devices[device_sn]->depth_reset_counter > max_reset_counter)
         {
             print("Reset " + device_sn + " due to high depth stream reset counter", 1);
             reset(device_sn);

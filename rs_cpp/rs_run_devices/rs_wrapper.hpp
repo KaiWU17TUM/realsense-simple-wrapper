@@ -135,6 +135,7 @@ class rs2wrapper : public rs2args
     // [INTERNAL] --------------------------------------------------------------
     // Reset frozen devices
     std::map<std::string, bool> reset_flags;
+    int max_reset_counter = 3 * fps();
     // Output message
     std::vector<std::pair<std::string, std::string>> output_msg_list;
     // Frame check

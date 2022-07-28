@@ -95,7 +95,7 @@ int main(int argc, char *argv[])
             if (i % rs2_dev.fps() == 0)
                 print("Step " + i_str + "   " + o_str, 0);
 
-            if (i % (rs2_dev.fps() * 60 * reset_interval) == 0)
+            if (i % (rs2_dev.fps() * reset_interval) == 0)
             {
                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
                 print("Pause for 100ms ...", 1);
