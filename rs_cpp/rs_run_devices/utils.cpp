@@ -28,10 +28,18 @@ std::int64_t get_timestamp_duration_ns(const std::chrono::steady_clock::time_poi
     return timestamp_diff;
 }
 
+argparser::argparser()
+{
+}
+
 argparser::argparser(int argc, char *argv[])
 {
     for (int i = 1; i < argc; ++i)
         args.push_back(std::string(argv[i]));
+}
+
+argparser::~argparser()
+{
 }
 
 std::string argparser::getarg(const std::string &option)
@@ -58,5 +66,6 @@ void argparser::printout()
     std::cout << "========================================" << std::endl;
     for (int i = 0; i < args.size(); i += 2)
         print(args[i] + "  " + args[i + 1], 1);
-    std::cout << "========================================\n" << std::endl;
+    std::cout << "========================================\n"
+              << std::endl;
 }

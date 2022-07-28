@@ -70,6 +70,7 @@ int main(int argc, char *argv[])
     {
         rs2::context ctx;
         rs2wrapper rs2_dev(argc, argv, ctx);
+        rs2args rs2_arg = rs2_dev.get_args();
 
         std::vector<std::string> available_devices_sn = rs2_dev.get_available_devices_sn();
         if (available_devices_sn.size() == 0)
@@ -77,7 +78,7 @@ int main(int argc, char *argv[])
 
         rs2_dev.initialize(true, true);
         rs2_dev.save_calib();
-        rs2_dev.flush_frames(rs2_dev.flush_steps());
+        rs2_dev.flush_frames(rs2_arg.flush_steps());
 
         int num_zeros_to_pad = 16;
         int dev_reset_loop = 0;
@@ -94,10 +95,10 @@ int main(int argc, char *argv[])
             rs2_dev.step();
             o_str += rs2_dev.get_output_msg();
 
-            if (i % rs2_dev.fps() == 0)
+            if (i % rs2_arg.fps() == 0)
                 print("Step " + i_str + "   " + o_str, 0);
 
-            if (i % (rs2_dev.fps() * rs2_dev.reset_interval()) == 0)
+            if (i % (rs2_arg.fps() * rs2_arg.reset_interval()) == 0)
             {
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
                 print("Pause for 10ms ...", 1);
@@ -105,7 +106,7 @@ int main(int argc, char *argv[])
                 dev_reset_loop = (dev_reset_loop + 1) % enabled_devices_sn.size();
             }
 
-            if (i >= rs2_dev.steps())
+            if (i >= rs2_arg.steps())
                 break;
             else
                 i++;

@@ -101,8 +101,11 @@ public:
  * @brief Wrapper class for the librealsense library to run a realsense device.
  *
  */
-class rs2wrapper : public rs2args
+class rs2wrapper
 {
+    // Args from CLI
+    rs2args args;
+
     // Device data
     std::shared_ptr<rs2::context> ctx;
     std::vector<std::string> available_devices_sn;
@@ -287,6 +290,21 @@ public:
                       const int &num_frames = 30);
 
     /**
+     * @brief resets the global timestamp start
+     *
+     */
+    void reset_global_timestamp();
+
+    /**
+     * @brief Set functions to change member variables.
+     *
+     */
+    void set_color_stream_config(const int &width, const int &height,
+                                 const int &fps, const rs2_format &format);
+    void set_depth_stream_config(const int &width, const int &height,
+                                 const int &fps, const rs2_format &format);
+
+    /**
      * @brief Get functions to expose member variables.
      *
      */
@@ -295,7 +313,7 @@ public:
     std::vector<std::string> get_available_devices_sn();
     std::map<std::string, std::shared_ptr<device>> get_enabled_devices();
     std::vector<std::string> get_enabled_devices_sn();
-    void reset_global_timestamp();
+    rs2args get_args();
 };
 
 #endif

@@ -20,12 +20,22 @@ class rs2args : public argparser
 
 public:
     /**
+     * @brief Construct a new rs2args object (empty)
+     *
+     */
+    rs2args();
+    /**
      * @brief Construct a new rs2args object
      *
      * @param argc Number of arguments.
      * @param argv Arguments in an array of char*.
      */
     rs2args(int argc, char *argv[]);
+    /**
+     * @brief Destroy the rs2args object
+     *
+     */
+    ~rs2args();
     /**
      * @brief Steps to run the realsense device.
      *
@@ -83,14 +93,14 @@ public:
     bool network();
     /**
      * @brief steps to flush initial frames.
-     * 
-     * @return int 
+     *
+     * @return int
      */
     int flush_steps();
     /**
      * @brief interval to reset pipeline.
-     * 
-     * @return int 
+     *
+     * @return int
      */
     int reset_interval();
     /**

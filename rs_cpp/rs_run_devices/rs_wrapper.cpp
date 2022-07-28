@@ -99,27 +99,31 @@ void storagepaths::show()
 rs2wrapper::rs2wrapper(int argc,
                        char *argv[],
                        rs2::context context,
-                       std::string device_sn) : rs2args(argc, argv)
+                       std::string device_sn)
 {
-    // prints out CLI args
-    print_args();
+    // CLI args
+    args = rs2args(argc, argv);
 
+    // prints out CLI args
+    args.print_args();
+
+    // if arg is given, we use only one rs device
     single_device_sn = device_sn;
 
     // context grabs the usb resources of the cameras.
     ctx = std::make_shared<rs2::context>(context);
 
     // Get available devices
-    if (network())
+    if (args.network())
     {
         print("Network mode", 0);
-        rs2::net_device dev(ip());
+        rs2::net_device dev(args.ip());
         print("Network device found", 0);
         dev.add_to(*ctx);
         auto serial = dev.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER);
         std::vector<std::string> available_device;
         available_device.push_back(serial);
-        available_device.push_back(ip());
+        available_device.push_back(args.ip());
         available_devices.push_back(available_device);
         print("using : " + std::string(serial), 0);
     }
@@ -165,23 +169,15 @@ rs2wrapper::rs2wrapper(int argc,
     for (auto &&device_sn : available_devices_sn)
     {
         storagepaths _storagepaths;
-        _storagepaths.create(device_sn, save_path());
+        _storagepaths.create(device_sn, args.save_path());
         storagepaths_perdev[device_sn] = _storagepaths;
     }
 
     // stream
-    {
-        stream_config_color.stream_type = RS2_STREAM_COLOR;
-        stream_config_color.width = width();
-        stream_config_color.height = height();
-        stream_config_color.format = color_format();
-        stream_config_color.framerate = fps();
-        stream_config_depth.stream_type = RS2_STREAM_DEPTH;
-        stream_config_depth.width = width();
-        stream_config_depth.height = height();
-        stream_config_depth.format = depth_format();
-        stream_config_depth.framerate = fps();
-    }
+    set_color_stream_config(args.width(), args.height(), args.fps(),
+                            args.color_format());
+    set_depth_stream_config(args.width(), args.height(), args.fps(),
+                            args.depth_format());
 }
 
 void rs2wrapper::initialize(const bool &enable_ir_emitter,
@@ -211,7 +207,7 @@ void rs2wrapper::initialize(const std::string &device_sn,
     // 2. configure
     configure_stream(device_sn, stream_config_color, stream_config_depth);
     rs2::config cfg = rs_cfg[device_sn];
-    if (!network())
+    if (!args.network())
         cfg.enable_device(std::string(device_sn));
     bool check = cfg.can_resolve(pipe);
     if (check)
@@ -524,8 +520,8 @@ void rs2wrapper::save_calib(const std::string &device_sn)
         << rs2_distortion_to_string(intr_color.model) << ",";
     for (auto &&value : intr_color.coeffs)
         csv << value << ",";
-    csv << color_format() << ","
-        << fps() << ",";
+    csv << args.color_format() << ","
+        << args.fps() << ",";
     csv << "\n";
 
     csv << intr_depth.width << ","
@@ -537,8 +533,8 @@ void rs2wrapper::save_calib(const std::string &device_sn)
         << rs2_distortion_to_string(intr_depth.model) << ",";
     for (auto &&value : intr_depth.coeffs)
         csv << value << ",";
-    csv << depth_format() << ","
-        << fps() << ",";
+    csv << args.depth_format() << ","
+        << args.fps() << ",";
     csv << "\n";
 
     for (auto &&value : extr.rotation)
@@ -584,6 +580,31 @@ void rs2wrapper::flush_frames(const std::string &device_sn,
     print(device_sn + " Flushed " + std::to_string(num_frames) + " initial frames...", 0);
 }
 
+void rs2wrapper::reset_global_timestamp()
+{
+    this->global_timestamp_start = std::chrono::steady_clock::now();
+}
+
+void rs2wrapper::set_color_stream_config(const int &width, const int &height,
+                                         const int &fps, const rs2_format &format)
+{
+    stream_config_color.stream_type = RS2_STREAM_COLOR;
+    stream_config_color.width = width;
+    stream_config_color.height = height;
+    stream_config_color.format = format;
+    stream_config_color.framerate = fps;
+}
+
+void rs2wrapper::set_depth_stream_config(const int &width, const int &height,
+                                         const int &fps, const rs2_format &format)
+{
+    stream_config_depth.stream_type = RS2_STREAM_DEPTH;
+    stream_config_depth.width = width;
+    stream_config_depth.height = height;
+    stream_config_depth.format = format;
+    stream_config_depth.framerate = fps;
+}
+
 std::string rs2wrapper::get_output_msg()
 {
     std::string output_msg;
@@ -613,9 +634,9 @@ std::vector<std::string> rs2wrapper::get_enabled_devices_sn()
     return this->enabled_devices_sn;
 }
 
-void rs2wrapper::reset_global_timestamp()
+rs2args rs2wrapper::get_args()
 {
-    this->global_timestamp_start = std::chrono::steady_clock::now();
+    return this->args;
 }
 
 /*******************************************************************************
@@ -623,7 +644,7 @@ void rs2wrapper::reset_global_timestamp()
  ******************************************************************************/
 rs2::pipeline rs2wrapper::initialize_pipeline(const std::shared_ptr<rs2::context> context)
 {
-    if (network())
+    if (args.network())
     {
         rs2::pipeline pipe(*ctx);
         return pipe;
@@ -798,7 +819,8 @@ void rs2wrapper::print_camera_infos(const std::shared_ptr<rs2::pipeline_profile>
     {
         std::cout << "not available, " << e.what() << std::endl;
     }
-    std::cout << "========================================\n" << std::endl;
+    std::cout << "========================================\n"
+              << std::endl;
 }
 
 void rs2wrapper::print_camera_temperature(const std::string &device_sn)

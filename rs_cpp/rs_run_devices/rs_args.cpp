@@ -1,6 +1,14 @@
 #include "rs_args.hpp"
 
+rs2args::rs2args() : argparser()
+{
+}
+
 rs2args::rs2args(int argc, char *argv[]) : argparser(argc, argv)
+{
+}
+
+rs2args::~rs2args()
 {
 }
 

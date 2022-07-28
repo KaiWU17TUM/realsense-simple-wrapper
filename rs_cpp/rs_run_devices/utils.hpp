@@ -39,7 +39,9 @@ class argparser
     std::vector<std::string> args;
 
 public:
+    argparser();
     argparser(int argc, char **argv);
+    ~argparser();
     std::string getarg(const std::string &option);
     bool checkarg(const std::string &option);
     void printout();
