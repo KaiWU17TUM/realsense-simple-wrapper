@@ -105,7 +105,7 @@ int main(int argc, char *argv[])
                 dev_reset_loop = (dev_reset_loop + 1) % enabled_devices_sn.size();
             }
 
-            if (i >= rs2_dev.fps() * rs2_dev.steps())
+            if (i >= rs2_dev.steps())
                 break;
             else
                 i++;

@@ -347,6 +347,7 @@ void rs2wrapper::step(const std::string &device_sn)
                         dev->color_reset_counter += 1;
                         reset_flags[device_sn] = true;
                         auto _msg =
+                            device_sn + " " +
                             e.get_failed_function() +
                             "(" + e.get_failed_args() + "): " +
                             e.what();
