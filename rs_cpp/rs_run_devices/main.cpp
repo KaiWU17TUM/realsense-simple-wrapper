@@ -99,8 +99,8 @@ int main(int argc, char *argv[])
 
             if (i % (rs2_dev.fps() * reset_interval) == 0)
             {
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
-                print("Pause for 100ms ...", 1);
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                print("Pause for 10ms ...", 1);
                 rs2_dev.reset(available_devices_sn[dev_reset_loop]);
                 dev_reset_loop = (dev_reset_loop + 1) % enabled_devices_sn.size();
             }

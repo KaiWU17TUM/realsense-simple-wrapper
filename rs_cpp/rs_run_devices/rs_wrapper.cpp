@@ -302,8 +302,8 @@ void rs2wrapper::step()
             step(device_sn);
             reset_with_high_reset_counter(device_sn);
             // In case a device is not sending anything at all.
-            // empty frame for 3 seconds.
-            if (empty_frame_check_counter[device_sn] > 3000000000)
+            // empty frame for 1 seconds.
+            if (empty_frame_check_counter[device_sn] > 1000000000)
             {
                 reset(device_sn);
                 break;
@@ -366,6 +366,7 @@ void rs2wrapper::step(const std::string &device_sn)
                         dev->depth_reset_counter += 1;
                         reset_flags[device_sn] = true;
                         auto _msg =
+                            device_sn + " " +
                             e.get_failed_function() +
                             "(" + e.get_failed_args() + "): " +
                             e.what();
@@ -438,7 +439,7 @@ void rs2wrapper::reset(const std::string &device_sn)
     }
 
     stop(device_sn);
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
     start(device_sn);
     print(device_sn + " pipeline has been restarted...", 0);
 }
