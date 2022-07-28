@@ -579,8 +579,8 @@ void rs2wrapper::flush_frames(const std::string &device_sn,
 std::string rs2wrapper::get_output_msg()
 {
     std::string output_msg;
-    std::sort(output_msg_list.begin(), output_msg_list.end());
-    for (auto &&_output_msg : output_msg_list)
+    std::sort(this->output_msg_list.begin(), this->output_msg_list.end());
+    for (auto &&_output_msg : this->output_msg_list)
         output_msg += _output_msg.second;
     return output_msg;
 }
@@ -603,6 +603,11 @@ std::map<std::string, std::shared_ptr<device>> rs2wrapper::get_enabled_devices()
 std::vector<std::string> rs2wrapper::get_enabled_devices_sn()
 {
     return this->enabled_devices_sn;
+}
+
+void rs2wrapper::reset_global_timestamp()
+{
+    this->global_timestamp_start = std::chrono::steady_clock::now();
 }
 
 /*******************************************************************************

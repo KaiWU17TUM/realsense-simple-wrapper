@@ -83,6 +83,8 @@ int main(int argc, char *argv[])
         int reset_interval = std::stoi(rs2_dev.getarg("--reset-interval"));
         std::vector<std::string> enabled_devices_sn = rs2_dev.get_enabled_devices_sn();
 
+        rs2_dev.reset_global_timestamp();
+
         int i = 1;
         while (!stop)
         {

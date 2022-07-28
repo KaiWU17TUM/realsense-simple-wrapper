@@ -295,6 +295,7 @@ public:
     std::vector<std::string> get_available_devices_sn();
     std::map<std::string, std::shared_ptr<device>> get_enabled_devices();
     std::vector<std::string> get_enabled_devices_sn();
+    void reset_global_timestamp();
 };
 
 #endif
