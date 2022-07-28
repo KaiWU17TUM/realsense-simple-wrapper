@@ -44,9 +44,10 @@ int main(int argc, char *argv[])
             "--color-format",
             "--depth-format",
             "--save-path",
-            "--reset-interval",
         };
         std::vector<std::string> OPTIONAL_ARGS{
+            "--reset-interval",
+            "--flush-steps",
             "--ip",
         };
         for (auto &&arg : REQUIRED_ARGS)
@@ -76,11 +77,10 @@ int main(int argc, char *argv[])
 
         rs2_dev.initialize(true, true);
         rs2_dev.save_calib();
-        rs2_dev.flush_frames();
+        rs2_dev.flush_frames(rs2_dev.flush_steps());
 
         int num_zeros_to_pad = 16;
         int dev_reset_loop = 0;
-        int reset_interval = std::stoi(rs2_dev.getarg("--reset-interval"));
         std::vector<std::string> enabled_devices_sn = rs2_dev.get_enabled_devices_sn();
 
         rs2_dev.reset_global_timestamp();
@@ -97,7 +97,7 @@ int main(int argc, char *argv[])
             if (i % rs2_dev.fps() == 0)
                 print("Step " + i_str + "   " + o_str, 0);
 
-            if (i % (rs2_dev.fps() * reset_interval) == 0)
+            if (i % (rs2_dev.fps() * rs2_dev.reset_interval()) == 0)
             {
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
                 print("Pause for 10ms ...", 1);

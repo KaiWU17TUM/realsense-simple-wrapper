@@ -769,7 +769,7 @@ void rs2wrapper::process_depth_stream(const std::string &device_sn,
 
 void rs2wrapper::print_camera_infos(const std::shared_ptr<rs2::pipeline_profile> profile)
 {
-    std::cout << "========================================" << std::endl;
+    std::cout << "\n========================================" << std::endl;
     std::cout << ">>>>> RS2_CAMERA_INFO <<<<<" << std::endl;
     std::cout << "========================================" << std::endl;
     std::cout << "Name          : " << profile->get_device().get_info(RS2_CAMERA_INFO_NAME) << std::endl;
@@ -798,7 +798,7 @@ void rs2wrapper::print_camera_infos(const std::shared_ptr<rs2::pipeline_profile>
     {
         std::cout << "not available, " << e.what() << std::endl;
     }
-    std::cout << "========================================" << std::endl;
+    std::cout << "========================================\n" << std::endl;
 }
 
 void rs2wrapper::print_camera_temperature(const std::string &device_sn)

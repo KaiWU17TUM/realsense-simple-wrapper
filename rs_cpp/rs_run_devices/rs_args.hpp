@@ -82,6 +82,18 @@ public:
      */
     bool network();
     /**
+     * @brief steps to flush initial frames.
+     * 
+     * @return int 
+     */
+    int flush_steps();
+    /**
+     * @brief interval to reset pipeline.
+     * 
+     * @return int 
+     */
+    int reset_interval();
+    /**
      * @brief prints out the raw arguments.
      *
      */

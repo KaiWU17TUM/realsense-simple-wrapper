@@ -53,10 +53,10 @@ bool argparser::checkarg(const std::string &option)
 
 void argparser::printout()
 {
-    std::cout << "========================================" << std::endl;
+    std::cout << "\n========================================" << std::endl;
     std::cout << ">>>>> rs2args <<<<<" << std::endl;
     std::cout << "========================================" << std::endl;
     for (int i = 0; i < args.size(); i += 2)
         print(args[i] + "  " + args[i + 1], 1);
-    std::cout << "========================================" << std::endl;
+    std::cout << "========================================\n" << std::endl;
 }

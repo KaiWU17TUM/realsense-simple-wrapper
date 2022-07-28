@@ -58,6 +58,22 @@ bool rs2args::network()
         return false;
 }
 
+int rs2args::flush_steps()
+{
+    if (checkarg("--flush-steps"))
+        return std::stoi(getarg("--flush-steps"));
+    else
+        return 30;
+}
+
+int rs2args::reset_interval()
+{
+    if (checkarg("--reset-interval"))
+        return std::stoi(getarg("--reset-interval"));
+    else
+        return 120;
+}
+
 void rs2args::print_args()
 {
     printout();
