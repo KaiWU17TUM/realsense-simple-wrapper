@@ -301,7 +301,8 @@ void rs2wrapper::step()
         {
             step(device_sn);
             reset_with_high_reset_counter(device_sn);
-            // In case a device is not sending anything at all. (empty frame)
+            // In case a device is not sending anything at all.
+            // empty frame for 3 seconds.
             if (empty_frame_check_counter[device_sn] > 3000000000)
             {
                 reset(device_sn);
@@ -323,6 +324,9 @@ void rs2wrapper::step(const std::string &device_sn)
 
     std::shared_ptr<device> dev = enabled_devices[device_sn];
     std::vector<rs2::stream_profile> streams = dev->pipeline_profile->get_streams();
+
+    std::chrono::steady_clock::time_point local_timestamp_start = std::chrono::steady_clock::now();
+
     if (dev->pipeline->poll_for_frames(&frameset))
     {
         if (frameset.size() == streams.size())
@@ -388,8 +392,8 @@ void rs2wrapper::step(const std::string &device_sn)
     }
     else
     {
-        std::int64_t global_timestamp_diff = get_timestamp_duration_ns(global_timestamp_start);
-        empty_frame_check_counter[device_sn] += global_timestamp_diff;
+        std::int64_t local_timestamp_diff = get_timestamp_duration_ns(local_timestamp_start);
+        empty_frame_check_counter[device_sn] += local_timestamp_diff;
     }
 }
 
