@@ -10,7 +10,7 @@
  * @param msg message to be printed
  * @param mode which tags to use
  */
-void print(const std::string &msg, int mode = 0);
+void print(const std::string &msg, const int &mode = 0);
 
 /**
  * @brief pads a string with zeros.

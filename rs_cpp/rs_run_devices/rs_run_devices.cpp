@@ -44,9 +44,9 @@ int main(int argc, char *argv[])
             "--color-format",
             "--depth-format",
             "--save-path",
+            "--reset-interval",
         };
         std::vector<std::string> OPTIONAL_ARGS{
-            "--reset-interval",
             "--ip",
         };
         for (auto &&arg : REQUIRED_ARGS)

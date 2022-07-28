@@ -1,6 +1,6 @@
 #include "utils.h"
 
-void print(const std::string &msg, int mode)
+void print(const std::string &msg, const int &mode)
 {
     if (mode == 0)
         std::cout << "[INFO] : " << msg << std::endl;
