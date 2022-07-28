@@ -1,3 +1,6 @@
+#ifndef UTILS_HPP
+#define UTILS_HPP
+
 #include <iostream>
 #include <chrono>
 #include <thread>
@@ -10,7 +13,7 @@
  * @param msg message to be printed
  * @param mode which tags to use
  */
-void print(const std::string &msg, const int &mode = 0);
+void print(const std::string &msg, const int &mode);
 
 /**
  * @brief pads a string with zeros.
@@ -41,3 +44,5 @@ public:
     bool checkarg(const std::string &option);
     void printout();
 };
+
+#endif

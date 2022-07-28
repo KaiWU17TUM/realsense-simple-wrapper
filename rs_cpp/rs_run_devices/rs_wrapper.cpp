@@ -1,5 +1,4 @@
-#include "utils.h"
-#include "rs_wrapper.h"
+#include "rs_wrapper.hpp"
 
 // doesnt work in the class init.
 rs2::align align_to_depth(RS2_STREAM_DEPTH);
@@ -114,7 +113,7 @@ rs2wrapper::rs2wrapper(int argc,
     if (network())
     {
         print("Network mode", 0);
-        rs2::net_device dev((std::string)ip());
+        rs2::net_device dev(ip());
         print("Network device found", 0);
         dev.add_to(*ctx);
         auto serial = dev.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER);
@@ -122,7 +121,7 @@ rs2wrapper::rs2wrapper(int argc,
         available_device.push_back(serial);
         available_device.push_back(ip());
         available_devices.push_back(available_device);
-        print("using : " + std::string(serial));
+        print("using : " + std::string(serial), 0);
     }
     else
     {
@@ -137,7 +136,7 @@ rs2wrapper::rs2wrapper(int argc,
                 available_device.push_back(serial);
                 available_device.push_back(product_line);
                 available_devices.push_back(available_device);
-                print("found : " + std::string(serial));
+                print("found : " + std::string(serial), 0);
             }
         }
         else
@@ -146,7 +145,7 @@ rs2wrapper::rs2wrapper(int argc,
             available_device.push_back(single_device_sn.c_str());
             available_device.push_back("D400");
             available_devices.push_back(available_device);
-            print("using : " + std::string(single_device_sn.c_str()));
+            print("using : " + std::string(single_device_sn.c_str()), 0);
         }
     }
 
@@ -248,7 +247,7 @@ void rs2wrapper::initialize(const std::string &device_sn,
         if (dev->depth_sensor->supports(RS2_OPTION_EMITTER_ENABLED))
         {
             // TODO: add arg for this.
-            dev->depth_sensor->set_option(RS2_OPTION_EMITTER_ENABLED, 1);
+            dev->depth_sensor->set_option(RS2_OPTION_EMITTER_ENABLED, 0);
             print("ir emitter enabled...", 0);
         }
     }
@@ -455,14 +454,14 @@ void rs2wrapper::reset_with_high_reset_counter(const std::string &device_sn)
     {
         if (enabled_devices[device_sn]->color_reset_counter > 3 * fps())
         {
-            print("Reset " + device_sn + " due to high color stream reset counter");
+            print("Reset " + device_sn + " due to high color stream reset counter", 1);
             reset(device_sn);
             enabled_devices[device_sn]->color_reset_counter = 0;
             enabled_devices[device_sn]->depth_reset_counter = 0;
         }
         if (enabled_devices[device_sn]->depth_reset_counter > 3 * fps())
         {
-            print("Reset " + device_sn + " due to high depth stream reset counter");
+            print("Reset " + device_sn + " due to high depth stream reset counter", 1);
             reset(device_sn);
             enabled_devices[device_sn]->color_reset_counter = 0;
             enabled_devices[device_sn]->depth_reset_counter = 0;
@@ -627,17 +626,17 @@ void rs2wrapper::query_timestamp_mode(const std::string &device_sn)
         {
             if (vf.supports_frame_metadata(RS2_FRAME_METADATA_SENSOR_TIMESTAMP))
             {
-                print("using RS2_FRAME_METADATA_SENSOR_TIMESTAMP");
+                print("using RS2_FRAME_METADATA_SENSOR_TIMESTAMP", 0);
                 timestamp_mode = RS2_FRAME_METADATA_SENSOR_TIMESTAMP;
             }
             else if (vf.supports_frame_metadata(RS2_FRAME_METADATA_FRAME_TIMESTAMP))
             {
-                print("using RS2_FRAME_METADATA_FRAME_TIMESTAMP");
+                print("using RS2_FRAME_METADATA_FRAME_TIMESTAMP", 0);
                 timestamp_mode = RS2_FRAME_METADATA_FRAME_TIMESTAMP;
             }
             else if (vf.supports_frame_metadata(RS2_FRAME_METADATA_TIME_OF_ARRIVAL))
             {
-                print("using RS2_FRAME_METADATA_TIME_OF_ARRIVAL");
+                print("using RS2_FRAME_METADATA_TIME_OF_ARRIVAL", 0);
                 timestamp_mode = RS2_FRAME_METADATA_FRAME_TIMESTAMP;
             }
             break;

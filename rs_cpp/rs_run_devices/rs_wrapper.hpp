@@ -1,3 +1,6 @@
+#ifndef RS_WRAPPER_HPP
+#define RS_WRAPPER_HPP
+
 // Based on : librealsense/examples/save-to-disk/rs-save-to-disk.cpp
 
 // License: Apache 2.0. See LICENSE file in root directory.
@@ -20,6 +23,9 @@
 #include <fstream>  // File IO
 #include <iostream> // Terminal IO
 #include <sstream>  // Stringstreams
+
+#include "utils.hpp"
+#include "rs_args.hpp"
 
 /**
  * @brief Save raw frame data into a binary file.
@@ -58,6 +64,10 @@ struct device
     int camera_temp_printout_counter = -1;
 };
 
+/**
+ * @brief Configs needed for rs stream.
+ *
+ */
 struct stream_config
 {
     rs2_stream stream_type = RS2_STREAM_COLOR; // RS2_STREAM_DEPTH;
@@ -67,6 +77,10 @@ struct stream_config
     int framerate = 30;
 };
 
+/**
+ * @brief Storage paths to save data.
+ *
+ */
 class storagepaths
 {
 public:
@@ -81,117 +95,6 @@ public:
     void create(const std::string &device_sn,
                 const std::string &base_path);
     void show();
-};
-
-/**
- * @brief Class that contains the arguments for the rs2wrapper class.
- *
- */
-class rs2args : public argparser
-{
-
-    std::map<std::string, rs2_format> _SUPPORTED_FORMATS{
-        {"z16", RS2_FORMAT_Z16},
-        {"bgr8", RS2_FORMAT_BGR8},
-        {"rgb8", RS2_FORMAT_RGB8},
-        {"yuyv", RS2_FORMAT_YUYV}};
-
-public:
-    /**
-     * @brief Construct a new rs2args object
-     *
-     * @param argc Number of arguments.
-     * @param argv Arguments in an array of char*.
-     */
-    rs2args(int argc, char **argv) : argparser(argc, argv)
-    {
-    }
-    /**
-     * @brief Steps to run the realsense device.
-     *
-     * @return int
-     */
-    int steps()
-    {
-        return std::stoi(getarg("--steps"));
-    }
-    /**
-     * @brief FPS of the realsense device.
-     *
-     * @return int
-     */
-    int fps()
-    {
-        return std::stoi(getarg("--fps"));
-    }
-    /**
-     * @brief Height of the realsense frames.
-     *
-     * @return int
-     */
-    int height()
-    {
-        return std::stoi(getarg("--height"));
-    }
-    /**
-     * @brief Width of the realsense frames.
-     *
-     * @return int
-     */
-    int width()
-    {
-        return std::stoi(getarg("--width"));
-    }
-    rs2_format color_format()
-    {
-        if (_SUPPORTED_FORMATS.count(getarg("--color-format")))
-            return _SUPPORTED_FORMATS[getarg("--color-format")];
-        else
-            throw std::invalid_argument("rs color format unknown");
-    }
-    rs2_format depth_format()
-    {
-        if (_SUPPORTED_FORMATS.count(getarg("--depth-format")))
-            return _SUPPORTED_FORMATS[getarg("--depth-format")];
-        else
-            throw std::invalid_argument("rs depth format unknown");
-    }
-    /**
-     * @brief Path to save the frames.
-     *
-     * @return std::string
-     */
-    std::string save_path()
-    {
-        return getarg("--save-path");
-    }
-    /**
-     * @brief IP address of the remote realsense device (optional).
-     *
-     * @return const char*
-     */
-    const char *ip()
-    {
-        return getarg("--ip").c_str();
-    }
-    /**
-     * @brief Checks whether the realsense device is connected over the network.
-     *
-     * @return true
-     * @return false
-     */
-    bool network()
-    {
-        if (checkarg("--ip"))
-            return true;
-        else
-            return false;
-    }
-
-    void print_args()
-    {
-        printout();
-    }
 };
 
 /**
@@ -249,13 +152,21 @@ class rs2wrapper : public rs2args
     /**
      * @brief configures the rs stream.
      *
-     * @param device_sn
-     * @param stream_config_color
-     * @param stream_config_depth
+     * @param device_sn device serial number.
+     * @param stream_config_color stream config for color.
+     * @param stream_config_depth stream config for depth.
      */
     void configure_stream(const std::string &device_sn,
                           const stream_config &stream_config_color,
                           const stream_config &stream_config_depth);
+
+    /**
+     * @brief processes the color and depth streams.
+     *
+     * @param device_sn device serial number.
+     * @param frameset rs2 frameset object, contains multiple frames.
+     * @param timestamp timestamp from rs.
+     */
     void process_color_stream(const std::string &device_sn,
                               const rs2::frameset &frameset,
                               rs2_metadata_type &timestamp);
@@ -263,12 +174,31 @@ class rs2wrapper : public rs2args
                               const rs2::frameset &frameset,
                               rs2_metadata_type &timestamp);
 
+    /**
+     * @brief query the timestamp mode.
+     *
+     * @param device_sn device serial number.
+     */
     void query_timestamp_mode(const std::string &device_sn);
+
+    /**
+     * @brief saves the timestamp.
+     *
+     * @param device_sn device serial number.
+     * @param global_timestamp global system timestamp. (difference from start)
+     * @param color_timestamp color timestamp from rs.
+     * @param depth_timestamp depth timestamp from rs.
+     */
     void save_timestamp(const std::string &device_sn,
                         const std::int64_t &global_timestamp,
                         const rs2_metadata_type &color_timestamp,
                         const rs2_metadata_type &depth_timestamp);
 
+    /**
+     * @brief print camera infos
+     *
+     * @param profile
+     */
     void print_camera_infos(const std::shared_ptr<rs2::pipeline_profile> profile);
     void print_camera_temperature(const std::string &device_sn);
 
@@ -298,6 +228,10 @@ public:
                     const bool &enable_ir_emitter = true,
                     const bool &verbose = true);
 
+    /**
+     * @brief starts the rs pipeline.
+     *
+     */
     void start();
     void start(const std::string &device_sn);
 
@@ -319,9 +253,17 @@ public:
     void stop();
     void stop(const std::string &device_sn);
 
+    /**
+     * @brief resets the pipeline using stop and start.
+     *
+     */
     void reset();
     void reset(const std::string &device_sn);
 
+    /**
+     * @brief checks and resets if the reset counter gets too high.
+     *
+     */
     void reset_with_high_reset_counter();
     void reset_with_high_reset_counter(const std::string &device_sn);
 
@@ -343,10 +285,15 @@ public:
     void flush_frames(const std::string &device_sn,
                       const int &num_frames = 30);
 
+    /**
+     * @brief Get functions to expose member variables.
+     *
+     */
     std::string get_output_msg();
-
     std::vector<std::vector<std::string>> get_available_devices();
     std::vector<std::string> get_available_devices_sn();
     std::map<std::string, std::shared_ptr<device>> get_enabled_devices();
     std::vector<std::string> get_enabled_devices_sn();
 };
+
+#endif
