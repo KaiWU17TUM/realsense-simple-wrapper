@@ -149,9 +149,8 @@ class rs2wrapper
     /**
      * @brief Initialize the pipeline.
      *
-     * @param ctx rs2::context object.
      */
-    rs2::pipeline initialize_pipeline(const std::shared_ptr<rs2::context> context);
+    rs2::pipeline initialize_pipeline();
 
     /**
      * @brief configures the rs stream.

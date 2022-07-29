@@ -12,13 +12,29 @@
 class rs2args : public argparser
 {
 
+public:
     std::map<std::string, rs2_format> _SUPPORTED_FORMATS{
         {"z16", RS2_FORMAT_Z16},
         {"bgr8", RS2_FORMAT_BGR8},
         {"rgb8", RS2_FORMAT_RGB8},
         {"yuyv", RS2_FORMAT_YUYV}};
 
-public:
+    std::vector<std::string> _REQUIRED_ARGS{
+        "--steps",
+        "--fps",
+        "--height",
+        "--width",
+        "--color-format",
+        "--depth-format",
+        "--save-path",
+    };
+
+    std::vector<std::string> _OPTIONAL_ARGS{
+        "--reset-interval",
+        "--flush-steps",
+        "--ip",
+    };
+
     /**
      * @brief Construct a new rs2args object (empty)
      *
@@ -108,6 +124,7 @@ public:
      *
      */
     void print_args();
+    bool check_rs2args();
 };
 
 #endif

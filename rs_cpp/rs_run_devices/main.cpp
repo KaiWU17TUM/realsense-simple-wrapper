@@ -23,7 +23,7 @@
 #include "utils.hpp"
 #include "rs_wrapper.hpp"
 
-volatile sig_atomic_t stop;
+volatile sig_atomic_t stop = 0;
 
 void inthand(int signum)
 {
@@ -31,41 +31,8 @@ void inthand(int signum)
     print("ctrl + c detected", 1);
 }
 
-int main(int argc, char *argv[])
+bool run(int argc, char *argv[])
 {
-
-    {
-        argparser args(argc, argv);
-        std::vector<std::string> REQUIRED_ARGS{
-            "--steps",
-            "--fps",
-            "--height",
-            "--width",
-            "--color-format",
-            "--depth-format",
-            "--save-path",
-        };
-        std::vector<std::string> OPTIONAL_ARGS{
-            "--reset-interval",
-            "--flush-steps",
-            "--ip",
-        };
-        for (auto &&arg : REQUIRED_ARGS)
-        {
-            if (!args.checkarg(arg))
-            {
-                print(arg + " is missing", 2);
-                return EXIT_FAILURE;
-            }
-        }
-        for (auto &&arg : OPTIONAL_ARGS)
-            if (!args.checkarg(arg))
-                print(arg + " is not used", 1);
-    }
-
-    signal(SIGINT, inthand);
-    stop = 0;
-
     try
     {
         rs2::context ctx;
@@ -128,4 +95,16 @@ int main(int argc, char *argv[])
         std::cerr << e.what() << std::endl;
         return EXIT_FAILURE;
     }
+}
+
+int main(int argc, char *argv[])
+{
+    signal(SIGINT, inthand);
+
+    rs2args args(argc, argv);
+    auto valid_args = args.check_rs2args();
+    if (valid_args == EXIT_FAILURE)
+        return EXIT_FAILURE;
+
+    return run(argc, argv);
 }

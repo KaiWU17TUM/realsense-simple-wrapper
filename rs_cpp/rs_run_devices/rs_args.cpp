@@ -86,3 +86,19 @@ void rs2args::print_args()
 {
     printout();
 }
+
+bool rs2args::check_rs2args()
+{
+    for (auto &&arg : _REQUIRED_ARGS)
+    {
+        if (!checkarg(arg))
+        {
+            print(arg + " is missing", 2);
+            return EXIT_FAILURE;
+        }
+    }
+    for (auto &&arg : _OPTIONAL_ARGS)
+        if (!checkarg(arg))
+            print(arg + " is not used", 1);
+    return EXIT_SUCCESS;
+}

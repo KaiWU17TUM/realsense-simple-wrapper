@@ -111,11 +111,12 @@ rs2wrapper::rs2wrapper(int argc,
     single_device_sn = device_sn;
 
     // context grabs the usb resources of the cameras.
-    ctx = std::make_shared<rs2::context>(context);
+    // ctx = std::make_shared<rs2::context>(context);
 
     // Get available devices
     if (args.network())
     {
+        ctx = std::make_shared<rs2::context>(context);
         print("Network mode", 0);
         rs2::net_device dev(args.ip());
         print("Network device found", 0);
@@ -132,6 +133,7 @@ rs2wrapper::rs2wrapper(int argc,
         print("Local mode", 0);
         if (single_device_sn == "-1")
         {
+            ctx = std::make_shared<rs2::context>(context);
             for (auto &&dev : ctx->query_devices())
             {
                 auto serial = dev.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER);
@@ -201,7 +203,7 @@ void rs2wrapper::initialize(const std::string &device_sn,
     reset_flags[device_sn] = false;
 
     // 1. pipeline
-    rs2::pipeline pipe = initialize_pipeline(ctx);
+    rs2::pipeline pipe = initialize_pipeline();
     dev->pipeline = std::make_shared<rs2::pipeline>(pipe);
 
     // 2. configure
@@ -642,7 +644,7 @@ rs2args rs2wrapper::get_args()
 /*******************************************************************************
  * rs2wrapper PRIVATAE FUNCTIONS
  ******************************************************************************/
-rs2::pipeline rs2wrapper::initialize_pipeline(const std::shared_ptr<rs2::context> context)
+rs2::pipeline rs2wrapper::initialize_pipeline()
 {
     if (args.network())
     {
