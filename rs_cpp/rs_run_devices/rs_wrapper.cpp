@@ -217,9 +217,9 @@ void rs2wrapper::initialize(const std::string &device_sn,
 
     // 3. pipeline start
     start(device_sn);
-    if (verbose)
-        print("pipeline started...", 0);
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    if (verbose)
+        print("pipeline started with 100ms sleep...", 0);
 
     // 4. sensors
     std::vector<rs2::sensor> sensors = dev->pipeline_profile->get_device().query_sensors();
@@ -436,9 +436,9 @@ void rs2wrapper::reset(const std::string &device_sn)
     }
 
     stop(device_sn);
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
     start(device_sn);
-    print(device_sn + " pipeline has been restarted...", 0);
+    print(device_sn + " pipeline has been restarted with 100ms sleep...", 0);
 }
 
 void rs2wrapper::reset_with_high_reset_counter()

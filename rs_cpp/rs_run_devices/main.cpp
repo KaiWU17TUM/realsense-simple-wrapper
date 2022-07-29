@@ -98,10 +98,10 @@ int main(int argc, char *argv[])
             if (i % rs2_arg.fps() == 0)
                 print("Step " + i_str + "   " + o_str, 0);
 
-            if (i % (rs2_arg.fps() * rs2_arg.reset_interval()) == 0)
+            if (i % rs2_arg.reset_interval() == 0)
             {
                 std::this_thread::sleep_for(std::chrono::milliseconds(10));
-                print("Pause for 10ms ...", 1);
+                print("Sleep for 100ms ...", 1);
                 rs2_dev.reset(available_devices_sn[dev_reset_loop]);
                 dev_reset_loop = (dev_reset_loop + 1) % enabled_devices_sn.size();
             }
