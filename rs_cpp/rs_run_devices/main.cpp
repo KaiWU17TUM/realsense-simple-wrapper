@@ -45,7 +45,7 @@ bool run(int argc, char *argv[])
 
         rs2_dev.initialize(true, true);
         rs2_dev.save_calib();
-        rs2_dev.flush_frames(rs2_arg.flush_steps());
+        rs2_dev.flush_frames();
 
         int num_zeros_to_pad = 16;
         int dev_reset_loop = 0;

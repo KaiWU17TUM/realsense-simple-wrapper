@@ -576,10 +576,16 @@ void rs2wrapper::flush_frames(const std::string &device_sn,
         return;
     }
 
+    int _num_frames = 0;
+    if (num_frames == -1)
+        _num_frames = args.flush_steps();
+    else
+        _num_frames = num_frames;
+
     std::shared_ptr<device> dev = enabled_devices[device_sn];
-    for (auto i = 0; i < num_frames; ++i)
+    for (auto i = 0; i < _num_frames; ++i)
         dev->pipeline->wait_for_frames();
-    print(device_sn + " Flushed " + std::to_string(num_frames) + " initial frames...", 0);
+    print(device_sn + " Flushed " + std::to_string(_num_frames) + " initial frames...", 0);
 }
 
 void rs2wrapper::reset_global_timestamp()
