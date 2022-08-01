@@ -32,54 +32,48 @@ void inthand(int signum)
     print("ctrl + c detected", 1);
 }
 
-void multithreading_function(const size_t &thread_id,
-                             const std::string &device_sn,
-                             rs2args rs2_args,
-                             std::shared_ptr<rs2wrapper> rs2_dev)
+void multithreading_function(size_t th_id,
+                             int argc,
+                             char *argv[],
+                             rs2::context context,
+                             std::string device_sn,
+                             size_t num_devices)
 {
-    size_t num_dev = rs2_dev->get_enabled_devices_sn().size();
+    rs2wrapper rs2_dev(argc, argv, context, device_sn);
+    rs2args rs2_arg = rs2_dev.get_args();
+
+    rs2_dev.initialize(true, true);
+    rs2_dev.save_calib();
+    rs2_dev.flush_frames();
+    rs2_dev.reset_global_timestamp();
 
     int i = 1;
     while (!stop)
     {
+        std::string i_str = pad_zeros(std::to_string(i), num_zeros_to_pad);
+        std::string o_str = "";
 
-        while (rs2_dev->step_receiving_frame_from_all_devices())
-        {
-            rs2_dev->step(device_sn);
-            rs2_dev->reset_with_high_reset_counter(device_sn);
-            // In case a device is not sending anything at all.
-            // empty frame for 1 seconds.
-            if (rs2_dev->get_empty_frame_check_counter(device_sn) > 1000000000)
-            {
-                rs2_dev->set_valid_frame_check_flag(device_sn, false);
-                rs2_dev->reset(device_sn);
-            }
-        }
+        rs2_dev.step();
+        o_str += rs2_dev.get_output_msg();
 
-        if (((i + (rs2_args.reset_interval() * thread_id)) %
-             (rs2_args.reset_interval() * num_dev)) ==
+        if (i % rs2_arg.fps() == 0)
+            print("Step " + i_str + "   " + o_str, 0);
+
+        if (((i + (rs2_arg.reset_interval() * th_id)) %
+             (rs2_arg.reset_interval() * num_devices)) ==
             0)
         {
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
             print("Sleep for 10ms ...", 1);
-            rs2_dev->reset(device_sn);
+            rs2_dev.reset(device_sn);
         }
 
-        if (num_dev == thread_id + 1)
-        {
-            std::string i_str = pad_zeros(std::to_string(i), num_zeros_to_pad);
-            std::string o_str = rs2_dev->get_output_msg();
-            if (i % rs2_args.fps() == 0)
-                print("Step " + i_str + "   " + o_str, 0);
-
-            rs2_dev->step_clear();
-        }
-
-        if (i >= rs2_args.steps())
+        if (i >= rs2_arg.steps())
             break;
         else
             i++;
     }
+    rs2_dev.stop();
 }
 
 bool run_multithreading(int argc, char *argv[])
@@ -87,34 +81,33 @@ bool run_multithreading(int argc, char *argv[])
     try
     {
         rs2::context ctx;
-        std::shared_ptr<rs2wrapper> rs2_dev = std::make_shared<rs2wrapper>(argc, argv, ctx);
-        rs2args rs2_arg = rs2_dev->get_args();
+        std::vector<std::string> device_sn_list;
 
-        std::vector<std::string> available_devices_sn = rs2_dev->get_available_devices_sn();
-        if (available_devices_sn.size() == 0)
+        {
+            rs2wrapper rs2_dev = rs2wrapper(argc, argv, ctx);
+            device_sn_list = rs2_dev.get_available_devices_sn();
+        }
+
+        if (device_sn_list.size() == 0)
             throw rs2::error("No RS device detected...");
 
-        rs2_dev->initialize(true, true);
-        rs2_dev->save_calib();
-        rs2_dev->flush_frames();
-
-        int num_threads = 3;
+        size_t num_threads = device_sn_list.size();
         std::vector<std::thread> threads;
-        for (int i = 0; i < num_threads; ++i)
+        for (size_t i = 0; i < num_threads; ++i)
             threads.push_back(
                 std::thread([=]
                             { multithreading_function(i,
-                                                      available_devices_sn[i],
-                                                      rs2_arg,
-                                                      rs2_dev); }));
+                                                      argc,
+                                                      argv,
+                                                      ctx,
+                                                      device_sn_list[i],
+                                                      num_threads); }));
 
         for (int i = 0; i < num_threads; ++i)
         {
             threads[i].join();
             std::cout << "joining t" << i << std::endl;
         }
-
-        rs2_dev->stop();
 
         return EXIT_SUCCESS;
     }
@@ -208,5 +201,8 @@ int main(int argc, char *argv[])
     if (valid_args == EXIT_FAILURE)
         return EXIT_FAILURE;
 
-    return run(argc, argv);
+    if (args.checkarg("--multithreading"))
+        return run_multithreading(argc, argv);
+    else
+        return run(argc, argv);
 }

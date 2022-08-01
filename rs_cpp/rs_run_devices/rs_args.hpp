@@ -33,6 +33,7 @@ public:
         "--reset-interval",
         "--flush-steps",
         "--ip",
+        "--multithreading",
     };
 
     /**
