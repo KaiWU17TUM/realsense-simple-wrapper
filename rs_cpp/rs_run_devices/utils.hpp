@@ -26,7 +26,7 @@ void print(const std::string &msg, const int &mode);
  */
 std::string pad_zeros(const std::string &in_str, const int &num_zeros);
 
-std::int64_t get_timestamp_duration_ns(const std::chrono::steady_clock::time_point &timestamp_start);
+int64_t get_timestamp_duration_ns(const std::chrono::steady_clock::time_point &timestamp_start);
 
 /**
  * @brief parses in put arguments.

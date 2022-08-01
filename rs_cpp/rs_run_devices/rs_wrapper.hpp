@@ -143,7 +143,7 @@ class rs2wrapper
     std::vector<std::pair<std::string, std::string>> output_msg_list;
     // Frame check
     std::map<std::string, bool> valid_frame_check_flag;
-    std::map<std::string, std::int64_t> empty_frame_check_counter;
+    std::map<std::string, int64_t> empty_frame_check_counter;
     // -------------------------------------------------------------- [INTERNAL]
 
     /**
@@ -193,7 +193,7 @@ class rs2wrapper
      * @param depth_timestamp depth timestamp from rs.
      */
     void save_timestamp(const std::string &device_sn,
-                        const std::int64_t &global_timestamp,
+                        const int64_t &global_timestamp,
                         const rs2_metadata_type &color_timestamp,
                         const rs2_metadata_type &depth_timestamp);
 
@@ -248,6 +248,8 @@ public:
      */
     void step();
     void step(const std::string &device_sn);
+    void step_clear();
+    bool step_receiving_frame_from_all_devices();
 
     /**
      * @brief Stops the devices through rs2::pipeline
@@ -302,11 +304,15 @@ public:
                                  const int &fps, const rs2_format &format);
     void set_depth_stream_config(const int &width, const int &height,
                                  const int &fps, const rs2_format &format);
+    void set_valid_frame_check_flag(const std::string &device_sn,
+                                    const bool &flag);
 
     /**
      * @brief Get functions to expose member variables.
      *
      */
+    int64_t get_empty_frame_check_counter(const std::string &device_sn);
+    std::map<std::string, int64_t> get_empty_frame_check_counter();
     std::string get_output_msg();
     std::vector<std::vector<std::string>> get_available_devices();
     std::vector<std::string> get_available_devices_sn();

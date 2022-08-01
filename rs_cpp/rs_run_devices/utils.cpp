@@ -18,10 +18,10 @@ std::string pad_zeros(const std::string &in_str, const int &num_zeros)
     return out_str;
 }
 
-std::int64_t get_timestamp_duration_ns(const std::chrono::steady_clock::time_point &timestamp_start)
+int64_t get_timestamp_duration_ns(const std::chrono::steady_clock::time_point &timestamp_start)
 {
     auto timestamp_now = std::chrono::steady_clock::now();
-    std::int64_t timestamp_diff =
+    int64_t timestamp_diff =
         std::chrono::duration_cast<std::chrono::nanoseconds>(
             timestamp_now - timestamp_start)
             .count();

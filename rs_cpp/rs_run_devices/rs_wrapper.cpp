@@ -287,13 +287,23 @@ void rs2wrapper::start(const std::string &device_sn)
     print(device_sn + " has been started...", 0);
 }
 
-void rs2wrapper::step()
+void rs2wrapper::step_clear()
 {
     output_msg_list.clear();
     valid_frame_check_flag.clear();
     empty_frame_check_counter.clear();
+}
 
-    while (valid_frame_check_flag.size() < enabled_devices.size())
+bool rs2wrapper::step_receiving_frame_from_all_devices()
+{
+    return valid_frame_check_flag.size() < enabled_devices.size();
+}
+
+void rs2wrapper::step()
+{
+    step_clear();
+
+    while (step_receiving_frame_from_all_devices())
     {
         for (auto &&device_sn : enabled_devices_sn)
         {
@@ -303,8 +313,8 @@ void rs2wrapper::step()
             // empty frame for 1 seconds.
             if (empty_frame_check_counter[device_sn] > 1000000000)
             {
+                set_valid_frame_check_flag(device_sn, false);
                 reset(device_sn);
-                break;
             }
         }
     }
@@ -329,7 +339,7 @@ void rs2wrapper::step(const std::string &device_sn)
     {
         if (frameset.size() == streams.size())
         {
-            std::int64_t global_timestamp_diff = get_timestamp_duration_ns(global_timestamp_start);
+            int64_t global_timestamp_diff = get_timestamp_duration_ns(global_timestamp_start);
 
             rs2::frameset aligned_frameset = align_to_color.process(frameset);
             for (auto &&stream : streams)
@@ -388,13 +398,13 @@ void rs2wrapper::step(const std::string &device_sn)
             std::pair<std::string, std::string> msg(device_sn, _output_msg);
             output_msg_list.push_back(msg);
 
-            valid_frame_check_flag[device_sn] = true;
+            set_valid_frame_check_flag(device_sn, true);
             empty_frame_check_counter[device_sn] = 0;
         }
     }
     else
     {
-        std::int64_t local_timestamp_diff = get_timestamp_duration_ns(local_timestamp_start);
+        int64_t local_timestamp_diff = get_timestamp_duration_ns(local_timestamp_start);
         empty_frame_check_counter[device_sn] += local_timestamp_diff;
     }
 }
@@ -613,6 +623,22 @@ void rs2wrapper::set_depth_stream_config(const int &width, const int &height,
     stream_config_depth.framerate = fps;
 }
 
+void rs2wrapper::set_valid_frame_check_flag(const std::string &device_sn,
+                                            const bool &flag)
+{
+    this->valid_frame_check_flag[device_sn] = flag;
+}
+
+int64_t rs2wrapper::get_empty_frame_check_counter(const std::string &device_sn)
+{
+    return this->empty_frame_check_counter[device_sn];
+}
+
+std::map<std::string, int64_t> rs2wrapper::get_empty_frame_check_counter()
+{
+    return this->empty_frame_check_counter;
+}
+
 std::string rs2wrapper::get_output_msg()
 {
     std::string output_msg;
@@ -691,7 +717,7 @@ void rs2wrapper::query_timestamp_mode(const std::string &device_sn)
 }
 
 void rs2wrapper::save_timestamp(const std::string &device_sn,
-                                const std::int64_t &global_timestamp,
+                                const int64_t &global_timestamp,
                                 const rs2_metadata_type &color_timestamp,
                                 const rs2_metadata_type &depth_timestamp)
 {
