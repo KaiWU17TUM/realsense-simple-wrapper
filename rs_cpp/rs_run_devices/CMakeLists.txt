@@ -14,7 +14,7 @@ add_executable(rs_run_devices
                rs_wrapper.cpp 
                main.cpp )
 set_property(TARGET rs_run_devices PROPERTY CXX_STANDARD 11)
-target_link_libraries(rs_run_devices ${DEPENDENCIES} realsense2 realsense2-net)
+target_link_libraries(rs_run_devices ${DEPENDENCIES} realsense2 realsense2-net, pthread)
 include_directories(~/librealsense/common 
                     ~/librealsense/third-party 
                     ~/librealsense/third-party/tclap/include)

@@ -39,6 +39,7 @@ void multithreading_function(size_t th_id,
                              std::string device_sn,
                              size_t num_devices)
 {
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
     rs2wrapper rs2_dev(argc, argv, context, device_sn);
     rs2args rs2_arg = rs2_dev.get_args();
 
@@ -47,6 +48,7 @@ void multithreading_function(size_t th_id,
     rs2_dev.flush_frames();
     rs2_dev.reset_global_timestamp();
 
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
     int i = 1;
     while (!stop)
     {
@@ -73,7 +75,10 @@ void multithreading_function(size_t th_id,
         else
             i++;
     }
+    
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
     rs2_dev.stop();
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
 }
 
 bool run_multithreading(int argc, char *argv[])
@@ -102,6 +107,8 @@ bool run_multithreading(int argc, char *argv[])
                                                       ctx,
                                                       device_sn_list[i],
                                                       num_threads); }));
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
         for (int i = 0; i < num_threads; ++i)
         {
