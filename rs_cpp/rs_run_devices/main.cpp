@@ -41,7 +41,8 @@ void multithreading_function(
     size_t num_devices,
     std::chrono::steady_clock::time_point global_timestamp)
 {
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    std::this_thread::sleep_for(std::chrono::milliseconds(100 * (th_id + 1)));
+
     rs2wrapper rs2_dev(argc, argv, context, device_sn);
     rs2args rs2_arg = rs2_dev.get_args();
 
@@ -78,8 +79,8 @@ void multithreading_function(
             i++;
     }
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
     rs2_dev.stop();
+
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
 }
 
@@ -112,8 +113,6 @@ bool run_multithreading(int argc, char *argv[])
                                                       device_sn_list[i],
                                                       num_threads,
                                                       global_timestamp); }));
-
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
         for (int i = 0; i < num_threads; ++i)
         {
