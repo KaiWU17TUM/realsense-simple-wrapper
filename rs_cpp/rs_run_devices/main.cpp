@@ -41,7 +41,7 @@ void multithreading_function(
     size_t num_devices,
     std::chrono::steady_clock::time_point global_timestamp)
 {
-    std::this_thread::sleep_for(std::chrono::milliseconds(100 * (th_id + 1)));
+    std::this_thread::sleep_for(std::chrono::milliseconds(50 * (th_id + 1)));
 
     rs2wrapper rs2_dev(argc, argv, context, device_sn);
     rs2args rs2_arg = rs2_dev.get_args();
@@ -53,6 +53,8 @@ void multithreading_function(
 
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
     int i = 1;
+    int i_offset = rs2_arg.reset_interval() * th_id;
+    int i_range = rs2_arg.reset_interval() * num_devices;
     while (!stop)
     {
         std::string i_str = pad_zeros(std::to_string(i), num_zeros_to_pad);
@@ -64,14 +66,8 @@ void multithreading_function(
         if (i % rs2_arg.fps() == 0)
             print("Step " + i_str + "   " + o_str, 0);
 
-        if (((i + (rs2_arg.reset_interval() * th_id)) %
-             (rs2_arg.reset_interval() * num_devices)) ==
-            0)
-        {
-            std::this_thread::sleep_for(std::chrono::milliseconds(10));
-            print("Sleep for 10ms ...", 1);
+        if ((i + i_offset) % i_range == 0)
             rs2_dev.reset(device_sn);
-        }
 
         if (i >= rs2_arg.steps())
             break;
@@ -173,8 +169,6 @@ bool run(int argc, char *argv[])
 
             if (i % rs2_arg.reset_interval() == 0)
             {
-                std::this_thread::sleep_for(std::chrono::milliseconds(10));
-                print("Sleep for 10ms ...", 1);
                 rs2_dev.reset(available_devices_sn[dev_reset_loop]);
                 dev_reset_loop = (dev_reset_loop + 1) % num_dev;
             }
