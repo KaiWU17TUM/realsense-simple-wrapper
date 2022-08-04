@@ -212,10 +212,11 @@ void rs2wrapper::initialize(const std::string &device_sn,
     if (!args.network())
         cfg.enable_device(std::string(device_sn));
     bool check = cfg.can_resolve(pipe);
-    if (check)
-        print("'cfg' usable with 'pipeline' : True", 0);
-    else
-        print("'cfg' usable with 'pipeline' : False", 0);
+    if (verbose)
+        if (check)
+            print("'cfg' usable with 'pipeline' : True", 0);
+        else
+            print("'cfg' usable with 'pipeline' : False", 0);
 
     // 3. pipeline start
     start(device_sn);
@@ -230,12 +231,14 @@ void rs2wrapper::initialize(const std::string &device_sn,
         if (auto css = sensor.as<rs2::color_sensor>())
         {
             dev->color_sensor = std::make_shared<rs2::color_sensor>(css);
-            print("color sensor available...", 0);
+            if (verbose)
+                print("color sensor available...", 0);
         }
         else if (auto dss = sensor.as<rs2::depth_stereo_sensor>())
         {
             dev->depth_sensor = std::make_shared<rs2::depth_stereo_sensor>(dss);
-            print("depth sensor available...", 0);
+            if (verbose)
+                print("depth sensor available...", 0);
         }
     }
 
@@ -246,13 +249,17 @@ void rs2wrapper::initialize(const std::string &device_sn,
         {
             // TODO: add arg for this.
             dev->depth_sensor->set_option(RS2_OPTION_EMITTER_ENABLED, 0);
-            print("ir emitter enabled...", 0);
+            if (verbose)
+                print("ir emitter enabled...", 0);
         }
     }
 
     // 6. infos
-    print_camera_infos(dev->pipeline_profile);
-    print_camera_temperature(device_sn);
+    if (verbose)
+    {
+        print_camera_infos(dev->pipeline_profile);
+        print_camera_temperature(device_sn);
+    }
 
     if (storagepaths_perdev.size() > 0)
         query_timestamp_mode(std::string(device_sn));
