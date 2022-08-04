@@ -610,6 +610,11 @@ void rs2wrapper::reset_global_timestamp()
     this->global_timestamp_start = std::chrono::steady_clock::now();
 }
 
+void rs2wrapper::reset_global_timestamp(std::chrono::steady_clock::time_point global_timestamp)
+{
+    this->global_timestamp_start = global_timestamp;
+}
+
 void rs2wrapper::set_color_stream_config(const int &width, const int &height,
                                          const int &fps, const rs2_format &format)
 {

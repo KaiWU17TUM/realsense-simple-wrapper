@@ -32,12 +32,14 @@ void inthand(int signum)
     print("ctrl + c detected", 1);
 }
 
-void multithreading_function(size_t th_id,
-                             int argc,
-                             char *argv[],
-                             rs2::context context,
-                             std::string device_sn,
-                             size_t num_devices)
+void multithreading_function(
+    size_t th_id,
+    int argc,
+    char *argv[],
+    rs2::context context,
+    std::string device_sn,
+    size_t num_devices,
+    std::chrono::steady_clock::time_point global_timestamp)
 {
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
     rs2wrapper rs2_dev(argc, argv, context, device_sn);
@@ -46,7 +48,7 @@ void multithreading_function(size_t th_id,
     rs2_dev.initialize(true, true);
     rs2_dev.save_calib();
     rs2_dev.flush_frames();
-    rs2_dev.reset_global_timestamp();
+    rs2_dev.reset_global_timestamp(global_timestamp);
 
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
     int i = 1;
@@ -75,7 +77,7 @@ void multithreading_function(size_t th_id,
         else
             i++;
     }
-    
+
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
     rs2_dev.stop();
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -96,6 +98,8 @@ bool run_multithreading(int argc, char *argv[])
         if (device_sn_list.size() == 0)
             throw rs2::error("No RS device detected...");
 
+        std::chrono::steady_clock::time_point global_timestamp = std::chrono::steady_clock::now();
+
         size_t num_threads = device_sn_list.size();
         std::vector<std::thread> threads;
         for (size_t i = 0; i < num_threads; ++i)
@@ -106,7 +110,8 @@ bool run_multithreading(int argc, char *argv[])
                                                       argv,
                                                       ctx,
                                                       device_sn_list[i],
-                                                      num_threads); }));
+                                                      num_threads,
+                                                      global_timestamp); }));
 
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
 

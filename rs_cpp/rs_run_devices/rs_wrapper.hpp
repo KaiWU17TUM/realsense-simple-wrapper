@@ -295,6 +295,7 @@ public:
      *
      */
     void reset_global_timestamp();
+    void reset_global_timestamp(std::chrono::steady_clock::time_point global_timestamp);
 
     /**
      * @brief Set functions to change member variables.
