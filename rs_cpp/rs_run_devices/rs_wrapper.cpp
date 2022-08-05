@@ -342,6 +342,7 @@ void rs2wrapper::step(const std::string &device_sn)
 
     std::chrono::steady_clock::time_point local_timestamp_start = std::chrono::steady_clock::now();
 
+    bool error_flag = false;
     if (dev->pipeline->poll_for_frames(&frameset))
     {
         if (frameset.size() == streams.size())
@@ -367,7 +368,8 @@ void rs2wrapper::step(const std::string &device_sn)
                             "(" + e.get_failed_args() + "): " +
                             e.what();
                         print(_msg, 2);
-                        return;
+                        error_flag = true;
+                        break;
                     }
                 }
                 else if (stream.stream_type() == RS2_STREAM_DEPTH)
@@ -387,32 +389,46 @@ void rs2wrapper::step(const std::string &device_sn)
                             "(" + e.get_failed_args() + "): " +
                             e.what();
                         print(_msg, 2);
-                        return;
+                        error_flag = true;
+                        break;
                     }
                 }
             }
 
-            save_timestamp(device_sn,
-                           global_timestamp_diff,
-                           current_color_timestamp,
-                           current_depth_timestamp);
+            if (!error_flag)
+            {
+                save_timestamp(device_sn,
+                               global_timestamp_diff,
+                               current_color_timestamp,
+                               current_depth_timestamp);
 
-            std::string _output_msg =
-                device_sn + "::" +
-                std::to_string(global_timestamp_diff) + "::" +
-                std::to_string(current_color_timestamp) + "::" +
-                std::to_string(current_depth_timestamp) + "  ";
-            std::pair<std::string, std::string> msg(device_sn, _output_msg);
-            output_msg_list.push_back(msg);
+                set_valid_frame_check_flag(device_sn, true);
+                empty_frame_check_counter[device_sn] = 0;
 
-            set_valid_frame_check_flag(device_sn, true);
-            empty_frame_check_counter[device_sn] = 0;
+                std::string _output_msg =
+                    device_sn + "::" +
+                    std::to_string(global_timestamp_diff) + "::" +
+                    std::to_string(current_color_timestamp) + "::" +
+                    std::to_string(current_depth_timestamp) + "  ";
+                std::pair<std::string, std::string> msg(device_sn, _output_msg);
+                output_msg_list.push_back(msg);
+            }
+            else
+            {
+                std::string _output_msg = device_sn + ":: Error in stream...";
+                std::pair<std::string, std::string> msg(device_sn, _output_msg);
+                output_msg_list.push_back(msg);
+            }
         }
     }
     else
     {
         int64_t local_timestamp_diff = get_timestamp_duration_ns(local_timestamp_start);
         empty_frame_check_counter[device_sn] += local_timestamp_diff;
+
+        std::string _output_msg = device_sn + ":: Empty frame returned...";
+        std::pair<std::string, std::string> msg(device_sn, _output_msg);
+        output_msg_list.push_back(msg);
     }
 }
 

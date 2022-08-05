@@ -18,6 +18,7 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <signal.h>
+#include <mutex>
 
 // #include <tclap/CmdLine.h>
 #include "utils.hpp"
@@ -25,6 +26,7 @@
 
 volatile sig_atomic_t stop = 0;
 const int num_zeros_to_pad = 16;
+std::mutex mux;
 
 void inthand(int signum)
 {
@@ -46,9 +48,14 @@ void multithreading_function(
     rs2wrapper rs2_dev(argc, argv, context, device_sn);
     rs2args rs2_arg = rs2_dev.get_args();
 
-    rs2_dev.initialize(true, true);
-    rs2_dev.save_calib();
-    rs2_dev.flush_frames();
+    {
+        // Initializing RS devices in parallel can be problematic with libusb.
+        std::lock_guard<std::mutex> guard(mux);
+        rs2_dev.initialize(true, true);
+        rs2_dev.save_calib();
+        rs2_dev.flush_frames();
+    }
+
     rs2_dev.reset_global_timestamp(global_timestamp);
 
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
