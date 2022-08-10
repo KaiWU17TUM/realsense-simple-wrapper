@@ -330,36 +330,55 @@ void rs2wrapper::step(const std::string &device_sn)
 {
     reset_flags[device_sn] = false;
 
+    bool error_flag = false;
     rs2::frameset frameset;
+    rs2::frameset aligned_frameset;
     rs2_metadata_type current_color_timestamp = 0;
     rs2_metadata_type current_depth_timestamp = 0;
 
+    // Getting the enabled device 'device' class object
     std::shared_ptr<device> dev = enabled_devices[device_sn];
     std::vector<rs2::stream_profile> streams = dev->pipeline_profile->get_streams();
 
-    std::chrono::steady_clock::time_point local_timestamp_start = std::chrono::steady_clock::now();
+    // Timestamp used to track empty frames.
+    std::chrono::steady_clock::time_point local_timestamp =
+        std::chrono::steady_clock::now();
 
-    bool error_flag = false;
+    // Poll for frames.
     if (dev->pipeline->poll_for_frames(&frameset))
     {
         if (frameset.size() == streams.size())
         {
-            int64_t global_timestamp_diff = get_timestamp_duration_ns(global_timestamp_start);
+            // Timestamp duration using the global start timestamp.
+            int64_t global_timestamp_diff = get_timestamp_duration_ns(
+                global_timestamp_start);
 
-            rs2::frameset aligned_frameset = align_to_color.process(frameset);
+            // Tries to align the frames, and skip step if not possible.
+            if (!align_frameset(frameset, aligned_frameset, 1))
+            {
+                dev->color_reset_counter += 1;
+                dev->depth_reset_counter += 1;
+                reset_flags[device_sn] = true;
+                return;
+            }
+
+            // Loops through the streams to get color and depth.
+            // This is needed for multi cam setup.
             for (auto &&stream : streams)
             {
                 if (stream.stream_type() == RS2_STREAM_COLOR)
                 {
                     try
                     {
-                        process_color_stream(device_sn, aligned_frameset, current_color_timestamp);
+                        process_color_stream(device_sn,
+                                             aligned_frameset,
+                                             current_color_timestamp);
                     }
                     catch (const rs2::error &e)
                     {
                         dev->color_reset_counter += 1;
                         reset_flags[device_sn] = true;
-                        auto _msg =
+                        std::string _msg =
                             device_sn + " " +
                             e.get_failed_function() +
                             "(" + e.get_failed_args() + "): " +
@@ -373,14 +392,16 @@ void rs2wrapper::step(const std::string &device_sn)
                 {
                     try
                     {
-                        process_depth_stream(device_sn, aligned_frameset, current_depth_timestamp);
+                        process_depth_stream(device_sn,
+                                             aligned_frameset,
+                                             current_depth_timestamp);
                         print_camera_temperature(device_sn);
                     }
                     catch (const rs2::error &e)
                     {
                         dev->depth_reset_counter += 1;
                         reset_flags[device_sn] = true;
-                        auto _msg =
+                        std::string _msg =
                             device_sn + " " +
                             e.get_failed_function() +
                             "(" + e.get_failed_args() + "): " +
@@ -392,6 +413,7 @@ void rs2wrapper::step(const std::string &device_sn)
                 }
             }
 
+            // Saves the timestamps and generate output message.
             if (!error_flag)
             {
                 save_timestamp(device_sn,
@@ -402,29 +424,32 @@ void rs2wrapper::step(const std::string &device_sn)
                 set_valid_frame_check_flag(device_sn, true);
                 empty_frame_check_counter[device_sn] = 0;
 
-                std::string _output_msg =
+                std::string _msg =
                     device_sn + "::" +
                     std::to_string(global_timestamp_diff) + "::" +
                     std::to_string(current_color_timestamp) + "::" +
                     std::to_string(current_depth_timestamp) + "  ";
-                std::pair<std::string, std::string> msg(device_sn, _output_msg);
+                std::pair<std::string, std::string> msg(device_sn, _msg);
                 output_msg_list.push_back(msg);
             }
+            // Something was wrong with color/depth stream.
+            // No timestamp is saved, and an error message is generated.
             else
             {
-                std::string _output_msg = device_sn + ":: Error in stream...";
-                std::pair<std::string, std::string> msg(device_sn, _output_msg);
+                std::string _msg = device_sn + ":: Error in stream...";
+                std::pair<std::string, std::string> msg(device_sn, _msg);
                 output_msg_list.push_back(msg);
             }
         }
     }
+    // Polled frames are empty.
     else
     {
-        int64_t local_timestamp_diff = get_timestamp_duration_ns(local_timestamp_start);
-        empty_frame_check_counter[device_sn] += local_timestamp_diff;
+        int64_t timestamp_diff = get_timestamp_duration_ns(local_timestamp);
+        empty_frame_check_counter[device_sn] += timestamp_diff;
 
-        std::string _output_msg = device_sn + ":: Empty frame returned...";
-        std::pair<std::string, std::string> msg(device_sn, _output_msg);
+        std::string _msg = device_sn + ":: Empty frame returned...";
+        std::pair<std::string, std::string> msg(device_sn, _msg);
         output_msg_list.push_back(msg);
     }
 }
@@ -841,6 +866,41 @@ void rs2wrapper::process_depth_stream(const std::string &device_sn,
         {
             dev->depth_timestamp = timestamp;
         }
+    }
+}
+
+bool rs2wrapper::align_frameset(rs2::frameset &frameset,
+                                rs2::frameset &aligned_frameset,
+                                const int &mode)
+{
+    try
+    {
+        if (mode == 1)
+        {
+            aligned_frameset = align_to_color.process(frameset);
+            return EXIT_SUCCESS;
+        }
+        else if (mode == 2)
+        {
+            aligned_frameset = align_to_depth.process(frameset);
+            return EXIT_SUCCESS;
+        }
+        else
+            return EXIT_FAILURE;
+    }
+    catch (const rs2::error &e)
+    {
+        std::cerr << "RealSense error calling "
+                  << e.get_failed_function()
+                  << "(" << e.get_failed_args() << "):\n    "
+                  << e.what()
+                  << std::endl;
+        return EXIT_FAILURE;
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << e.what() << std::endl;
+        return EXIT_FAILURE;
     }
 }
 

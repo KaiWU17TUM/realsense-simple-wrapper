@@ -178,6 +178,17 @@ class rs2wrapper
                               rs2_metadata_type &timestamp);
 
     /**
+     * @brief alsigns the frameset to either color or depth.
+     *
+     * @param frameset rs2 frameset object, contains multiple frames.
+     * @param align_to rs2 align object, aligns frame.
+     * @return bool whether the frameset has been successfully aligned.
+     */
+    bool align_frameset(rs2::frameset &frameset,
+                        rs2::frameset &aligned_frameset,
+                        const int &mode = 0);
+
+    /**
      * @brief query the timestamp mode.
      *
      * @param device_sn device serial number.
