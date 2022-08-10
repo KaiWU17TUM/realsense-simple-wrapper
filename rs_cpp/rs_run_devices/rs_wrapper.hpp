@@ -334,6 +334,8 @@ public:
     std::map<std::string, std::shared_ptr<device>> get_enabled_devices();
     std::vector<std::string> get_enabled_devices_sn();
     rs2args get_args();
+    rs2_metadata_type get_frame_timestamp(const std::string &device_sn,
+                                          const rs2::frame &frame);
 
     /**
      * @brief Check functions to see if some condition is true.

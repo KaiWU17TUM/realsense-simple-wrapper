@@ -719,6 +719,29 @@ rs2args rs2wrapper::get_args()
     return this->args;
 }
 
+rs2_metadata_type rs2wrapper::get_frame_timestamp(const std::string &device_sn,
+                                                  const rs2::frame &frame)
+{
+    try
+    {
+        return frame.get_frame_metadata(this->timestamp_mode);
+    }
+    catch (const rs2::error &e)
+    {
+        std::string _msg = device_sn + " :: " +
+                           e.get_failed_function() +
+                           "(" + e.get_failed_args() + "): " +
+                           e.what();
+        print(_msg, 2);
+        return -1;
+    }
+    catch (const std::exception &e)
+    {
+        print(e.what(), 2);
+        return -1;
+    }
+}
+
 bool rs2wrapper::check_enabled_device(const std::string &device_sn,
                                       const std::string &function_name)
 {
@@ -821,7 +844,7 @@ bool rs2wrapper::process_color_stream(const std::string &device_sn,
     try
     {
         rs2::frame frame = frameset.first_or_default(RS2_STREAM_COLOR);
-        timestamp = frame.get_frame_metadata(timestamp_mode);
+        timestamp = get_frame_timestamp(device_sn, frame);
         std::string filename = pad_zeros(std::to_string(timestamp), 12);
         // Record per-frame metadata for UVC streams
         std::string csv_file =
@@ -837,7 +860,11 @@ bool rs2wrapper::process_color_stream(const std::string &device_sn,
         // Setting reset flag if timestamp is frozen
         {
             std::shared_ptr<device> dev = enabled_devices[device_sn];
-            if (dev->color_timestamp == timestamp)
+            if (timestamp == -1)
+            {
+                dev->color_timestamp = timestamp;
+            }
+            else if (dev->color_timestamp == timestamp)
             {
                 dev->color_reset_counter += 1;
                 reset_flags[device_sn] = true;
@@ -874,7 +901,7 @@ bool rs2wrapper::process_depth_stream(const std::string &device_sn,
     try
     {
         rs2::frame frame = frameset.first_or_default(RS2_STREAM_DEPTH);
-        timestamp = frame.get_frame_metadata(timestamp_mode);
+        timestamp = get_frame_timestamp(device_sn, frame);
         std::string filename = pad_zeros(std::to_string(timestamp), 12);
         // Record per-frame metadata for UVC streams
         std::string csv_file =
@@ -890,7 +917,11 @@ bool rs2wrapper::process_depth_stream(const std::string &device_sn,
         // Setting reset flag if timestamp is frozen
         {
             std::shared_ptr<device> dev = enabled_devices[device_sn];
-            if (dev->depth_timestamp == timestamp)
+            if (timestamp == -1)
+            {
+                dev->depth_timestamp = timestamp;
+            }
+            else if (dev->depth_timestamp == timestamp)
             {
                 dev->depth_reset_counter += 1;
                 reset_flags[device_sn] = true;
