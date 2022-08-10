@@ -960,11 +960,15 @@ bool rs2wrapper::align_frameset(const std::string &device_sn,
     {
         if (mode == 1)
         {
+            std::mutex align_mux;
+            std::lock_guard<std::mutex> guard(align_mux);
             aligned_frameset = align_to_color.process(frameset);
             return EXIT_SUCCESS;
         }
         else if (mode == 2)
         {
+            std::mutex align_mux;
+            std::lock_guard<std::mutex> guard(align_mux);
             aligned_frameset = align_to_depth.process(frameset);
             return EXIT_SUCCESS;
         }
