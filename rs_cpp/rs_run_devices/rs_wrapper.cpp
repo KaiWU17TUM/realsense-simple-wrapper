@@ -354,7 +354,7 @@ void rs2wrapper::step(const std::string &device_sn)
                 global_timestamp_start);
 
             // Tries to align the frames, and skip step if not possible.
-            if (!align_frameset(frameset, aligned_frameset, 1))
+            if (align_frameset(frameset, aligned_frameset, 1) == EXIT_FAILURE)
             {
                 dev->color_reset_counter += 1;
                 dev->depth_reset_counter += 1;
@@ -448,7 +448,7 @@ void rs2wrapper::step(const std::string &device_sn)
         int64_t timestamp_diff = get_timestamp_duration_ns(local_timestamp);
         empty_frame_check_counter[device_sn] += timestamp_diff;
 
-        std::string _msg = device_sn + ":: Empty frame returned...";
+        std::string _msg = "";
         std::pair<std::string, std::string> msg(device_sn, _msg);
         output_msg_list.push_back(msg);
     }
