@@ -225,7 +225,8 @@ void rs2wrapper::initialize(const std::string &device_sn,
         print("pipeline started with 100ms sleep...", 0);
 
     // 4. sensors
-    std::vector<rs2::sensor> sensors = dev->pipeline_profile->get_device().query_sensors();
+    std::vector<rs2::sensor> sensors =
+        dev->pipeline_profile->get_device().query_sensors();
     for (auto &&sensor : sensors)
     {
         if (auto css = sensor.as<rs2::color_sensor>())
@@ -330,7 +331,7 @@ void rs2wrapper::step(const std::string &device_sn)
 {
     reset_flags[device_sn] = false;
 
-    bool error_flag = false;
+    std::string output_msg = "";
     rs2::frameset frameset;
     rs2::frameset aligned_frameset;
     rs2_metadata_type current_color_timestamp = 0;
@@ -338,7 +339,8 @@ void rs2wrapper::step(const std::string &device_sn)
 
     // Getting the enabled device 'device' class object
     std::shared_ptr<device> dev = enabled_devices[device_sn];
-    std::vector<rs2::stream_profile> streams = dev->pipeline_profile->get_streams();
+    std::vector<rs2::stream_profile> streams =
+        dev->pipeline_profile->get_streams();
 
     // Timestamp used to track empty frames.
     std::chrono::steady_clock::time_point local_timestamp =
@@ -353,60 +355,63 @@ void rs2wrapper::step(const std::string &device_sn)
             int64_t global_timestamp_diff = get_timestamp_duration_ns(
                 global_timestamp_start);
 
-            // Tries to align the frames, and skip step if not possible.
-            if (align_frameset(frameset, aligned_frameset, 1) == EXIT_FAILURE)
+            // Check if both frames are valid, skip step if one is invalid.
+            {
+                rs2::frame cf = frameset.first_or_default(RS2_STREAM_COLOR);
+                rs2::frame df = frameset.first_or_default(RS2_STREAM_DEPTH);
+                if (!cf || !df)
+                {
+                    dev->color_reset_counter += 1;
+                    dev->depth_reset_counter += 1;
+                    reset_flags[device_sn] = true;
+                    output_msg = device_sn + " :: Error in stream...";
+                    std::pair<std::string, std::string> msg(device_sn, output_msg);
+                    output_msg_list.push_back(msg);
+                    return;
+                }
+            }
+
+            // Tries to align the frames, and skip step if exception occurs.
+            if (align_frameset(device_sn, frameset, aligned_frameset, 1) ==
+                EXIT_FAILURE)
             {
                 dev->color_reset_counter += 1;
                 dev->depth_reset_counter += 1;
                 reset_flags[device_sn] = true;
+                output_msg = device_sn + " :: Error in stream...";
+                std::pair<std::string, std::string> msg(device_sn, output_msg);
+                output_msg_list.push_back(msg);
                 return;
             }
 
             // Loops through the streams to get color and depth.
             // This is needed for multi cam setup.
+            bool error_flag = false;
             for (auto &&stream : streams)
             {
                 if (stream.stream_type() == RS2_STREAM_COLOR)
                 {
-                    try
-                    {
-                        process_color_stream(device_sn,
+                    if (process_color_stream(device_sn,
                                              aligned_frameset,
-                                             current_color_timestamp);
-                    }
-                    catch (const rs2::error &e)
+                                             current_color_timestamp) ==
+                        EXIT_FAILURE)
                     {
                         dev->color_reset_counter += 1;
                         reset_flags[device_sn] = true;
-                        std::string _msg =
-                            device_sn + " " +
-                            e.get_failed_function() +
-                            "(" + e.get_failed_args() + "): " +
-                            e.what();
-                        print(_msg, 2);
                         error_flag = true;
                         break;
                     }
                 }
                 else if (stream.stream_type() == RS2_STREAM_DEPTH)
                 {
-                    try
-                    {
-                        process_depth_stream(device_sn,
+                    print_camera_temperature(device_sn);
+                    if (process_depth_stream(device_sn,
                                              aligned_frameset,
-                                             current_depth_timestamp);
-                        print_camera_temperature(device_sn);
-                    }
-                    catch (const rs2::error &e)
+                                             current_depth_timestamp) ==
+                        EXIT_FAILURE)
                     {
                         dev->depth_reset_counter += 1;
                         reset_flags[device_sn] = true;
-                        std::string _msg =
-                            device_sn + " " +
-                            e.get_failed_function() +
-                            "(" + e.get_failed_args() + "): " +
-                            e.what();
-                        print(_msg, 2);
                         error_flag = true;
                         break;
                     }
@@ -424,20 +429,20 @@ void rs2wrapper::step(const std::string &device_sn)
                 set_valid_frame_check_flag(device_sn, true);
                 empty_frame_check_counter[device_sn] = 0;
 
-                std::string _msg =
+                output_msg =
                     device_sn + "::" +
                     std::to_string(global_timestamp_diff) + "::" +
                     std::to_string(current_color_timestamp) + "::" +
                     std::to_string(current_depth_timestamp) + "  ";
-                std::pair<std::string, std::string> msg(device_sn, _msg);
+                std::pair<std::string, std::string> msg(device_sn, output_msg);
                 output_msg_list.push_back(msg);
             }
             // Something was wrong with color/depth stream.
             // No timestamp is saved, and an error message is generated.
             else
             {
-                std::string _msg = device_sn + ":: Error in stream...";
-                std::pair<std::string, std::string> msg(device_sn, _msg);
+                output_msg = device_sn + " :: Error in stream...";
+                std::pair<std::string, std::string> msg(device_sn, output_msg);
                 output_msg_list.push_back(msg);
             }
         }
@@ -448,8 +453,7 @@ void rs2wrapper::step(const std::string &device_sn)
         int64_t timestamp_diff = get_timestamp_duration_ns(local_timestamp);
         empty_frame_check_counter[device_sn] += timestamp_diff;
 
-        std::string _msg = "";
-        std::pair<std::string, std::string> msg(device_sn, _msg);
+        std::pair<std::string, std::string> msg(device_sn, output_msg);
         output_msg_list.push_back(msg);
     }
 }
@@ -545,15 +549,21 @@ void rs2wrapper::save_calib(const std::string &device_sn)
     csv.open(csv_file);
 
     // Intrinsics of color & depth frames
-    rs2::stream_profile profile_color = dev->pipeline_profile->get_stream(RS2_STREAM_COLOR);
-    rs2_intrinsics intr_color = profile_color.as<rs2::video_stream_profile>().get_intrinsics();
+    rs2::stream_profile profile_color =
+        dev->pipeline_profile->get_stream(RS2_STREAM_COLOR);
+    rs2_intrinsics intr_color =
+        profile_color.as<rs2::video_stream_profile>().get_intrinsics();
     // Fetch stream profile for depth stream
     // Downcast to video_stream_profile and fetch intrinsics
-    rs2::stream_profile profile_depth = dev->pipeline_profile->get_stream(RS2_STREAM_DEPTH);
-    rs2_intrinsics intr_depth = profile_depth.as<rs2::video_stream_profile>().get_intrinsics();
+    rs2::stream_profile profile_depth =
+        dev->pipeline_profile->get_stream(RS2_STREAM_DEPTH);
+    rs2_intrinsics intr_depth =
+        profile_depth.as<rs2::video_stream_profile>().get_intrinsics();
 
     // Extrinsic matrix from color sensor to Depth sensor
-    rs2_extrinsics extr = profile_color.as<rs2::video_stream_profile>().get_extrinsics_to(profile_depth);
+    rs2_extrinsics extr =
+        profile_color.as<rs2::video_stream_profile>()
+            .get_extrinsics_to(profile_depth);
 
     // Write calibration data to json file
     csv << intr_color.width << ","
@@ -588,7 +598,8 @@ void rs2wrapper::save_calib(const std::string &device_sn)
         csv << value << ",";
     csv << "\n";
 
-    std::vector<rs2::sensor> sensors = dev->pipeline_profile->get_device().query_sensors();
+    std::vector<rs2::sensor> sensors =
+        dev->pipeline_profile->get_device().query_sensors();
     for (auto &&sensor : sensors)
     {
         if (auto dss = sensor.as<rs2::depth_stereo_sensor>())
@@ -803,73 +814,114 @@ void rs2wrapper::configure_stream(const std::string &device_sn,
     rs_cfg[device_sn] = cfg;
 }
 
-void rs2wrapper::process_color_stream(const std::string &device_sn,
+bool rs2wrapper::process_color_stream(const std::string &device_sn,
                                       const rs2::frameset &frameset,
                                       rs2_metadata_type &timestamp)
 {
-    rs2::frame frame = frameset.first_or_default(RS2_STREAM_COLOR);
-    timestamp = frame.get_frame_metadata(timestamp_mode);
-    std::string filename = pad_zeros(std::to_string(timestamp), 12);
-    // Record per-frame metadata for UVC streams
-    std::string csv_file = storagepaths_perdev[device_sn].color_metadata + "/" + filename + ".csv";
-    metadata_to_csv(frame, csv_file);
-    // Write images to disk
-    std::string png_file = storagepaths_perdev[device_sn].color + "/" + filename + ".bin";
-    framedata_to_bin(frame, png_file);
-    // Release frame
-    // TODO: WORKED????
-    rs2_release_frame(frame.get());
-    // Setting reset flag if timestamp is frozen
+    try
     {
-        std::shared_ptr<device> dev = enabled_devices[device_sn];
-        if (dev->color_timestamp == timestamp)
+        rs2::frame frame = frameset.first_or_default(RS2_STREAM_COLOR);
+        timestamp = frame.get_frame_metadata(timestamp_mode);
+        std::string filename = pad_zeros(std::to_string(timestamp), 12);
+        // Record per-frame metadata for UVC streams
+        std::string csv_file =
+            storagepaths_perdev[device_sn].color_metadata + "/" + filename + ".csv";
+        metadata_to_csv(frame, csv_file);
+        // Write images to disk
+        std::string png_file =
+            storagepaths_perdev[device_sn].color + "/" + filename + ".bin";
+        framedata_to_bin(frame, png_file);
+        // Release frame
+        // TODO: WORKED????
+        rs2_release_frame(frame.get());
+        // Setting reset flag if timestamp is frozen
         {
-            dev->color_reset_counter += 1;
-            reset_flags[device_sn] = true;
-            std::string c_msg = std::to_string(dev->color_reset_counter);
-            print(device_sn + " Resetting, same color timestamp, c=" + c_msg, 1);
+            std::shared_ptr<device> dev = enabled_devices[device_sn];
+            if (dev->color_timestamp == timestamp)
+            {
+                dev->color_reset_counter += 1;
+                reset_flags[device_sn] = true;
+                std::string c_msg = std::to_string(dev->color_reset_counter);
+                print(device_sn + " Resetting, same color timestamp, c=" + c_msg, 1);
+            }
+            else
+            {
+                dev->color_timestamp = timestamp;
+            }
         }
-        else
-        {
-            dev->color_timestamp = timestamp;
-        }
+        return EXIT_SUCCESS;
+    }
+    catch (const rs2::error &e)
+    {
+        std::string _msg = device_sn + " :: " +
+                           e.get_failed_function() +
+                           "(" + e.get_failed_args() + "): " +
+                           e.what();
+        print(_msg, 2);
+        return EXIT_FAILURE;
+    }
+    catch (const std::exception &e)
+    {
+        print(e.what(), 2);
+        return EXIT_FAILURE;
     }
 }
 
-void rs2wrapper::process_depth_stream(const std::string &device_sn,
+bool rs2wrapper::process_depth_stream(const std::string &device_sn,
                                       const rs2::frameset &frameset,
                                       rs2_metadata_type &timestamp)
 {
-    rs2::frame frame = frameset.first_or_default(RS2_STREAM_DEPTH);
-    timestamp = frame.get_frame_metadata(timestamp_mode);
-    std::string filename = pad_zeros(std::to_string(timestamp), 12);
-    // Record per-frame metadata for UVC streams
-    std::string csv_file = storagepaths_perdev[device_sn].depth_metadata + "/" + filename + ".csv";
-    metadata_to_csv(frame, csv_file);
-    // Write images to disk
-    std::string png_file = storagepaths_perdev[device_sn].depth + "/" + filename + ".bin";
-    framedata_to_bin(frame, png_file);
-    // Release frame
-    // TODO: WORKED????
-    rs2_release_frame(frame.get());
-    // Setting reset flag if timestamp is frozen
+    try
     {
-        std::shared_ptr<device> dev = enabled_devices[device_sn];
-        if (dev->depth_timestamp == timestamp)
+        rs2::frame frame = frameset.first_or_default(RS2_STREAM_DEPTH);
+        timestamp = frame.get_frame_metadata(timestamp_mode);
+        std::string filename = pad_zeros(std::to_string(timestamp), 12);
+        // Record per-frame metadata for UVC streams
+        std::string csv_file =
+            storagepaths_perdev[device_sn].depth_metadata + "/" + filename + ".csv";
+        metadata_to_csv(frame, csv_file);
+        // Write images to disk
+        std::string png_file =
+            storagepaths_perdev[device_sn].depth + "/" + filename + ".bin";
+        framedata_to_bin(frame, png_file);
+        // Release frame
+        // TODO: WORKED????
+        rs2_release_frame(frame.get());
+        // Setting reset flag if timestamp is frozen
         {
-            dev->depth_reset_counter += 1;
-            reset_flags[device_sn] = true;
-            std::string c_msg = std::to_string(dev->depth_reset_counter);
-            print(device_sn + " Resetting, same depth timestamp, c=" + c_msg, 1);
+            std::shared_ptr<device> dev = enabled_devices[device_sn];
+            if (dev->depth_timestamp == timestamp)
+            {
+                dev->depth_reset_counter += 1;
+                reset_flags[device_sn] = true;
+                std::string c_msg = std::to_string(dev->depth_reset_counter);
+                print(device_sn + " Resetting, same depth timestamp, c=" + c_msg, 1);
+            }
+            else
+            {
+                dev->depth_timestamp = timestamp;
+            }
         }
-        else
-        {
-            dev->depth_timestamp = timestamp;
-        }
+        return EXIT_SUCCESS;
+    }
+    catch (const rs2::error &e)
+    {
+        std::string _msg = device_sn + " :: " +
+                           e.get_failed_function() +
+                           "(" + e.get_failed_args() + "): " +
+                           e.what();
+        print(_msg, 2);
+        return EXIT_FAILURE;
+    }
+    catch (const std::exception &e)
+    {
+        print(e.what(), 2);
+        return EXIT_FAILURE;
     }
 }
 
-bool rs2wrapper::align_frameset(rs2::frameset &frameset,
+bool rs2wrapper::align_frameset(const std::string &device_sn,
+                                rs2::frameset &frameset,
                                 rs2::frameset &aligned_frameset,
                                 const int &mode)
 {
@@ -886,20 +938,22 @@ bool rs2wrapper::align_frameset(rs2::frameset &frameset,
             return EXIT_SUCCESS;
         }
         else
+        {
             return EXIT_FAILURE;
+        }
     }
     catch (const rs2::error &e)
     {
-        std::cerr << "RealSense error calling "
-                  << e.get_failed_function()
-                  << "(" << e.get_failed_args() << "):\n    "
-                  << e.what()
-                  << std::endl;
+        std::string _msg = device_sn + " :: " +
+                           e.get_failed_function() +
+                           "(" + e.get_failed_args() + "): " +
+                           e.what();
+        print(_msg, 2);
         return EXIT_FAILURE;
     }
     catch (const std::exception &e)
     {
-        std::cerr << e.what() << std::endl;
+        print(e.what(), 2);
         return EXIT_FAILURE;
     }
 }

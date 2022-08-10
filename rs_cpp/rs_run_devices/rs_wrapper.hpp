@@ -170,21 +170,24 @@ class rs2wrapper
      * @param frameset rs2 frameset object, contains multiple frames.
      * @param timestamp timestamp from rs.
      */
-    void process_color_stream(const std::string &device_sn,
+    bool process_color_stream(const std::string &device_sn,
                               const rs2::frameset &frameset,
                               rs2_metadata_type &timestamp);
-    void process_depth_stream(const std::string &device_sn,
+    bool process_depth_stream(const std::string &device_sn,
                               const rs2::frameset &frameset,
                               rs2_metadata_type &timestamp);
 
     /**
      * @brief alsigns the frameset to either color or depth.
      *
+     * @param device_sn device serial number.
      * @param frameset rs2 frameset object, contains multiple frames.
+     * @param aligned_frameset rs2 frameset object that is aligned.
      * @param align_to rs2 align object, aligns frame.
      * @return bool whether the frameset has been successfully aligned.
      */
-    bool align_frameset(rs2::frameset &frameset,
+    bool align_frameset(const std::string &device_sn,
+                        rs2::frameset &frameset,
                         rs2::frameset &aligned_frameset,
                         const int &mode = 0);
 

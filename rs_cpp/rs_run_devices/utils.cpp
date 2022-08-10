@@ -7,7 +7,7 @@ void print(const std::string &msg, const int &mode)
     if (mode == 1)
         std::cout << "[WARN] : " << msg << std::endl;
     if (mode == 2)
-        std::cout << "[ERRO] : " << msg << std::endl;
+        std::cerr << "[ERRO] : " << msg << std::endl;
 }
 
 std::string pad_zeros(const std::string &in_str, const int &num_zeros)
