@@ -320,6 +320,15 @@ public:
     std::map<std::string, std::shared_ptr<device>> get_enabled_devices();
     std::vector<std::string> get_enabled_devices_sn();
     rs2args get_args();
+
+    /**
+     * @brief Check functions to see if some condition is true.
+     *
+     * @return true
+     * @return false
+     */
+    bool check_enabled_device(const std::string &device_sn,
+                              const std::string &function_name);
 };
 
 #endif

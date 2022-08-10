@@ -12,8 +12,9 @@ void print(const std::string &msg, const int &mode)
 
 std::string pad_zeros(const std::string &in_str, const int &num_zeros)
 {
+    int string_len = num_zeros - std::min(num_zeros, (int)in_str.length());
     std::string out_str = "";
-    out_str += std::string(num_zeros - std::min(num_zeros, (int)in_str.length()), '0');
+    out_str += std::string(string_len, '0');
     out_str += in_str;
     return out_str;
 }
@@ -52,6 +53,11 @@ std::string argparser::getarg(const std::string &option)
     }
     static const std::string empty_string("");
     return empty_string;
+}
+
+int argparser::getargi(const std::string &option)
+{
+    return std::stoi(getarg(option));
 }
 
 bool argparser::checkarg(const std::string &option)

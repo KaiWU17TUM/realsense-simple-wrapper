@@ -14,22 +14,22 @@ rs2args::~rs2args()
 
 int rs2args::steps()
 {
-    return std::stoi(getarg("--steps"));
+    return getargi("--steps");
 }
 
 int rs2args::fps()
 {
-    return std::stoi(getarg("--fps"));
+    return getargi("--fps");
 }
 
 int rs2args::height()
 {
-    return std::stoi(getarg("--height"));
+    return getargi("--height");
 }
 
 int rs2args::width()
 {
-    return std::stoi(getarg("--width"));
+    return getargi("--width");
 }
 
 rs2_format rs2args::color_format()
@@ -60,26 +60,17 @@ std::string rs2args::ip()
 
 bool rs2args::network()
 {
-    if (checkarg("--ip"))
-        return true;
-    else
-        return false;
+    return checkarg("--ip") ? true : false;
 }
 
 int rs2args::flush_steps()
 {
-    if (checkarg("--flush-steps"))
-        return std::stoi(getarg("--flush-steps"));
-    else
-        return 30;
+    return checkarg("--flush-steps") ? getargi("--flush-steps") : 30;
 }
 
 int rs2args::reset_interval()
 {
-    if (checkarg("--reset-interval"))
-        return std::stoi(getarg("--reset-interval"));
-    else
-        return 120;
+    return checkarg("--reset-interval") ? getargi("--reset-interval") : 120;
 }
 
 void rs2args::print_args()

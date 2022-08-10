@@ -281,11 +281,8 @@ void rs2wrapper::start()
 
 void rs2wrapper::start(const std::string &device_sn)
 {
-    if (enabled_devices.count(device_sn) <= 0)
-    {
-        print(device_sn + " is not in the list of enabled devices, skipping start()...", 1);
+    if (!check_enabled_device(device_sn, __func__))
         return;
-    }
 
     rs2::config cfg = rs_cfg[device_sn];
     std::shared_ptr<device> dev = enabled_devices[device_sn];
@@ -443,11 +440,8 @@ void rs2wrapper::stop()
 
 void rs2wrapper::stop(const std::string &device_sn)
 {
-    if (enabled_devices.count(device_sn) <= 0)
-    {
-        print(device_sn + " is not in the list of enabled devices, skipping stop()...", 1);
+    if (!check_enabled_device(device_sn, __func__))
         return;
-    }
 
     enabled_devices[device_sn]->pipeline->stop();
     print(device_sn + " has been stopped...", 0);
@@ -464,11 +458,8 @@ void rs2wrapper::reset()
 
 void rs2wrapper::reset(const std::string &device_sn)
 {
-    if (enabled_devices.count(device_sn) <= 0)
-    {
-        print(device_sn + " is not in the list of enabled devices, skipping reset()...", 1);
+    if (!check_enabled_device(device_sn, __func__))
         return;
-    }
 
     stop(device_sn);
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
@@ -487,11 +478,8 @@ void rs2wrapper::reset_with_high_reset_counter()
 
 void rs2wrapper::reset_with_high_reset_counter(const std::string &device_sn)
 {
-    if (enabled_devices.count(device_sn) <= 0)
-    {
-        print(device_sn + " is not in the list of enabled devices, skipping reset_with_high_reset_counter()...", 1);
+    if (!check_enabled_device(device_sn, __func__))
         return;
-    }
 
     if (reset_flags[device_sn])
     {
@@ -523,11 +511,8 @@ void rs2wrapper::save_calib()
 
 void rs2wrapper::save_calib(const std::string &device_sn)
 {
-    if (enabled_devices.count(device_sn) <= 0)
-    {
-        print(device_sn + " is not in the list of enabled devices, skipping save_calib()...", 1);
+    if (!check_enabled_device(device_sn, __func__))
         return;
-    }
 
     std::shared_ptr<device> dev = enabled_devices[device_sn];
     std::string csv_file = storagepaths_perdev[device_sn].calib + "/calib.csv";
@@ -603,11 +588,8 @@ void rs2wrapper::flush_frames(const int &num_frames)
 void rs2wrapper::flush_frames(const std::string &device_sn,
                               const int &num_frames)
 {
-    if (enabled_devices.count(device_sn) <= 0)
-    {
-        print(device_sn + " is not in the list of enabled devices, skipping flush_frames()...", 1);
+    if (!check_enabled_device(device_sn, __func__))
         return;
-    }
 
     int _num_frames = 0;
     if (num_frames == -1)
@@ -699,6 +681,18 @@ std::vector<std::string> rs2wrapper::get_enabled_devices_sn()
 rs2args rs2wrapper::get_args()
 {
     return this->args;
+}
+
+bool rs2wrapper::check_enabled_device(const std::string &device_sn,
+                                      const std::string &function_name)
+{
+    if (enabled_devices.count(device_sn) <= 0)
+    {
+        print(device_sn + " is not enabled, skipping '" + function_name + "' ...", 1);
+        return false;
+    }
+    else
+        return true;
 }
 
 /*******************************************************************************
