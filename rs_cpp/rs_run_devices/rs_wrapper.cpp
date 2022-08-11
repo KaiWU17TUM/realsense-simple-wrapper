@@ -1,9 +1,5 @@
 #include "rs_wrapper.hpp"
 
-// doesnt work in the class init.
-rs2::align align_to_depth(RS2_STREAM_DEPTH);
-rs2::align align_to_color(RS2_STREAM_COLOR);
-
 bool framedata_to_bin(const rs2::frame &frm, const std::string &filename)
 {
     bool ret = false;
@@ -973,15 +969,11 @@ bool rs2wrapper::align_frameset(const std::string &device_sn,
     {
         if (mode == 1)
         {
-            std::mutex align_mux;
-            std::lock_guard<std::mutex> guard(align_mux);
             aligned_frameset = align_to_color.process(frameset);
             return true;
         }
         else if (mode == 2)
         {
-            std::mutex align_mux;
-            std::lock_guard<std::mutex> guard(align_mux);
             aligned_frameset = align_to_depth.process(frameset);
             return true;
         }
