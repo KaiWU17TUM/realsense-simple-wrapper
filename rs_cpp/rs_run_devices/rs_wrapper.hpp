@@ -63,6 +63,7 @@ struct device
     rs2_metadata_type color_reset_counter = 0;
     rs2_metadata_type depth_reset_counter = 0;
     int camera_temp_printout_counter = -1;
+    int num_streams = 0;
 };
 
 /**
@@ -177,6 +178,10 @@ class rs2wrapper
     bool process_depth_stream(const std::string &device_sn,
                               const rs2::frameset &frameset,
                               rs2_metadata_type &timestamp);
+    bool process_color_depth_stream(const std::string &device_sn,
+                                    const rs2::frameset &frameset,
+                                    rs2_metadata_type &color_timestamp,
+                                    rs2_metadata_type &depth_timestamp);
 
     /**
      * @brief alsigns the frameset to either color or depth.
@@ -346,6 +351,8 @@ public:
      */
     bool check_enabled_device(const std::string &device_sn,
                               const std::string &function_name);
+    bool check_valid_color_depth_streams(const std::string &device_sn,
+                                         const rs2::frameset &frameset);
 };
 
 #endif
