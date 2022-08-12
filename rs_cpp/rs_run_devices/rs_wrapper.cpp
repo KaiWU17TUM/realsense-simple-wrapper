@@ -1,5 +1,7 @@
 #include "rs_wrapper.hpp"
 
+std::mutex reset_mux;
+
 bool framedata_to_bin(const rs2::frame &frm, const std::string &filename)
 {
     bool ret = false;
@@ -213,6 +215,7 @@ void rs2wrapper::initialize(const std::string &device_sn,
             print("'cfg' usable with 'pipeline' : True", 0);
         else
             print("'cfg' usable with 'pipeline' : False", 0);
+    rs_cfg[device_sn] = cfg;
 
     // 3. pipeline start
     start(device_sn);
@@ -453,6 +456,7 @@ void rs2wrapper::reset(const std::string &device_sn)
     if (!check_enabled_device(device_sn, __func__))
         return;
 
+    std::lock_guard<std::mutex> lock(reset_mux);
     stop(device_sn);
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
     start(device_sn);
