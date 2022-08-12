@@ -366,8 +366,8 @@ void rs2wrapper::step(const std::string &device_sn)
             // Check if both frames are valid, skip step if one is invalid.
             if (!check_valid_color_depth_streams(device_sn, frameset))
             {
-                dev->color_reset_counter += 100;
-                dev->depth_reset_counter += 100;
+                dev->color_reset_counter += args.fps();
+                dev->depth_reset_counter += args.fps();
                 reset_flags[device_sn] = true;
                 output_msg = device_sn + " :: One of the streams is missing...";
             }
@@ -377,8 +377,8 @@ void rs2wrapper::step(const std::string &device_sn)
                 // Tries to align the frames, and skip step if exception occurs.
                 if (!align_frameset(device_sn, frameset, aligned_frameset, 1))
                 {
-                    dev->color_reset_counter += 100;
-                    dev->depth_reset_counter += 100;
+                    dev->color_reset_counter += args.fps();
+                    dev->depth_reset_counter += args.fps();
                     reset_flags[device_sn] = true;
                     output_msg = device_sn + " :: Align failed...";
                 }
@@ -850,7 +850,7 @@ bool rs2wrapper::process_color_stream(const std::string &device_sn,
             }
             else if (dev->color_timestamp == timestamp)
             {
-                dev->color_reset_counter += 100;
+                dev->color_reset_counter += args.fps();
                 reset_flags[device_sn] = true;
                 std::string c_msg = std::to_string(dev->color_reset_counter);
                 print(device_sn + " Resetting, same color timestamp, c=" + c_msg, 1);
@@ -911,7 +911,7 @@ bool rs2wrapper::process_depth_stream(const std::string &device_sn,
             }
             else if (dev->depth_timestamp == timestamp)
             {
-                dev->depth_reset_counter += 100;
+                dev->depth_reset_counter += args.fps();
                 reset_flags[device_sn] = true;
                 std::string c_msg = std::to_string(dev->depth_reset_counter);
                 print(device_sn + " Resetting, same depth timestamp, c=" + c_msg, 1);
@@ -953,7 +953,7 @@ bool rs2wrapper::process_color_depth_stream(const std::string &device_sn,
         {
             if (!process_color_stream(device_sn, frameset, color_timestamp))
             {
-                dev->color_reset_counter += 100;
+                dev->color_reset_counter += args.fps();
                 reset_flags[device_sn] = true;
                 error_flag = true;
                 std::string c_msg = std::to_string(dev->color_reset_counter);
@@ -966,7 +966,7 @@ bool rs2wrapper::process_color_depth_stream(const std::string &device_sn,
             print_camera_temperature(device_sn);
             if (!process_depth_stream(device_sn, frameset, depth_timestamp))
             {
-                dev->depth_reset_counter += 100;
+                dev->depth_reset_counter += args.fps();
                 reset_flags[device_sn] = true;
                 error_flag = true;
                 std::string c_msg = std::to_string(dev->depth_reset_counter);
