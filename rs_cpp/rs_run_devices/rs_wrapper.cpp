@@ -120,9 +120,7 @@ rs2wrapper::rs2wrapper(int argc,
         print("Network device found", 0);
         dev.add_to(*ctx);
         auto serial = dev.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER);
-        std::vector<std::string> available_device;
-        available_device.push_back(serial);
-        available_device.push_back(args.ip());
+        std::vector<std::string> available_device{serial, args.ip()};
         available_devices.push_back(available_device);
         print("using : " + std::string(serial), 0);
     }
@@ -136,18 +134,15 @@ rs2wrapper::rs2wrapper(int argc,
             {
                 auto serial = dev.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER);
                 auto product_line = dev.get_info(RS2_CAMERA_INFO_PRODUCT_LINE);
-                std::vector<std::string> available_device;
-                available_device.push_back(serial);
-                available_device.push_back(product_line);
+                std::vector<std::string> available_device{serial, product_line};
                 available_devices.push_back(available_device);
                 print("found : " + std::string(serial), 0);
             }
         }
         else
         {
-            std::vector<std::string> available_device;
-            available_device.push_back(single_device_sn.c_str());
-            available_device.push_back("D400");
+            std::vector<std::string> available_device{single_device_sn.c_str(),
+                                                      "D400"};
             available_devices.push_back(available_device);
             print("using : " + std::string(single_device_sn.c_str()), 0);
         }
@@ -180,6 +175,21 @@ rs2wrapper::rs2wrapper(int argc,
                             args.depth_format());
 }
 
+void rs2wrapper::configure(const std::string &device_sn,
+                           const stream_config &stream_config_color,
+                           const stream_config &stream_config_depth)
+{
+    rs_cfg[device_sn] = rs2::config();
+    configure_stream(device_sn, stream_config_color, stream_config_depth);
+    if (!args.network())
+        rs_cfg[device_sn].enable_device(std::string(device_sn));
+    bool check = rs_cfg[device_sn].can_resolve(*enabled_devices[device_sn]->pipeline);
+    if (check)
+        print("'cfg' usable with 'pipeline' : True", 0);
+    else
+        print("'cfg' usable with 'pipeline' : False", 0);
+}
+
 void rs2wrapper::initialize(const bool &enable_ir_emitter,
                             const bool &verbose)
 {
@@ -205,17 +215,7 @@ void rs2wrapper::initialize(const std::string &device_sn,
     dev->pipeline = std::make_shared<rs2::pipeline>(pipe);
 
     // 2. configure
-    configure_stream(device_sn, stream_config_color, stream_config_depth);
-    rs2::config cfg = rs_cfg[device_sn];
-    if (!args.network())
-        cfg.enable_device(std::string(device_sn));
-    bool check = cfg.can_resolve(pipe);
-    if (verbose)
-        if (check)
-            print("'cfg' usable with 'pipeline' : True", 0);
-        else
-            print("'cfg' usable with 'pipeline' : False", 0);
-    rs_cfg[device_sn] = cfg;
+    configure(device_sn, stream_config_color, stream_config_depth);
 
     // 3. pipeline start
     start(device_sn);
@@ -366,8 +366,8 @@ void rs2wrapper::step(const std::string &device_sn)
             // Check if both frames are valid, skip step if one is invalid.
             if (!check_valid_color_depth_streams(device_sn, frameset))
             {
-                dev->color_reset_counter += 1;
-                dev->depth_reset_counter += 1;
+                dev->color_reset_counter += 100;
+                dev->depth_reset_counter += 100;
                 reset_flags[device_sn] = true;
                 output_msg = device_sn + " :: One of the streams is missing...";
             }
@@ -377,8 +377,8 @@ void rs2wrapper::step(const std::string &device_sn)
                 // Tries to align the frames, and skip step if exception occurs.
                 if (!align_frameset(device_sn, frameset, aligned_frameset, 1))
                 {
-                    dev->color_reset_counter += 1;
-                    dev->depth_reset_counter += 1;
+                    dev->color_reset_counter += 100;
+                    dev->depth_reset_counter += 100;
                     reset_flags[device_sn] = true;
                     output_msg = device_sn + " :: Align failed...";
                 }
@@ -459,8 +459,10 @@ void rs2wrapper::reset(const std::string &device_sn)
     std::lock_guard<std::mutex> lock(reset_mux);
     stop(device_sn);
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    start(device_sn);
     print(device_sn + " pipeline has been restarted with 100ms sleep...", 0);
+    rs2::pipeline pipe = initialize_pipeline();
+    enabled_devices[device_sn]->pipeline = std::make_shared<rs2::pipeline>(pipe);
+    start(device_sn);
 }
 
 void rs2wrapper::reset_with_high_reset_counter()
@@ -801,7 +803,7 @@ void rs2wrapper::configure_stream(const std::string &device_sn,
                                   const stream_config &stream_config_color,
                                   const stream_config &stream_config_depth)
 {
-    rs2::config cfg;
+    rs2::config cfg = rs_cfg[device_sn];
     cfg.enable_stream(stream_config_color.stream_type,
                       stream_config_color.width,
                       stream_config_color.height,
@@ -841,10 +843,14 @@ bool rs2wrapper::process_color_stream(const std::string &device_sn,
             if (timestamp == -1)
             {
                 dev->color_timestamp = timestamp;
+                dev->color_reset_counter += 1;
+                reset_flags[device_sn] = true;
+                std::string c_msg = std::to_string(dev->color_reset_counter);
+                print(device_sn + " Resetting, no color timestamp, c=" + c_msg, 1);
             }
             else if (dev->color_timestamp == timestamp)
             {
-                dev->color_reset_counter += 1;
+                dev->color_reset_counter += 100;
                 reset_flags[device_sn] = true;
                 std::string c_msg = std::to_string(dev->color_reset_counter);
                 print(device_sn + " Resetting, same color timestamp, c=" + c_msg, 1);
@@ -898,10 +904,14 @@ bool rs2wrapper::process_depth_stream(const std::string &device_sn,
             if (timestamp == -1)
             {
                 dev->depth_timestamp = timestamp;
+                dev->depth_reset_counter += 1;
+                reset_flags[device_sn] = true;
+                std::string c_msg = std::to_string(dev->depth_reset_counter);
+                print(device_sn + " Resetting, no depth timestamp, c=" + c_msg, 1);
             }
             else if (dev->depth_timestamp == timestamp)
             {
-                dev->depth_reset_counter += 1;
+                dev->depth_reset_counter += 100;
                 reset_flags[device_sn] = true;
                 std::string c_msg = std::to_string(dev->depth_reset_counter);
                 print(device_sn + " Resetting, same depth timestamp, c=" + c_msg, 1);
@@ -943,9 +953,11 @@ bool rs2wrapper::process_color_depth_stream(const std::string &device_sn,
         {
             if (!process_color_stream(device_sn, frameset, color_timestamp))
             {
-                dev->color_reset_counter += 1;
+                dev->color_reset_counter += 100;
                 reset_flags[device_sn] = true;
                 error_flag = true;
+                std::string c_msg = std::to_string(dev->color_reset_counter);
+                print(device_sn + " Resetting, error in processing color stream, c=" + c_msg, 1);
                 break;
             }
         }
@@ -954,9 +966,11 @@ bool rs2wrapper::process_color_depth_stream(const std::string &device_sn,
             print_camera_temperature(device_sn);
             if (!process_depth_stream(device_sn, frameset, depth_timestamp))
             {
-                dev->depth_reset_counter += 1;
+                dev->depth_reset_counter += 100;
                 reset_flags[device_sn] = true;
                 error_flag = true;
+                std::string c_msg = std::to_string(dev->depth_reset_counter);
+                print(device_sn + " Resetting, error in processing depth stream, c=" + c_msg, 1);
                 break;
             }
         }

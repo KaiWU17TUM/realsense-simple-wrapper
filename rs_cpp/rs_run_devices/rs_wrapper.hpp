@@ -144,7 +144,7 @@ class rs2wrapper
     // [INTERNAL] --------------------------------------------------------------
     // Reset frozen devices
     std::map<std::string, bool> reset_flags;
-    int max_reset_counter = 5;
+    int max_reset_counter = 500;
     // Output message
     std::vector<std::pair<std::string, std::string>> output_msg_list;
     // Frame check
@@ -242,6 +242,17 @@ public:
                char *argv[],
                rs2::context context,
                std::string device_sn = "-1");
+
+    /**
+     * @brief prepares the config for the rs2 pipeline.
+     *
+     * @param device_sn device serial number.
+     * @param stream_config_color stream config for color.
+     * @param stream_config_depth stream config for depth.
+     */
+    void configure(const std::string &device_sn,
+                   const stream_config &stream_config_color,
+                   const stream_config &stream_config_depth);
 
     /**
      * @brief Initialize the realsense devices.
