@@ -203,6 +203,8 @@ void rs2wrapper::initialize(const std::string &device_sn,
                             const bool &enable_ir_emitter,
                             const bool &verbose)
 {
+    max_reset_counter = 3 * args.fps();
+    
     print("Initializing RealSense devices " + std::string(device_sn), 0);
 
     // 0. enabled devices
@@ -287,9 +289,10 @@ void rs2wrapper::start(const std::string &device_sn)
     rs2::config cfg = rs_cfg[device_sn];
     std::shared_ptr<device> dev = enabled_devices[device_sn];
     rs2::pipeline_profile profile = dev->pipeline->start(cfg);
+    print(device_sn + " has been started...", 0);
     dev->pipeline_profile = std::make_shared<rs2::pipeline_profile>(profile);
     dev->num_streams = dev->pipeline_profile->get_streams().size();
-    print(device_sn + " has been started...", 0);
+    print(device_sn + " pipeline profile is saved...", 0);
 }
 
 void rs2wrapper::step_clear()
@@ -459,10 +462,12 @@ void rs2wrapper::reset(const std::string &device_sn)
     std::lock_guard<std::mutex> lock(reset_mux);
     stop(device_sn);
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    print(device_sn + " pipeline has been restarted with 100ms sleep...", 0);
     rs2::pipeline pipe = initialize_pipeline();
     enabled_devices[device_sn]->pipeline = std::make_shared<rs2::pipeline>(pipe);
+    print(device_sn + " pipeline has been reinitialized...", 0);
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
     start(device_sn);
+    print(device_sn + " pipeline has been restarted with 200ms sleep...", 0);
 }
 
 void rs2wrapper::reset_with_high_reset_counter()
