@@ -105,6 +105,8 @@ public:
  */
 class rs2wrapper
 {
+    bool verbose = false;
+
     // Args from CLI
     rs2args args;
 
@@ -150,6 +152,11 @@ class rs2wrapper
     // Frame check
     std::map<std::string, bool> valid_frame_check_flag;
     std::map<std::string, int64_t> empty_frame_check_counter;
+    // IP Mapping
+    std::map<std::string, std::string> USBIP_MAPPING{
+        {"001622070408", "192.168.1.238"},
+        {"001622071039", "192.168.1.202"},
+        {"001622070717", "192.168.1.34"}};
     // -------------------------------------------------------------- [INTERNAL]
 
     /**
@@ -237,11 +244,13 @@ public:
      * @param argv Arguments in an array of char*.
      * @param ctx rs context.
      * @param device_sn Device serial number to be used.
+     * @param verbose Whether to printout infos.
      */
     rs2wrapper(int argc,
                char *argv[],
                rs2::context context,
-               std::string device_sn = "-1");
+               std::string device_sn = "-1",
+               const bool &verbose = true);
 
     /**
      * @brief prepares the config for the rs2 pipeline.
@@ -258,13 +267,12 @@ public:
      * @brief Initialize the realsense devices.
      *
      * @param enable_ir_emitter Whether to use the ir emmiter.
-     * @param verbose Whether to printout infos.
      */
-    void initialize(const bool &enable_ir_emitter = true,
-                    const bool &verbose = true);
+    void initialize(const bool &enable_ir_emitter = true);
     void initialize(const std::string &device_sn,
-                    const bool &enable_ir_emitter = true,
-                    const bool &verbose = true);
+                    const bool &enable_ir_emitter = true);
+    void initialize_depth_sensor();
+    void initialize_depth_sensor(const std::string &device_sn);
 
     /**
      * @brief starts the rs pipeline.
@@ -299,6 +307,7 @@ public:
      */
     void reset();
     void reset(const std::string &device_sn);
+    void reset_hardware(const std::string &device_sn);
 
     /**
      * @brief checks and resets if the reset counter gets too high.

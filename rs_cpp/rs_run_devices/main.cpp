@@ -45,13 +45,20 @@ void multithreading_function(
 {
     std::this_thread::sleep_for(std::chrono::milliseconds(50 * (th_id + 1)));
 
-    rs2wrapper rs2_dev(argc, argv, context, device_sn);
+    {
+        // Initializing RS devices in parallel can be problematic with libusb.
+        std::lock_guard<std::mutex> guard(mux);
+        rs2wrapper rs2_dev(argc, argv, context, device_sn, false);
+        rs2_dev.initialize_depth_sensor();
+    }
+
+    rs2wrapper rs2_dev(argc, argv, context, device_sn, true);
     rs2args rs2_arg = rs2_dev.get_args();
 
     {
         // Initializing RS devices in parallel can be problematic with libusb.
         std::lock_guard<std::mutex> guard(mux);
-        rs2_dev.initialize(true, true);
+        rs2_dev.initialize(true);
         rs2_dev.save_calib();
         rs2_dev.flush_frames();
     }
@@ -146,6 +153,12 @@ bool run(int argc, char *argv[])
     try
     {
         rs2::context ctx;
+
+        {
+            rs2wrapper _rs2_dev(argc, argv, ctx, "-1", false);
+            _rs2_dev.initialize_depth_sensor();
+        }
+
         rs2wrapper rs2_dev(argc, argv, ctx);
         rs2args rs2_arg = rs2_dev.get_args();
 
@@ -153,7 +166,7 @@ bool run(int argc, char *argv[])
         if (available_devices_sn.size() == 0)
             throw rs2::error("No RS device detected...");
 
-        rs2_dev.initialize(true, true);
+        rs2_dev.initialize(true);
         rs2_dev.save_calib();
         rs2_dev.flush_frames();
 
