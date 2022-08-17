@@ -48,7 +48,7 @@ void multithreading_function(
     {
         // Initializing RS devices in parallel can be problematic with libusb.
         std::lock_guard<std::mutex> guard(mux);
-        rs2wrapper rs2_dev(argc, argv, context, device_sn);
+        rs2wrapper rs2_dev(argc, argv, false, context, device_sn);
         rs2_dev.initialize_depth_sensor();
     }
 
@@ -102,7 +102,7 @@ bool run_multithreading(int argc, char *argv[])
         std::vector<std::string> device_sn_list;
 
         {
-            rs2wrapper _rs2_dev = rs2wrapper(argc, argv, ctx, "-1");
+            rs2wrapper _rs2_dev = rs2wrapper(argc, argv, false, ctx, "-1");
             _rs2_dev.prepare_storage();
             device_sn_list = _rs2_dev.get_available_devices_sn();
         }
@@ -156,11 +156,11 @@ bool run(int argc, char *argv[])
         rs2::context ctx;
 
         {
-            rs2wrapper _rs2_dev(argc, argv, ctx, "-1");
+            rs2wrapper _rs2_dev(argc, argv, false, ctx, "-1");
             _rs2_dev.initialize_depth_sensor();
         }
 
-        rs2wrapper rs2_dev(argc, argv, ctx);
+        rs2wrapper rs2_dev(argc, argv, ctx, "-1");
         rs2args rs2_arg = rs2_dev.get_args();
 
         std::vector<std::string> available_devices_sn = rs2_dev.get_available_devices_sn();

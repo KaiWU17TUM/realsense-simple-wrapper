@@ -98,13 +98,23 @@ rs2wrapper::rs2wrapper(int argc,
                        rs2::context context,
                        std::string device_sn)
 {
+    bool _verbose = rs2args(argc, argv).verbose();
+    rs2wrapper(argc, argv, _verbose, context, device_sn);
+}
+rs2wrapper::rs2wrapper(int argc,
+                       char *argv[],
+                       const bool &verbose,
+                       rs2::context context,
+                       std::string device_sn)
+{
     // CLI args
     args = rs2args(argc, argv);
 
-    verbose = args.verbose();
+    // whether to printout stuffs
+    this->verbose = verbose;
 
     // prints out CLI args
-    if (verbose)
+    if (this->verbose)
         args.print_args();
 
     // if arg is given, we use only one rs device
@@ -119,13 +129,13 @@ rs2wrapper::rs2wrapper(int argc,
         ctx = std::make_shared<rs2::context>(context);
         print("Network mode", 0);
         rs2::net_device dev(args.ip());
-        if (verbose)
+        if (this->verbose)
             print("Network device found", 0);
         dev.add_to(*ctx);
         auto serial = dev.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER);
         std::vector<std::string> available_device{serial, args.ip()};
         available_devices.push_back(available_device);
-        if (verbose)
+        if (this->verbose)
             print("using : " + std::string(serial), 0);
     }
     else
@@ -140,7 +150,7 @@ rs2wrapper::rs2wrapper(int argc,
                 auto product_line = dev.get_info(RS2_CAMERA_INFO_PRODUCT_LINE);
                 std::vector<std::string> available_device{serial, product_line};
                 available_devices.push_back(available_device);
-                if (verbose)
+                if (this->verbose)
                     print("found : " + std::string(serial), 0);
             }
         }
@@ -149,7 +159,7 @@ rs2wrapper::rs2wrapper(int argc,
             std::vector<std::string> available_device{single_device_sn.c_str(),
                                                       "D400"};
             available_devices.push_back(available_device);
-            if (verbose)
+            if (this->verbose)
                 print("using : " + std::string(single_device_sn.c_str()), 0);
         }
     }

@@ -243,9 +243,15 @@ public:
      *
      * @param argc Number of arguments.
      * @param argv Arguments in an array of char*.
+     * @param verbose If provided overrides the one in args.
      * @param ctx rs context.
      * @param device_sn Device serial number to be used.
      */
+    rs2wrapper(int argc,
+               char *argv[],
+               const bool &verbose,
+               rs2::context context,
+               std::string device_sn = "-1");
     rs2wrapper(int argc,
                char *argv[],
                rs2::context context,
