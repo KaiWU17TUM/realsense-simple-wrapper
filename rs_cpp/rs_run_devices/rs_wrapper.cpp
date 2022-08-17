@@ -99,13 +99,23 @@ rs2wrapper::rs2wrapper(int argc,
                        std::string device_sn)
 {
     bool _verbose = rs2args(argc, argv).verbose();
-    rs2wrapper(argc, argv, _verbose, context, device_sn);
+    _constructor(argc, argv, _verbose, context, device_sn);
 }
+
 rs2wrapper::rs2wrapper(int argc,
                        char *argv[],
                        const bool &verbose,
                        rs2::context context,
                        std::string device_sn)
+{
+    _constructor(argc, argv, verbose, context, device_sn);
+}
+
+void rs2wrapper::_constructor(int argc,
+                              char *argv[],
+                              const bool &verbose,
+                              rs2::context context,
+                              std::string device_sn)
 {
     // CLI args
     args = rs2args(argc, argv);

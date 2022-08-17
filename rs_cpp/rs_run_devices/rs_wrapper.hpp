@@ -161,6 +161,21 @@ class rs2wrapper
     // -------------------------------------------------------------- [INTERNAL]
 
     /**
+     * @brief Base constructor function
+     *
+     * @param argc Number of arguments.
+     * @param argv Arguments in an array of char*.
+     * @param verbose If provided overrides the one in args.
+     * @param ctx rs context.
+     * @param device_sn Device serial number to be used.
+     */
+    void _constructor(int argc,
+                      char *argv[],
+                      const bool &verbose,
+                      rs2::context context,
+                      std::string device_sn);
+
+    /**
      * @brief Initialize the pipeline.
      *
      */
