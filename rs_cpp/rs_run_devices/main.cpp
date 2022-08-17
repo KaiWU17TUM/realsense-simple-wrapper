@@ -55,7 +55,7 @@ void multithreading_function(
 
     rs2wrapper rs2_dev(argc, argv, context, device_sn);
     rs2args rs2_arg = rs2_dev.get_args();
-    rs2_dev;
+    rs2_dev.set_storagepaths_perdev(storagepaths_perdev);
 
     {
         // Initializing RS devices in parallel can be problematic with libusb.
