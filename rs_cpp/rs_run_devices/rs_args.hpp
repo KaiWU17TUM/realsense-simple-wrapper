@@ -26,7 +26,6 @@ public:
         "--width",
         "--color-format",
         "--depth-format",
-        "--save-path",
     };
 
     std::vector<std::string> _OPTIONAL_ARGS{
@@ -34,6 +33,8 @@ public:
         "--flush-steps",
         "--ip",
         "--multithreading",
+        "--verbose",
+        "--save-path",
     };
 
     /**
@@ -120,6 +121,20 @@ public:
      * @return int
      */
     int reset_interval();
+    /**
+     * @brief
+     *
+     * @return true
+     * @return false
+     */
+    bool verbose();
+    /**
+     * @brief
+     *
+     * @return true
+     * @return false
+     */
+    bool multithreading();
     /**
      * @brief prints out the raw arguments.
      *

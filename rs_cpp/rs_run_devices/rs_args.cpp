@@ -73,6 +73,16 @@ int rs2args::reset_interval()
     return checkarg("--reset-interval") ? getargi("--reset-interval") : 120;
 }
 
+bool rs2args::verbose()
+{
+    return checkarg("--verbose");
+}
+
+bool rs2args::multithreading()
+{
+    return checkarg("--multithreading");
+}
+
 void rs2args::print_args()
 {
     printout();

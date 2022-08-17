@@ -45,6 +45,7 @@ void metadata_to_csv(const rs2::frame &frm, const std::string &filename)
 
 storagepaths::storagepaths()
 {
+    time(&trial_idx);
 }
 
 void storagepaths::create(const std::string &device_sn,
@@ -59,10 +60,8 @@ void storagepaths::create(const std::string &device_sn,
     path.append(device_sn);
     mkdir(path.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
     // System time , trial
-    time_t current_time;
-    time(&current_time);
     path.append("/");
-    path.append(std::to_string(current_time));
+    path.append(std::to_string(trial_idx));
     mkdir(path.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
     // Calib
     calib = path + "/calib";
@@ -97,16 +96,15 @@ void storagepaths::show()
 rs2wrapper::rs2wrapper(int argc,
                        char *argv[],
                        rs2::context context,
-                       std::string device_sn,
-                       const bool &verbose)
+                       std::string device_sn)
 {
-    this->verbose = verbose;
-
     // CLI args
     args = rs2args(argc, argv);
 
+    verbose = args.verbose();
+
     // prints out CLI args
-    if (this->verbose)
+    if (verbose)
         args.print_args();
 
     // if arg is given, we use only one rs device
@@ -121,13 +119,13 @@ rs2wrapper::rs2wrapper(int argc,
         ctx = std::make_shared<rs2::context>(context);
         print("Network mode", 0);
         rs2::net_device dev(args.ip());
-        if (this->verbose)
+        if (verbose)
             print("Network device found", 0);
         dev.add_to(*ctx);
         auto serial = dev.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER);
         std::vector<std::string> available_device{serial, args.ip()};
         available_devices.push_back(available_device);
-        if (this->verbose)
+        if (verbose)
             print("using : " + std::string(serial), 0);
     }
     else
@@ -142,7 +140,7 @@ rs2wrapper::rs2wrapper(int argc,
                 auto product_line = dev.get_info(RS2_CAMERA_INFO_PRODUCT_LINE);
                 std::vector<std::string> available_device{serial, product_line};
                 available_devices.push_back(available_device);
-                if (this->verbose)
+                if (verbose)
                     print("found : " + std::string(serial), 0);
             }
         }
@@ -151,7 +149,7 @@ rs2wrapper::rs2wrapper(int argc,
             std::vector<std::string> available_device{single_device_sn.c_str(),
                                                       "D400"};
             available_devices.push_back(available_device);
-            if (this->verbose)
+            if (verbose)
                 print("using : " + std::string(single_device_sn.c_str()), 0);
         }
     }
@@ -167,7 +165,10 @@ rs2wrapper::rs2wrapper(int argc,
     // get available devices_sn.
     for (auto &&available_device : available_devices)
         available_devices_sn.push_back(available_device[0]);
+}
 
+void rs2wrapper::prepare_storage()
+{
     // storage
     for (auto &&device_sn : available_devices_sn)
     {
@@ -175,12 +176,6 @@ rs2wrapper::rs2wrapper(int argc,
         _storagepaths.create(device_sn, args.save_path());
         storagepaths_perdev[device_sn] = _storagepaths;
     }
-
-    // stream
-    set_color_stream_config(args.width(), args.height(), args.fps(),
-                            args.color_format());
-    set_depth_stream_config(args.width(), args.height(), args.fps(),
-                            args.depth_format());
 }
 
 void rs2wrapper::configure(const std::string &device_sn,
@@ -223,7 +218,11 @@ void rs2wrapper::initialize(const std::string &device_sn,
     rs2::pipeline pipe = initialize_pipeline();
     dev->pipeline = std::make_shared<rs2::pipeline>(pipe);
 
-    // 2. configure
+    // 2. configure stream
+    set_color_stream_config(args.width(), args.height(), args.fps(),
+                            args.color_format());
+    set_depth_stream_config(args.width(), args.height(), args.fps(),
+                            args.depth_format());
     configure(device_sn, stream_config_color, stream_config_depth);
 
     // 3. pipeline start

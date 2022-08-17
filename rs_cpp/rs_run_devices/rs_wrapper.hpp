@@ -86,6 +86,7 @@ struct stream_config
 class storagepaths
 {
 public:
+    time_t trial_idx;
     bool save = true;
     std::string timestamp;
     std::string calib;
@@ -244,13 +245,17 @@ public:
      * @param argv Arguments in an array of char*.
      * @param ctx rs context.
      * @param device_sn Device serial number to be used.
-     * @param verbose Whether to printout infos.
      */
     rs2wrapper(int argc,
                char *argv[],
                rs2::context context,
-               std::string device_sn = "-1",
-               const bool &verbose = true);
+               std::string device_sn = "-1");
+
+    /**
+     * @brief
+     *
+     */
+    void prepare_storage();
 
     /**
      * @brief prepares the config for the rs2 pipeline.
