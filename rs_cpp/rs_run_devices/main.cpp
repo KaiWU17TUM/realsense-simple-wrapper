@@ -102,8 +102,8 @@ bool run_multithreading(int argc, char *argv[])
         std::vector<std::string> device_sn_list;
 
         {
-            rs2wrapper rs2_dev = rs2wrapper(argc, argv, ctx);
-            device_sn_list = rs2_dev.get_available_devices_sn();
+            rs2wrapper _rs2_dev = rs2wrapper(argc, argv, ctx, "-1", false);
+            device_sn_list = _rs2_dev.get_available_devices_sn();
         }
 
         if (device_sn_list.size() == 0)

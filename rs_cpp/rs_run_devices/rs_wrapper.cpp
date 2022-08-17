@@ -278,6 +278,14 @@ void rs2wrapper::initialize(const std::string &device_sn,
     print("Initialized RealSense devices " + std::string(device_sn), 0);
 }
 
+void rs2wrapper::initialize_depth_sensor()
+{
+    for (auto &&device_sn : available_devices_sn)
+    {
+        initialize_depth_sensor(device_sn);
+    }
+}
+
 void rs2wrapper::initialize_depth_sensor(const std::string &device_sn)
 {
     print("Initializing RealSense device depth sensor " + std::string(device_sn), 0);
