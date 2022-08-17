@@ -377,6 +377,7 @@ public:
                                  const int &fps, const rs2_format &format);
     void set_valid_frame_check_flag(const std::string &device_sn,
                                     const bool &flag);
+    void set_storagepaths_perdev(const std::map<std::string, storagepaths> &storagepaths_perdev);
 
     /**
      * @brief Get functions to expose member variables.
@@ -392,6 +393,7 @@ public:
     rs2args get_args();
     rs2_metadata_type get_frame_timestamp(const std::string &device_sn,
                                           const rs2::frame &frame);
+    std::map<std::string, storagepaths> get_storagepaths_perdev();
 
     /**
      * @brief Check functions to see if some condition is true.

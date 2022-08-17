@@ -767,6 +767,11 @@ void rs2wrapper::set_valid_frame_check_flag(const std::string &device_sn,
     this->valid_frame_check_flag[device_sn] = flag;
 }
 
+void rs2wrapper::set_storagepaths_perdev(const std::map<std::string, storagepaths> &storagepaths_perdev)
+{
+    this->storagepaths_perdev = storagepaths_perdev;
+}
+
 int64_t rs2wrapper::get_empty_frame_check_counter(const std::string &device_sn)
 {
     return this->empty_frame_check_counter[device_sn];
@@ -832,6 +837,11 @@ rs2_metadata_type rs2wrapper::get_frame_timestamp(const std::string &device_sn,
         print(e.what(), 2);
         return -1;
     }
+}
+
+std::map<std::string, storagepaths> rs2wrapper::get_storagepaths_perdev()
+{
+    return this->storagepaths_perdev;
 }
 
 bool rs2wrapper::check_enabled_device(const std::string &device_sn,

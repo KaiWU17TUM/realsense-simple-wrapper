@@ -39,6 +39,7 @@ void multithreading_function(
     int argc,
     char *argv[],
     rs2::context context,
+    std::map<std::string, storagepaths> storagepaths_perdev,
     std::string device_sn,
     size_t num_devices,
     std::chrono::steady_clock::time_point global_timestamp)
@@ -54,6 +55,7 @@ void multithreading_function(
 
     rs2wrapper rs2_dev(argc, argv, context, device_sn);
     rs2args rs2_arg = rs2_dev.get_args();
+    rs2_dev;
 
     {
         // Initializing RS devices in parallel can be problematic with libusb.
@@ -100,11 +102,13 @@ bool run_multithreading(int argc, char *argv[])
     {
         rs2::context ctx;
         std::vector<std::string> device_sn_list;
+        std::map<std::string, storagepaths> storagepaths_perdev;
 
         {
             rs2wrapper _rs2_dev = rs2wrapper(argc, argv, false, ctx, "-1");
-            _rs2_dev.prepare_storage();
             device_sn_list = _rs2_dev.get_available_devices_sn();
+            _rs2_dev.prepare_storage();
+            storagepaths_perdev = _rs2_dev.get_storagepaths_perdev();
         }
 
         if (device_sn_list.size() == 0)
@@ -121,6 +125,7 @@ bool run_multithreading(int argc, char *argv[])
                                                       argc,
                                                       argv,
                                                       ctx,
+                                                      storagepaths_perdev,
                                                       device_sn_list[i],
                                                       num_threads,
                                                       global_timestamp); }));
