@@ -119,7 +119,7 @@ def get_parser() -> argparse.ArgumentParser:
                         help='save using key = "c" ')
     parser.add_argument('--rs-save-data',
                         type=str2bool,
-                        default=True,
+                        default=False,
                         help='Whether to save data')
     parser.add_argument('--rs-save-path',
                         type=str,
@@ -127,11 +127,11 @@ def get_parser() -> argparse.ArgumentParser:
                         help='path to save realsense frames if --rs-save-data=True.')  # noqa
     parser.add_argument('--rs-save-color',
                         type=str2bool,
-                        default=True,
+                        default=False,
                         help='Whether to save color frames')
     parser.add_argument('--rs-save-depth',
                         type=str2bool,
-                        default=True,
+                        default=False,
                         help='Whether to save depth frames')
     parser.add_argument('--rs-save-stacked',
                         type=str2bool,
@@ -712,7 +712,7 @@ class RealsenseWrapper:
                 'model': str(intr_color.model),
                 'coeffs': intr_color.coeffs,
                 'format': self.stream_config_color.format,
-                'fps': self.stream_config_color.fps,
+                'fps': self.stream_config_color.framerate,
             })
             calib_config.depth.append({
                 'width': intr_depth.width,
@@ -725,7 +725,7 @@ class RealsenseWrapper:
                 'depth_scale': depth_scale,
                 'depth_baseline': depth_baseline,
                 'format': self.stream_config_depth.format,
-                'fps': self.stream_config_color.fps,
+                'fps': self.stream_config_color.framerate,
             })
             calib_config.T_color_depth.append({
                 'rotation': extr.rotation,

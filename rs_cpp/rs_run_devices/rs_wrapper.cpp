@@ -214,16 +214,75 @@ void rs2wrapper::configure(const std::string &device_sn,
             print("'cfg' usable with 'pipeline' : False", 2);
 }
 
-void rs2wrapper::initialize(const bool &enable_ir_emitter)
+void rs2wrapper::update_roi(const std::string &device_sn)
+{
+    std::shared_ptr<device> dev = enabled_devices[device_sn];
+
+    // https://github.com/IntelRealSense/librealsense/issues/4015
+    // Set the Auto Exposure (AE) Region of Interest (ROI). Should be done after
+    // starting the pipe, will give an error otherwise
+    // Create the ROI for auto exposure (set these values to whatever you need)
+    rs2::region_of_interest roi;
+    roi.min_x = 20;
+    roi.min_y = 350;
+    roi.max_x = 828;
+    roi.max_y = 460;
+
+    try
+    {
+        rs2::roi_sensor roi_sensor = dev->color_sensor->as<rs2::roi_sensor>();
+        auto _pre_region = roi_sensor.get_region_of_interest();
+        std::cout << "pre  color sensor roi:\t"
+                  << _pre_region.min_x << "\t"
+                  << _pre_region.min_y << "\t"
+                  << _pre_region.max_x << "\t"
+                  << _pre_region.max_y << std::endl;
+        roi_sensor.set_region_of_interest(roi);
+        std::cout << "post color sensor roi:\t"
+                  << _pre_region.min_x << "\t"
+                  << _pre_region.min_y << "\t"
+                  << _pre_region.max_x << "\t"
+                  << _pre_region.max_y << std::endl;
+    }
+    catch (const rs2::invalid_value_error &e)
+    {
+        print(device_sn + ":: color :: " + e.what(), 2);
+    }
+
+    try
+    {
+        rs2::roi_sensor roi_sensor = dev->depth_sensor->as<rs2::roi_sensor>();
+        auto _pre_region = roi_sensor.get_region_of_interest();
+        std::cout << "pre  depth sensor roi:\t"
+                  << _pre_region.min_x << "\t"
+                  << _pre_region.min_y << "\t"
+                  << _pre_region.max_x << "\t"
+                  << _pre_region.max_y << std::endl;
+        roi_sensor.set_region_of_interest(roi);
+        std::cout << "post depth sensor roi:\t"
+                  << _pre_region.min_x << "\t"
+                  << _pre_region.min_y << "\t"
+                  << _pre_region.max_x << "\t"
+                  << _pre_region.max_y << std::endl;
+    }
+    catch (const rs2::invalid_value_error &e)
+    {
+        print(device_sn + ":: depth :: " + e.what(), 2);
+    }
+}
+
+void rs2wrapper::initialize(const bool &enable_ir_emitter,
+                            const bool &set_roi)
 {
     for (auto &&device_sn : available_devices_sn)
     {
-        initialize(device_sn, enable_ir_emitter);
+        initialize(device_sn, enable_ir_emitter, set_roi);
     }
 }
 
 void rs2wrapper::initialize(const std::string &device_sn,
-                            const bool &enable_ir_emitter)
+                            const bool &enable_ir_emitter,
+                            const bool &set_roi)
 {
     max_reset_counter = 3 * args.fps();
 
@@ -252,6 +311,17 @@ void rs2wrapper::initialize(const std::string &device_sn,
         print("pipeline started with 100ms sleep...", 0);
 
     // 4. sensors
+
+    // https://github.com/IntelRealSense/librealsense/issues/4015
+    // Set the Auto Exposure (AE) Region of Interest (ROI). Should be done after
+    // starting the pipe, will give an error otherwise
+    // Create the ROI for auto exposure (set these values to whatever you need)
+    rs2::region_of_interest roi;
+    roi.min_x = 20;
+    roi.min_y = 350;
+    roi.max_x = 828;
+    roi.max_y = 460;
+
     std::vector<rs2::sensor> sensors =
         dev->pipeline_profile->get_device().query_sensors();
     for (auto &&sensor : sensors)
@@ -263,14 +333,37 @@ void rs2wrapper::initialize(const std::string &device_sn,
             dev->color_sensor->set_option(RS2_OPTION_AUTO_EXPOSURE_PRIORITY, 0.0f);
             if (verbose)
                 print("color sensor available...", 0);
+
+            rs2::roi_sensor roi_sensor = dev->color_sensor->as<rs2::roi_sensor>();
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            roi_sensor.set_region_of_interest(roi);
+            if (verbose)
+                print("color sensor roi :\t" +
+                          std::to_string(roi.min_x) + "\t" +
+                          std::to_string(roi.min_y) + "\t" +
+                          std::to_string(roi.max_x) + "\t" +
+                          std::to_string(roi.max_y),
+                      0);
         }
         else if (auto dss = sensor.as<rs2::depth_stereo_sensor>())
         {
             dev->depth_sensor = std::make_shared<rs2::depth_stereo_sensor>(dss);
             if (verbose)
                 print("depth sensor available...", 0);
+
+            rs2::roi_sensor roi_sensor = dev->depth_sensor->as<rs2::roi_sensor>();
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            roi_sensor.set_region_of_interest(roi);
+            if (verbose)
+                print("depth sensor roi :\t" +
+                          std::to_string(roi.min_x) + "\t" +
+                          std::to_string(roi.min_y) + "\t" +
+                          std::to_string(roi.max_x) + "\t" +
+                          std::to_string(roi.max_y),
+                      0);
         }
     }
+    // update_roi(device_sn); rs bug
 
     // 5. IR
     if (enable_ir_emitter)
@@ -335,8 +428,8 @@ void rs2wrapper::initialize_depth_sensor(const std::string &device_sn)
     {
         if (auto dss = sensor.as<rs2::depth_stereo_sensor>())
         {
-            int limit = (100 / args.fps()) * 100;
-            // int limit = 1;
+            // int limit = (100 / args.fps()) * 100;
+            int limit = 8500; // default
             print("depth sensor exposure limit set to " + std::to_string(limit), 0);
             dev->depth_sensor = std::make_shared<rs2::depth_stereo_sensor>(dss);
             dev->depth_sensor->set_option(RS2_OPTION_ENABLE_AUTO_EXPOSURE, 1.0f);

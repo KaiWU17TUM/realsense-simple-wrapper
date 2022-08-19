@@ -289,14 +289,18 @@ public:
                    const stream_config &stream_config_color,
                    const stream_config &stream_config_depth);
 
+    void update_roi(const std::string &device_sn);
+
     /**
      * @brief Initialize the realsense devices.
      *
      * @param enable_ir_emitter Whether to use the ir emmiter.
      */
-    void initialize(const bool &enable_ir_emitter = true);
+    void initialize(const bool &enable_ir_emitter = true,
+                    const bool &set_roi = false);
     void initialize(const std::string &device_sn,
-                    const bool &enable_ir_emitter = true);
+                    const bool &enable_ir_emitter = true,
+                    const bool &set_roi = false);
     void initialize_depth_sensor();
     void initialize_depth_sensor(const std::string &device_sn);
 

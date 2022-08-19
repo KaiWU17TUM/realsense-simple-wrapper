@@ -92,7 +92,9 @@ def run_devices(args: argparse.Namespace):
     rsw = RealsenseWrapper(args, args.rs_dev)
     rsw.initialize()
     rsw.set_ir_laser_power(args.rs_laser_power)
-    rsw.save_calibration()
+
+    if args.rs_save_data:
+        rsw.save_calibration()
 
     rsw.dummy_capture(args.rs_fps * 5)
 
