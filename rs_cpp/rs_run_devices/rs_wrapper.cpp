@@ -616,6 +616,26 @@ void rs2wrapper::stop(const std::string &device_sn)
         print(device_sn + " has been stopped...", 0);
 }
 
+void rs2wrapper::stop_sensor()
+{
+    if (enabled_devices.size() > 0)
+        for (auto &&device_sn : enabled_devices_sn)
+            stop_sensor(device_sn);
+    else
+        print("no device has not been enabled, skipping stop_sensor()...", 1);
+}
+
+void rs2wrapper::stop_sensor(const std::string &device_sn)
+{
+    if (!check_enabled_device(device_sn, __func__))
+        return;
+
+    enabled_devices[device_sn]->color_sensor->stop();
+    enabled_devices[device_sn]->depth_sensor->stop();
+    if (verbose)
+        print(device_sn + " has been stopped...", 0);
+}
+
 void rs2wrapper::reset()
 {
     if (enabled_devices.size() > 0)
@@ -633,13 +653,13 @@ void rs2wrapper::reset(const std::string &device_sn)
     std::lock_guard<std::mutex> lock(reset_mux);
 
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
-    stop(device_sn);
+    stop_sensor(device_sn);
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
 
-    rs2::pipeline pipe = initialize_pipeline();
-    enabled_devices[device_sn]->pipeline = std::make_shared<rs2::pipeline>(pipe);
-    if (verbose)
-        print(device_sn + " pipeline has been reinitialized...", 0);
+    // rs2::pipeline pipe = initialize_pipeline();
+    // enabled_devices[device_sn]->pipeline = std::make_shared<rs2::pipeline>(pipe);
+    // if (verbose)
+    //     print(device_sn + " pipeline has been reinitialized...", 0);
     // std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 
     start(device_sn);

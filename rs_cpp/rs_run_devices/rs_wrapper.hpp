@@ -330,6 +330,8 @@ public:
      */
     void stop();
     void stop(const std::string &device_sn);
+    void stop_sensor();
+    void stop_sensor(const std::string &device_sn);
 
     /**
      * @brief resets the pipeline using stop and start.
