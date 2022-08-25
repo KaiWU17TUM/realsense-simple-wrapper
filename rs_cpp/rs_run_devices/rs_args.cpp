@@ -89,6 +89,11 @@ std::string rs2args::save_path()
     return getarg("--save-path");
 }
 
+bool rs2args::initialize_depth_sensor()
+{
+    return checkarg("--initialize-depth-sensor") ? getargb("--initialize-depth-sensor") : false;
+}
+
 // ------------------------------------------------------------------ [OPTIONAL]
 
 void rs2args::print_args()

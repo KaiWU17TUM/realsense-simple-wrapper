@@ -169,8 +169,7 @@ class rs2wrapper
      * @param ctx rs context.
      * @param device_sn Device serial number to be used.
      */
-    void _constructor(int argc,
-                      char *argv[],
+    void _constructor(rs2args args,
                       const bool &verbose,
                       rs2::context context,
                       std::string device_sn);
@@ -269,6 +268,13 @@ public:
                std::string device_sn = "-1");
     rs2wrapper(int argc,
                char *argv[],
+               rs2::context context,
+               std::string device_sn = "-1");
+    rs2wrapper(rs2args args,
+               const bool &verbose,
+               rs2::context context,
+               std::string device_sn = "-1");
+    rs2wrapper(rs2args args,
                rs2::context context,
                std::string device_sn = "-1");
 

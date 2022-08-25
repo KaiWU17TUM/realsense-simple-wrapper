@@ -98,8 +98,8 @@ rs2wrapper::rs2wrapper(int argc,
                        rs2::context context,
                        std::string device_sn)
 {
-    bool _verbose = rs2args(argc, argv).verbose();
-    _constructor(argc, argv, _verbose, context, device_sn);
+    rs2args _args = rs2args(argc, argv);
+    _constructor(_args, _args.verbose(), context, device_sn);
 }
 
 rs2wrapper::rs2wrapper(int argc,
@@ -108,24 +108,39 @@ rs2wrapper::rs2wrapper(int argc,
                        rs2::context context,
                        std::string device_sn)
 {
-    _constructor(argc, argv, verbose, context, device_sn);
+    rs2args _args = rs2args(argc, argv);
+    _constructor(_args, verbose, context, device_sn);
 }
 
-void rs2wrapper::_constructor(int argc,
-                              char *argv[],
+rs2wrapper::rs2wrapper(rs2args args,
+                       rs2::context context,
+                       std::string device_sn)
+{
+    _constructor(args, args.verbose(), context, device_sn);
+}
+
+rs2wrapper::rs2wrapper(rs2args args,
+                       const bool &verbose,
+                       rs2::context context,
+                       std::string device_sn)
+{
+    _constructor(args, verbose, context, device_sn);
+}
+
+void rs2wrapper::_constructor(rs2args args,
                               const bool &verbose,
                               rs2::context context,
                               std::string device_sn)
 {
     // CLI args
-    args = rs2args(argc, argv);
+    this->args = args;
 
     // whether to printout stuffs
     this->verbose = verbose;
 
     // prints out CLI args
     if (this->verbose)
-        args.print_args();
+        this->args.print_args();
 
     // if arg is given, we use only one rs device
     single_device_sn = device_sn;
@@ -134,16 +149,16 @@ void rs2wrapper::_constructor(int argc,
     // ctx = std::make_shared<rs2::context>(context);
 
     // Get available devices
-    if (args.network())
+    if (this->args.network())
     {
         ctx = std::make_shared<rs2::context>(context);
         print("Network mode", 0);
-        rs2::net_device dev(args.ip());
+        rs2::net_device dev(this->args.ip());
         if (this->verbose)
             print("Network device found", 0);
         dev.add_to(*ctx);
         auto serial = dev.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER);
-        std::vector<std::string> available_device{serial, args.ip()};
+        std::vector<std::string> available_device{serial, this->args.ip()};
         available_devices.push_back(available_device);
         if (this->verbose)
             print("using : " + std::string(serial), 0);

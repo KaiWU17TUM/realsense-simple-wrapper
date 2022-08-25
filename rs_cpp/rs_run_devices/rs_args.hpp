@@ -35,6 +35,7 @@ public:
         "--multithreading",
         "--verbose",
         "--save-path",
+        "--initialize-depth-sensor",
     };
 
     /**
@@ -135,6 +136,13 @@ public:
      * @return false
      */
     bool multithreading();
+    /**
+     * @brief
+     *
+     * @return true
+     * @return false
+     */
+    bool initialize_depth_sensor();
     /**
      * @brief prints out the raw arguments.
      *
