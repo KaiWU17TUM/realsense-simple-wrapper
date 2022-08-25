@@ -12,6 +12,8 @@ rs2args::~rs2args()
 {
 }
 
+// [REQUIRED] ------------------------------------------------------------------
+
 int rs2args::steps()
 {
     return getargi("--steps");
@@ -48,9 +50,18 @@ rs2_format rs2args::depth_format()
         throw std::invalid_argument("rs depth format unknown");
 }
 
-std::string rs2args::save_path()
+// ------------------------------------------------------------------ [REQUIRED]
+
+// [OPTIONAL] ------------------------------------------------------------------
+
+int rs2args::reset_interval()
 {
-    return getarg("--save-path");
+    return checkarg("--reset-interval") ? getargi("--reset-interval") : 120;
+}
+
+int rs2args::flush_steps()
+{
+    return checkarg("--flush-steps") ? getargi("--flush-steps") : 30;
 }
 
 std::string rs2args::ip()
@@ -63,25 +74,22 @@ bool rs2args::network()
     return checkarg("--ip") ? true : false;
 }
 
-int rs2args::flush_steps()
+bool rs2args::multithreading()
 {
-    return checkarg("--flush-steps") ? getargi("--flush-steps") : 30;
-}
-
-int rs2args::reset_interval()
-{
-    return checkarg("--reset-interval") ? getargi("--reset-interval") : 120;
+    return checkarg("--multithreading") ? getargb("--multithreading") : false;
 }
 
 bool rs2args::verbose()
 {
-    return checkarg("--verbose");
+    return checkarg("--verbose") ? getargb("--verbose") : false;
 }
 
-bool rs2args::multithreading()
+std::string rs2args::save_path()
 {
-    return checkarg("--multithreading");
+    return getarg("--save-path");
 }
+
+// ------------------------------------------------------------------ [OPTIONAL]
 
 void rs2args::print_args()
 {

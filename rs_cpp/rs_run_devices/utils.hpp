@@ -2,6 +2,7 @@
 #define UTILS_HPP
 
 #include <iostream>
+#include <sstream>
 #include <chrono>
 #include <thread>
 #include <algorithm>
@@ -44,6 +45,7 @@ public:
     ~argparser();
     std::string getarg(const std::string &option);
     int getargi(const std::string &option);
+    bool getargb(const std::string &option);
     bool checkarg(const std::string &option);
     void printout();
 };

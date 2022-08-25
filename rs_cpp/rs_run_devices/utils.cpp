@@ -60,6 +60,13 @@ int argparser::getargi(const std::string &option)
     return std::stoi(getarg(option));
 }
 
+bool argparser::getargb(const std::string &option)
+{
+    bool o;
+    std::istringstream(getarg(option)) >> std::boolalpha >> o;
+    return o;
+}
+
 bool argparser::checkarg(const std::string &option)
 {
     return std::find(args.begin(), args.end(), option) != args.end();
