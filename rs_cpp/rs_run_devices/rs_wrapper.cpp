@@ -99,7 +99,7 @@ rs2wrapper::rs2wrapper(int argc,
                        std::string device_sn)
 {
     rs2args _args = rs2args(argc, argv);
-    _constructor(_args, _args.verbose(), context, device_sn);
+    constructor(_args, _args.verbose(), context, device_sn);
 }
 
 rs2wrapper::rs2wrapper(int argc,
@@ -109,14 +109,14 @@ rs2wrapper::rs2wrapper(int argc,
                        std::string device_sn)
 {
     rs2args _args = rs2args(argc, argv);
-    _constructor(_args, verbose, context, device_sn);
+    constructor(_args, verbose, context, device_sn);
 }
 
 rs2wrapper::rs2wrapper(rs2args args,
                        rs2::context context,
                        std::string device_sn)
 {
-    _constructor(args, args.verbose(), context, device_sn);
+    constructor(args, args.verbose(), context, device_sn);
 }
 
 rs2wrapper::rs2wrapper(rs2args args,
@@ -124,82 +124,7 @@ rs2wrapper::rs2wrapper(rs2args args,
                        rs2::context context,
                        std::string device_sn)
 {
-    _constructor(args, verbose, context, device_sn);
-}
-
-void rs2wrapper::_constructor(rs2args args,
-                              const bool &verbose,
-                              rs2::context context,
-                              std::string device_sn)
-{
-    // CLI args
-    this->args = args;
-
-    // whether to printout stuffs
-    this->verbose = verbose;
-
-    // prints out CLI args
-    if (this->verbose)
-        this->args.print_args();
-
-    // if arg is given, we use only one rs device
-    single_device_sn = device_sn;
-
-    // context grabs the usb resources of the cameras.
-    // ctx = std::make_shared<rs2::context>(context);
-
-    // Get available devices
-    if (this->args.network())
-    {
-        ctx = std::make_shared<rs2::context>(context);
-        print("Network mode", 0);
-        rs2::net_device dev(this->args.ip());
-        if (this->verbose)
-            print("Network device found", 0);
-        dev.add_to(*ctx);
-        auto serial = dev.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER);
-        std::vector<std::string> available_device{serial, this->args.ip()};
-        available_devices.push_back(available_device);
-        if (this->verbose)
-            print("using : " + std::string(serial), 0);
-    }
-    else
-    {
-        print("Local mode", 0);
-        if (single_device_sn == "-1")
-        {
-            ctx = std::make_shared<rs2::context>(context);
-            for (auto &&dev : ctx->query_devices())
-            {
-                auto serial = dev.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER);
-                auto product_line = dev.get_info(RS2_CAMERA_INFO_PRODUCT_LINE);
-                std::vector<std::string> available_device{serial, product_line};
-                available_devices.push_back(available_device);
-                if (this->verbose)
-                    print("found : " + std::string(serial), 0);
-            }
-        }
-        else
-        {
-            std::vector<std::string> available_device{single_device_sn.c_str(),
-                                                      "D400"};
-            available_devices.push_back(available_device);
-            if (this->verbose)
-                print("using : " + std::string(single_device_sn.c_str()), 0);
-        }
-    }
-
-    // Sort the devices.
-    std::sort(available_devices.begin(), available_devices.end(),
-              [](const std::vector<std::string> &a,
-                 const std::vector<std::string> &b)
-              {
-                  return a[0] < b[0];
-              });
-
-    // get available devices_sn.
-    for (auto &&available_device : available_devices)
-        available_devices_sn.push_back(available_device[0]);
+    constructor(args, verbose, context, device_sn);
 }
 
 void rs2wrapper::prepare_storage()
@@ -238,10 +163,10 @@ void rs2wrapper::update_roi(const std::string &device_sn)
     // starting the pipe, will give an error otherwise
     // Create the ROI for auto exposure (set these values to whatever you need)
     rs2::region_of_interest roi;
-    roi.min_x = 20;
+    roi.min_x = 124;
     roi.min_y = 350;
-    roi.max_x = 828;
-    roi.max_y = 460;
+    roi.max_x = 724;
+    roi.max_y = 450;
 
     try
     {
@@ -290,9 +215,7 @@ void rs2wrapper::initialize(const bool &enable_ir_emitter,
                             const bool &set_roi)
 {
     for (auto &&device_sn : available_devices_sn)
-    {
         initialize(device_sn, enable_ir_emitter, set_roi);
-    }
 }
 
 void rs2wrapper::initialize(const std::string &device_sn,
@@ -332,10 +255,10 @@ void rs2wrapper::initialize(const std::string &device_sn,
     // starting the pipe, will give an error otherwise
     // Create the ROI for auto exposure (set these values to whatever you need)
     rs2::region_of_interest roi;
-    roi.min_x = 20;
+    roi.min_x = 124;
     roi.min_y = 350;
-    roi.max_x = 828;
-    roi.max_y = 460;
+    roi.max_x = 724;
+    roi.max_y = 450;
 
     std::vector<rs2::sensor> sensors =
         dev->pipeline_profile->get_device().query_sensors();
@@ -408,9 +331,7 @@ void rs2wrapper::initialize(const std::string &device_sn,
 void rs2wrapper::initialize_depth_sensor()
 {
     for (auto &&device_sn : available_devices_sn)
-    {
         initialize_depth_sensor(device_sn);
-    }
 }
 
 void rs2wrapper::initialize_depth_sensor(const std::string &device_sn)
@@ -457,11 +378,11 @@ void rs2wrapper::initialize_depth_sensor(const std::string &device_sn)
 
 void rs2wrapper::start()
 {
-    if (enabled_devices.size() > 0)
+    if (enabled_devices_sn.size() > 0)
         for (auto &&device_sn : enabled_devices_sn)
             start(device_sn);
     else
-        print("no device has not been enabled, skipping stop()...", 1);
+        print("no device enabled, skipping start()...", 1);
 }
 
 void rs2wrapper::start(const std::string &device_sn)
@@ -469,11 +390,11 @@ void rs2wrapper::start(const std::string &device_sn)
     if (!check_enabled_device(device_sn, __func__))
         return;
 
-    rs2::config cfg = rs_cfg[device_sn];
     std::shared_ptr<device> dev = enabled_devices[device_sn];
-    rs2::pipeline_profile profile = dev->pipeline->start(cfg);
+    rs2::pipeline_profile profile = dev->pipeline->start(rs_cfg[device_sn]);
     if (verbose)
-        print(device_sn + " has been started...", 0);
+        print(device_sn + " started...", 0);
+
     dev->pipeline_profile = std::make_shared<rs2::pipeline_profile>(profile);
     dev->num_streams = dev->pipeline_profile->get_streams().size();
     if (verbose)
@@ -487,7 +408,7 @@ void rs2wrapper::step_clear()
     empty_frame_check_counter.clear();
 }
 
-bool rs2wrapper::step_receiving_frame_from_all_devices()
+bool rs2wrapper::step_frame_received_from_all_devices()
 {
     return valid_frame_check_flag.size() < enabled_devices.size();
 }
@@ -496,7 +417,7 @@ void rs2wrapper::step()
 {
     step_clear();
 
-    while (step_receiving_frame_from_all_devices())
+    while (step_frame_received_from_all_devices())
     {
         for (auto &&device_sn : enabled_devices_sn)
         {
@@ -511,8 +432,6 @@ void rs2wrapper::step()
             }
         }
     }
-
-    // reset_with_high_reset_counter();
 }
 
 void rs2wrapper::step(const std::string &device_sn)
@@ -614,11 +533,11 @@ void rs2wrapper::step(const std::string &device_sn)
 
 void rs2wrapper::stop()
 {
-    if (enabled_devices.size() > 0)
+    if (enabled_devices_sn.size() > 0)
         for (auto &&device_sn : enabled_devices_sn)
             stop(device_sn);
     else
-        print("no device has not been enabled, skipping stop()...", 1);
+        print("no device enabled, skipping stop()...", 1);
 }
 
 void rs2wrapper::stop(const std::string &device_sn)
@@ -628,16 +547,16 @@ void rs2wrapper::stop(const std::string &device_sn)
 
     enabled_devices[device_sn]->pipeline->stop();
     if (verbose)
-        print(device_sn + " has been stopped...", 0);
+        print(device_sn + " stopped...", 0);
 }
 
 void rs2wrapper::stop_sensor()
 {
-    if (enabled_devices.size() > 0)
+    if (enabled_devices_sn.size() > 0)
         for (auto &&device_sn : enabled_devices_sn)
             stop_sensor(device_sn);
     else
-        print("no device has not been enabled, skipping stop_sensor()...", 1);
+        print("no device enabled, skipping stop_sensor()...", 1);
 }
 
 void rs2wrapper::stop_sensor(const std::string &device_sn)
@@ -648,16 +567,16 @@ void rs2wrapper::stop_sensor(const std::string &device_sn)
     enabled_devices[device_sn]->color_sensor->stop();
     enabled_devices[device_sn]->depth_sensor->stop();
     if (verbose)
-        print(device_sn + " has been stopped...", 0);
+        print(device_sn + " stopped...", 0);
 }
 
 void rs2wrapper::reset()
 {
-    if (enabled_devices.size() > 0)
+    if (enabled_devices_sn.size() > 0)
         for (auto &&device_sn : enabled_devices_sn)
             reset(device_sn);
     else
-        print("no device has not been enabled, skipping reset()...", 1);
+        print("no device enabled, skipping reset()...", 1);
 }
 
 void rs2wrapper::reset(const std::string &device_sn)
@@ -667,19 +586,20 @@ void rs2wrapper::reset(const std::string &device_sn)
 
     std::lock_guard<std::mutex> lock(reset_mux);
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(500));
     stop_sensor(device_sn);
-    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    if (verbose)
+        print(device_sn + " pipeline stopped + paused with 1000ms sleep...", 0);
 
     // rs2::pipeline pipe = initialize_pipeline();
     // enabled_devices[device_sn]->pipeline = std::make_shared<rs2::pipeline>(pipe);
     // if (verbose)
-    //     print(device_sn + " pipeline has been reinitialized...", 0);
+    //     print(device_sn + " pipeline reinitialized...", 0);
     // std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 
     start(device_sn);
     if (verbose)
-        print(device_sn + " pipeline has been restarted with 1000ms sleep...", 0);
+        print(device_sn + " pipeline restarted with 1000ms sleep...", 0);
 }
 
 void rs2wrapper::reset_hardware(const std::string &device_sn)
@@ -704,21 +624,21 @@ void rs2wrapper::reset_hardware(const std::string &device_sn)
     rs2::pipeline pipe = initialize_pipeline();
     enabled_devices[device_sn]->pipeline = std::make_shared<rs2::pipeline>(pipe);
     if (verbose)
-        print(device_sn + " pipeline has been reinitialized...", 0);
+        print(device_sn + " pipeline reinitialized...", 0);
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
     start(device_sn);
     if (verbose)
-        print(device_sn + " pipeline has been restarted with 300ms sleep...", 0);
+        print(device_sn + " pipeline restarted with 300ms sleep...", 0);
 }
 
 void rs2wrapper::reset_with_high_reset_counter()
 {
-    if (enabled_devices.size() > 0)
+    if (enabled_devices_sn.size() > 0)
         for (auto &&device_sn : enabled_devices_sn)
             reset_with_high_reset_counter(device_sn);
     else
-        print("no device has not been enabled, skipping reset_with_high_reset_counter()...", 1);
+        print("no device enabled, skipping reset_with_high_reset_counter()...", 1);
 }
 
 void rs2wrapper::reset_with_high_reset_counter(const std::string &device_sn)
@@ -749,11 +669,11 @@ void rs2wrapper::reset_with_high_reset_counter(const std::string &device_sn)
 
 void rs2wrapper::save_calib()
 {
-    if (enabled_devices.size() > 0)
+    if (enabled_devices_sn.size() > 0)
         for (auto &&device_sn : enabled_devices_sn)
             save_calib(device_sn);
     else
-        print("no device has not been enabled, skipping save_calib()...", 1);
+        print("no device enabled, skipping save_calib()...", 1);
 }
 
 void rs2wrapper::save_calib(const std::string &device_sn)
@@ -832,11 +752,11 @@ void rs2wrapper::save_calib(const std::string &device_sn)
 
 void rs2wrapper::flush_frames(const int &num_frames)
 {
-    if (enabled_devices.size() > 0)
+    if (enabled_devices_sn.size() > 0)
         for (auto &&device_sn : enabled_devices_sn)
             flush_frames(device_sn, num_frames);
     else
-        print("no device has not been enabled, skipping flush_frames()...", 1);
+        print("no device enabled, skipping flush_frames()...", 1);
 }
 
 void rs2wrapper::flush_frames(const std::string &device_sn,
@@ -868,6 +788,10 @@ void rs2wrapper::reset_global_timestamp(std::chrono::steady_clock::time_point gl
 {
     this->global_timestamp_start = global_timestamp;
 }
+
+/*******************************************************************************
+ * rs2wrapper PUBLIC FUNCTIONS : SET, GET, CHECK
+ ******************************************************************************/
 
 void rs2wrapper::set_color_stream_config(const int &width, const int &height,
                                          const int &fps, const rs2_format &format)
@@ -998,6 +922,81 @@ bool rs2wrapper::check_valid_color_depth_streams(const std::string &device_sn,
 /*******************************************************************************
  * rs2wrapper PRIVATAE FUNCTIONS
  ******************************************************************************/
+void rs2wrapper::constructor(rs2args args,
+                             const bool &verbose,
+                             rs2::context context,
+                             std::string device_sn)
+{
+    // CLI args
+    this->args = args;
+
+    // whether to printout stuffs
+    this->verbose = verbose;
+
+    // prints out CLI args
+    if (this->verbose)
+        this->args.print_args();
+
+    // if arg is given, we use only one rs device
+    single_device_sn = device_sn;
+
+    // context grabs the usb resources of the cameras.
+    // ctx = std::make_shared<rs2::context>(context);
+
+    // Get available devices
+    if (this->args.network())
+    {
+        ctx = std::make_shared<rs2::context>(context);
+        print("Network mode", 0);
+        rs2::net_device dev(this->args.ip());
+        if (this->verbose)
+            print("Network device found", 0);
+        dev.add_to(*ctx);
+        auto serial = dev.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER);
+        std::vector<std::string> available_device{serial, this->args.ip()};
+        available_devices.push_back(available_device);
+        if (this->verbose)
+            print("using : " + std::string(serial), 0);
+    }
+    else
+    {
+        print("Local mode", 0);
+        if (single_device_sn == "-1")
+        {
+            ctx = std::make_shared<rs2::context>(context);
+            for (auto &&dev : ctx->query_devices())
+            {
+                auto serial = dev.get_info(RS2_CAMERA_INFO_SERIAL_NUMBER);
+                auto product_line = dev.get_info(RS2_CAMERA_INFO_PRODUCT_LINE);
+                std::vector<std::string> available_device{serial, product_line};
+                available_devices.push_back(available_device);
+                if (this->verbose)
+                    print("found : " + std::string(serial), 0);
+            }
+        }
+        else
+        {
+            std::vector<std::string> available_device{single_device_sn.c_str(),
+                                                      "D400"};
+            available_devices.push_back(available_device);
+            if (this->verbose)
+                print("using : " + std::string(single_device_sn.c_str()), 0);
+        }
+    }
+
+    // Sort the devices.
+    std::sort(available_devices.begin(), available_devices.end(),
+              [](const std::vector<std::string> &a,
+                 const std::vector<std::string> &b)
+              {
+                  return a[0] < b[0];
+              });
+
+    // get available devices_sn.
+    for (auto &&available_device : available_devices)
+        available_devices_sn.push_back(available_device[0]);
+}
+
 rs2::pipeline rs2wrapper::initialize_pipeline()
 {
     if (args.network())

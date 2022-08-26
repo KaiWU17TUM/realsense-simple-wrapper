@@ -169,7 +169,7 @@ class rs2wrapper
      * @param ctx rs context.
      * @param device_sn Device serial number to be used.
      */
-    void _constructor(rs2args args,
+    void constructor(rs2args args,
                       const bool &verbose,
                       rs2::context context,
                       std::string device_sn);
@@ -328,7 +328,7 @@ public:
     void step();
     void step(const std::string &device_sn);
     void step_clear();
-    bool step_receiving_frame_from_all_devices();
+    bool step_frame_received_from_all_devices();
 
     /**
      * @brief Stops the devices through rs2::pipeline
