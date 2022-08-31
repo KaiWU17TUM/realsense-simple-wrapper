@@ -345,7 +345,10 @@ void rs2wrapper::step(const std::string &device_sn)
                     // Loops through the streams to get color and depth.
                     // This is needed for multi cam setup.
                     bool error_flag = process_color_depth_stream(
-                        device_sn, aligned_frameset, current_color_timestamp,
+                        device_sn,
+                        aligned_frameset,
+                        global_timestamp_diff,
+                        current_color_timestamp,
                         current_depth_timestamp);
 
                     // Saves the timestamps and generate output message.
@@ -436,10 +439,10 @@ void rs2wrapper::reset(const std::string &device_sn)
 
     std::lock_guard<std::mutex> lock(reset_mux);
 
-    stop_sensor(device_sn);
-    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    stop(device_sn);
+    std::this_thread::sleep_for(std::chrono::milliseconds(3000));
     if (verbose)
-        print(device_sn + " pipeline stopped + paused with 1000ms sleep...", 0);
+        print(device_sn + " pipeline stopped + paused with 3000ms sleep...", 0);
 
     // rs2::pipeline pipe = initialize_pipeline();
     // enabled_devices[device_sn]->pipeline = std::make_shared<rs2::pipeline>(pipe);
@@ -449,7 +452,7 @@ void rs2wrapper::reset(const std::string &device_sn)
 
     start(device_sn);
     if (verbose)
-        print(device_sn + " pipeline restarted with 1000ms sleep...", 0);
+        print(device_sn + " pipeline restarted...", 0);
 }
 
 void rs2wrapper::reset_hardware(const std::string &device_sn)
@@ -908,13 +911,14 @@ rs2::pipeline rs2wrapper::initialize_pipeline()
 
 bool rs2wrapper::process_color_stream(const std::string &device_sn,
                                       const rs2::frameset &frameset,
+                                      const int64_t &global_timestamp,
                                       rs2_metadata_type &timestamp)
 {
     try
     {
         rs2::frame frame = frameset.first_or_default(RS2_STREAM_COLOR);
         timestamp = get_frame_timestamp(device_sn, frame);
-        std::string filename = pad_zeros(std::to_string(timestamp), 12);
+        std::string filename = pad_zeros(std::to_string(global_timestamp), 20);
         // Record per-frame metadata for UVC streams
         std::string csv_file =
             storagepaths_perdev[device_sn].color_metadata + "/" + filename + ".csv";
@@ -971,13 +975,14 @@ bool rs2wrapper::process_color_stream(const std::string &device_sn,
 
 bool rs2wrapper::process_depth_stream(const std::string &device_sn,
                                       const rs2::frameset &frameset,
+                                      const int64_t &global_timestamp,
                                       rs2_metadata_type &timestamp)
 {
     try
     {
         rs2::frame frame = frameset.first_or_default(RS2_STREAM_DEPTH);
         timestamp = get_frame_timestamp(device_sn, frame);
-        std::string filename = pad_zeros(std::to_string(timestamp), 12);
+        std::string filename = pad_zeros(std::to_string(global_timestamp), 20);
         // Record per-frame metadata for UVC streams
         std::string csv_file =
             storagepaths_perdev[device_sn].depth_metadata + "/" + filename + ".csv";
@@ -1034,6 +1039,7 @@ bool rs2wrapper::process_depth_stream(const std::string &device_sn,
 
 bool rs2wrapper::process_color_depth_stream(const std::string &device_sn,
                                             const rs2::frameset &frameset,
+                                            const int64_t &global_timestamp,
                                             rs2_metadata_type &color_timestamp,
                                             rs2_metadata_type &depth_timestamp)
 {
@@ -1044,7 +1050,8 @@ bool rs2wrapper::process_color_depth_stream(const std::string &device_sn,
     {
         if (stream.stream_type() == RS2_STREAM_COLOR)
         {
-            if (!process_color_stream(device_sn, frameset, color_timestamp))
+            if (!process_color_stream(device_sn, frameset,
+                                      global_timestamp, color_timestamp))
             {
                 dev->color_reset_counter += args.fps();
                 reset_flags[device_sn] = true;
@@ -1058,7 +1065,8 @@ bool rs2wrapper::process_color_depth_stream(const std::string &device_sn,
         else if (stream.stream_type() == RS2_STREAM_DEPTH)
         {
             print_camera_temperature(device_sn);
-            if (!process_depth_stream(device_sn, frameset, depth_timestamp))
+            if (!process_depth_stream(device_sn, frameset,
+                                      global_timestamp, depth_timestamp))
             {
                 dev->depth_reset_counter += args.fps();
                 reset_flags[device_sn] = true;

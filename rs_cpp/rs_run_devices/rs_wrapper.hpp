@@ -234,12 +234,15 @@ private:
      */
     bool process_color_stream(const std::string &device_sn,
                               const rs2::frameset &frameset,
+                              const int64_t &global_timestamp,
                               rs2_metadata_type &timestamp);
     bool process_depth_stream(const std::string &device_sn,
                               const rs2::frameset &frameset,
+                              const int64_t &global_timestamp,
                               rs2_metadata_type &timestamp);
     bool process_color_depth_stream(const std::string &device_sn,
                                     const rs2::frameset &frameset,
+                                    const int64_t &global_timestamp,
                                     rs2_metadata_type &color_timestamp,
                                     rs2_metadata_type &depth_timestamp);
 
