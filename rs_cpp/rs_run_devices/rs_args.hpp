@@ -36,6 +36,7 @@ public:
         "--verbose",
         "--save-path",
         "--initialize-depth-sensor",
+        "--autoexposure",
     };
 
     /**
@@ -143,6 +144,13 @@ public:
      * @return false
      */
     bool initialize_depth_sensor();
+    /**
+     * @brief
+     *
+     * @return true
+     * @return false
+     */
+    bool autoexposure();
     /**
      * @brief prints out the raw arguments.
      *

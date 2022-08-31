@@ -94,6 +94,11 @@ bool rs2args::initialize_depth_sensor()
     return checkarg("--initialize-depth-sensor") ? getargb("--initialize-depth-sensor") : false;
 }
 
+bool rs2args::autoexposure()
+{
+    return checkarg("--autoexposure") ? getargb("--autoexposure") : true;
+}
+
 // ------------------------------------------------------------------ [OPTIONAL]
 
 void rs2args::print_args()

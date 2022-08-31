@@ -267,21 +267,31 @@ void rs2wrapper::initialize(const std::string &device_sn,
         if (auto css = sensor.as<rs2::color_sensor>())
         {
             dev->color_sensor = std::make_shared<rs2::color_sensor>(css);
-            dev->color_sensor->set_option(RS2_OPTION_ENABLE_AUTO_EXPOSURE, 1.0f);
-            dev->color_sensor->set_option(RS2_OPTION_AUTO_EXPOSURE_PRIORITY, 0.0f);
             if (verbose)
                 print("color sensor available...", 0);
 
-            rs2::roi_sensor roi_sensor = dev->color_sensor->as<rs2::roi_sensor>();
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            roi_sensor.set_region_of_interest(roi);
-            if (verbose)
-                print("color sensor roi :\t" +
-                          std::to_string(roi.min_x) + "\t" +
-                          std::to_string(roi.min_y) + "\t" +
-                          std::to_string(roi.max_x) + "\t" +
-                          std::to_string(roi.max_y),
-                      0);
+            if (!args.autoexposure())
+            {
+                dev->color_sensor->set_option(RS2_OPTION_ENABLE_AUTO_EXPOSURE, 0.0f);
+                dev->color_sensor->set_option(RS2_OPTION_EXPOSURE, 100.0);
+                if (verbose)
+                    print("no AE for color sensor...", 0);
+            }
+            else
+            {
+                dev->color_sensor->set_option(RS2_OPTION_ENABLE_AUTO_EXPOSURE, 1.0f);
+                dev->color_sensor->set_option(RS2_OPTION_AUTO_EXPOSURE_PRIORITY, 0.0f);
+                rs2::roi_sensor roi_sensor = dev->color_sensor->as<rs2::roi_sensor>();
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                roi_sensor.set_region_of_interest(roi);
+                if (verbose)
+                    print("color sensor roi :\t" +
+                              std::to_string(roi.min_x) + "\t" +
+                              std::to_string(roi.min_y) + "\t" +
+                              std::to_string(roi.max_x) + "\t" +
+                              std::to_string(roi.max_y),
+                          0);
+            }
         }
         else if (auto dss = sensor.as<rs2::depth_stereo_sensor>())
         {
@@ -289,16 +299,28 @@ void rs2wrapper::initialize(const std::string &device_sn,
             if (verbose)
                 print("depth sensor available...", 0);
 
-            rs2::roi_sensor roi_sensor = dev->depth_sensor->as<rs2::roi_sensor>();
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
-            roi_sensor.set_region_of_interest(roi);
-            if (verbose)
-                print("depth sensor roi :\t" +
-                          std::to_string(roi.min_x) + "\t" +
-                          std::to_string(roi.min_y) + "\t" +
-                          std::to_string(roi.max_x) + "\t" +
-                          std::to_string(roi.max_y),
-                      0);
+            if (!args.autoexposure())
+            {
+                dev->depth_sensor->set_option(RS2_OPTION_ENABLE_AUTO_EXPOSURE, 0.0f);
+                dev->depth_sensor->set_option(RS2_OPTION_EXPOSURE, 1000.0);
+                if (verbose)
+                    print("no AE for depth sensor...", 0);
+            }
+            else
+            {
+                // this is done in another init function.
+                // dev->depth_sensor->set_option(RS2_OPTION_ENABLE_AUTO_EXPOSURE, 1.0f);
+                rs2::roi_sensor roi_sensor = dev->depth_sensor->as<rs2::roi_sensor>();
+                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                roi_sensor.set_region_of_interest(roi);
+                if (verbose)
+                    print("depth sensor roi :\t" +
+                              std::to_string(roi.min_x) + "\t" +
+                              std::to_string(roi.min_y) + "\t" +
+                              std::to_string(roi.max_x) + "\t" +
+                              std::to_string(roi.max_y),
+                          0);
+            }
         }
     }
     // update_roi(device_sn); rs bug
