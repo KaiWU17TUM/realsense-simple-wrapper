@@ -10,6 +10,8 @@ add_executable(rs_run_devices
                utils.cpp
                rs_args.hpp 
                rs_args.cpp 
+               rs_utils.hpp 
+               rs_utils.cpp 
                rs_wrapper.hpp 
                rs_wrapper.cpp 
                main.cpp )

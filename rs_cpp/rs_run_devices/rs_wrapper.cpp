@@ -2,94 +2,6 @@
 
 std::mutex reset_mux;
 
-bool framedata_to_bin(const rs2::frame &frm, const std::string &filename)
-{
-    bool ret = false;
-    rs2::video_frame image = frm.as<rs2::video_frame>();
-    if (image)
-    {
-        std::ofstream outfile(filename, std::ofstream::binary);
-        outfile.write(static_cast<const char *>(image.get_data()),
-                      image.get_height() * image.get_stride_in_bytes());
-        outfile.close();
-        ret = true;
-    }
-    return ret;
-}
-
-void metadata_to_csv(const rs2::frame &frm, const std::string &filename)
-{
-    std::ofstream csv;
-    csv.open(filename);
-
-    csv << "Stream,"
-        << rs2_stream_to_string(frm.get_profile().stream_type())
-        << "\nAttribute,Value\n";
-
-    rs2_frame_metadata_value metadata_idx;
-    for (size_t i = 0; i < RS2_FRAME_METADATA_COUNT; i++)
-    {
-        metadata_idx = (rs2_frame_metadata_value)i;
-        if (frm.supports_frame_metadata(metadata_idx))
-        {
-            // rs2_metadata_type => long long.
-            rs2_metadata_type metadata = frm.get_frame_metadata(metadata_idx);
-            csv << rs2_frame_metadata_to_string(metadata_idx)
-                << ","
-                << metadata
-                << "\n";
-        }
-    }
-    csv.close();
-}
-
-storagepaths::storagepaths()
-{
-    time(&trial_idx);
-}
-
-void storagepaths::create(const std::string &device_sn,
-                          const std::string &base_path)
-{
-    std::string path;
-    // Base
-    path = base_path;
-    mkdir(path.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
-    // Device
-    path.append("/");
-    path.append(device_sn);
-    mkdir(path.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
-    // System time , trial
-    path.append("/");
-    path.append(std::to_string(trial_idx));
-    mkdir(path.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
-    // Calib
-    calib = path + "/calib";
-    mkdir(calib.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
-    // Timestamp
-    timestamp = path + "/timestamp";
-    mkdir(timestamp.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
-    // Color
-    color = path + "/color";
-    mkdir(color.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
-    color_metadata = path + "/color_metadata";
-    mkdir(color_metadata.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
-    // Depth
-    depth = path + "/depth";
-    mkdir(depth.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
-    depth_metadata = path + "/depth_metadata";
-    mkdir(depth_metadata.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
-}
-
-void storagepaths::show()
-{
-    print("calib : " + calib, 0);
-    print("color : " + color, 0);
-    print("depth : " + depth, 0);
-    print("color_metadata : " + color_metadata, 0);
-    print("depth_metadata : " + depth_metadata, 0);
-}
-
 /*******************************************************************************
  * rs2wrapper PUBLIC FUNCTIONS
  ******************************************************************************/
@@ -127,90 +39,6 @@ rs2wrapper::rs2wrapper(rs2args args,
     constructor(args, verbose, context, device_sn);
 }
 
-void rs2wrapper::prepare_storage()
-{
-    // storage
-    for (auto &&device_sn : available_devices_sn)
-    {
-        storagepaths _storagepaths;
-        _storagepaths.create(device_sn, args.save_path());
-        storagepaths_perdev[device_sn] = _storagepaths;
-    }
-}
-
-void rs2wrapper::configure(const std::string &device_sn,
-                           const stream_config &stream_config_color,
-                           const stream_config &stream_config_depth)
-{
-    rs_cfg[device_sn] = rs2::config();
-    configure_stream(device_sn, stream_config_color, stream_config_depth);
-    if (!args.network())
-        rs_cfg[device_sn].enable_device(std::string(device_sn));
-    bool check = rs_cfg[device_sn].can_resolve(*enabled_devices[device_sn]->pipeline);
-    if (verbose)
-        if (check)
-            print("'cfg' usable with 'pipeline' : True", 0);
-        else
-            print("'cfg' usable with 'pipeline' : False", 2);
-}
-
-void rs2wrapper::update_roi(const std::string &device_sn)
-{
-    std::shared_ptr<device> dev = enabled_devices[device_sn];
-
-    // https://github.com/IntelRealSense/librealsense/issues/4015
-    // Set the Auto Exposure (AE) Region of Interest (ROI). Should be done after
-    // starting the pipe, will give an error otherwise
-    // Create the ROI for auto exposure (set these values to whatever you need)
-    rs2::region_of_interest roi;
-    roi.min_x = 124;
-    roi.min_y = 350;
-    roi.max_x = 724;
-    roi.max_y = 450;
-
-    try
-    {
-        rs2::roi_sensor roi_sensor = dev->color_sensor->as<rs2::roi_sensor>();
-        auto _pre_region = roi_sensor.get_region_of_interest();
-        std::cout << "pre  color sensor roi:\t"
-                  << _pre_region.min_x << "\t"
-                  << _pre_region.min_y << "\t"
-                  << _pre_region.max_x << "\t"
-                  << _pre_region.max_y << std::endl;
-        roi_sensor.set_region_of_interest(roi);
-        std::cout << "post color sensor roi:\t"
-                  << _pre_region.min_x << "\t"
-                  << _pre_region.min_y << "\t"
-                  << _pre_region.max_x << "\t"
-                  << _pre_region.max_y << std::endl;
-    }
-    catch (const rs2::invalid_value_error &e)
-    {
-        print(device_sn + ":: color :: " + e.what(), 2);
-    }
-
-    try
-    {
-        rs2::roi_sensor roi_sensor = dev->depth_sensor->as<rs2::roi_sensor>();
-        auto _pre_region = roi_sensor.get_region_of_interest();
-        std::cout << "pre  depth sensor roi:\t"
-                  << _pre_region.min_x << "\t"
-                  << _pre_region.min_y << "\t"
-                  << _pre_region.max_x << "\t"
-                  << _pre_region.max_y << std::endl;
-        roi_sensor.set_region_of_interest(roi);
-        std::cout << "post depth sensor roi:\t"
-                  << _pre_region.min_x << "\t"
-                  << _pre_region.min_y << "\t"
-                  << _pre_region.max_x << "\t"
-                  << _pre_region.max_y << std::endl;
-    }
-    catch (const rs2::invalid_value_error &e)
-    {
-        print(device_sn + ":: depth :: " + e.what(), 2);
-    }
-}
-
 void rs2wrapper::initialize(const bool &enable_ir_emitter,
                             const bool &set_roi)
 {
@@ -240,7 +68,7 @@ void rs2wrapper::initialize(const std::string &device_sn,
                             args.color_format());
     set_depth_stream_config(args.width(), args.height(), args.fps(),
                             args.depth_format());
-    configure(device_sn, stream_config_color, stream_config_depth);
+    configure_stream_with_checks(device_sn, stream_config_color, stream_config_depth);
 
     // 3. pipeline start
     start(device_sn);
@@ -373,7 +201,7 @@ void rs2wrapper::initialize_depth_sensor(const std::string &device_sn)
     // HACK: sensor AE configuration seems to only work for fps = 6
     stream_config_color.framerate = 6;
     stream_config_depth.framerate = 6;
-    configure(device_sn, stream_config_color, stream_config_depth);
+    configure_stream_with_checks(device_sn, stream_config_color, stream_config_depth);
 
     // 3. pipeline start
     start(device_sn);
@@ -811,6 +639,17 @@ void rs2wrapper::reset_global_timestamp(std::chrono::steady_clock::time_point gl
     this->global_timestamp_start = global_timestamp;
 }
 
+void rs2wrapper::prepare_storage()
+{
+    // storage
+    for (auto &&device_sn : available_devices_sn)
+    {
+        storagepaths _storagepaths;
+        _storagepaths.create(device_sn, args.save_path());
+        storagepaths_perdev[device_sn] = _storagepaths;
+    }
+}
+
 /*******************************************************************************
  * rs2wrapper PUBLIC FUNCTIONS : SET, GET, CHECK
  ******************************************************************************/
@@ -1019,71 +858,6 @@ void rs2wrapper::constructor(rs2args args,
         available_devices_sn.push_back(available_device[0]);
 }
 
-rs2::pipeline rs2wrapper::initialize_pipeline()
-{
-    if (args.network())
-    {
-        rs2::pipeline pipe(*ctx);
-        return pipe;
-    }
-    else
-    {
-        rs2::pipeline pipe;
-        return pipe;
-    }
-}
-
-void rs2wrapper::query_timestamp_mode(const std::string &device_sn)
-{
-    for (auto &&frame : enabled_devices[device_sn]->pipeline->wait_for_frames())
-    {
-        if (auto vf = frame.as<rs2::video_frame>())
-        {
-            if (vf.supports_frame_metadata(RS2_FRAME_METADATA_SENSOR_TIMESTAMP))
-            {
-                if (verbose)
-                    print("using RS2_FRAME_METADATA_SENSOR_TIMESTAMP", 0);
-                timestamp_mode = RS2_FRAME_METADATA_SENSOR_TIMESTAMP;
-            }
-            else if (vf.supports_frame_metadata(RS2_FRAME_METADATA_FRAME_TIMESTAMP))
-            {
-                if (verbose)
-                    print("using RS2_FRAME_METADATA_FRAME_TIMESTAMP", 0);
-                timestamp_mode = RS2_FRAME_METADATA_FRAME_TIMESTAMP;
-            }
-            else if (vf.supports_frame_metadata(RS2_FRAME_METADATA_TIME_OF_ARRIVAL))
-            {
-                if (verbose)
-                    print("using RS2_FRAME_METADATA_TIME_OF_ARRIVAL", 0);
-                timestamp_mode = RS2_FRAME_METADATA_FRAME_TIMESTAMP;
-            }
-            break;
-        }
-    }
-}
-
-void rs2wrapper::save_timestamp(const std::string &device_sn,
-                                const int64_t &global_timestamp,
-                                const rs2_metadata_type &color_timestamp,
-                                const rs2_metadata_type &depth_timestamp)
-{
-    auto _path = storagepaths_perdev[device_sn].timestamp + "/timestamp.txt";
-    std::fstream filestream;
-    filestream.open(_path, std::fstream::in | std::fstream::out | std::fstream::app);
-    // If file does not exist, Create new file
-    if (!filestream)
-    {
-        filestream.open(_path, std::fstream::in | std::fstream::out | std::fstream::trunc);
-    }
-    filestream << global_timestamp
-               << "::"
-               << color_timestamp
-               << "::"
-               << depth_timestamp
-               << "\n";
-    filestream.close();
-}
-
 void rs2wrapper::configure_stream(const std::string &device_sn,
                                   const stream_config &stream_config_color,
                                   const stream_config &stream_config_depth)
@@ -1100,6 +874,36 @@ void rs2wrapper::configure_stream(const std::string &device_sn,
                       stream_config_depth.format,
                       stream_config_depth.framerate);
     rs_cfg[device_sn] = cfg;
+}
+
+void rs2wrapper::configure_stream_with_checks(const std::string &device_sn,
+                                              const stream_config &stream_config_color,
+                                              const stream_config &stream_config_depth)
+{
+    rs_cfg[device_sn] = rs2::config();
+    configure_stream(device_sn, stream_config_color, stream_config_depth);
+    if (!args.network())
+        rs_cfg[device_sn].enable_device(std::string(device_sn));
+    bool check = rs_cfg[device_sn].can_resolve(*enabled_devices[device_sn]->pipeline);
+    if (verbose)
+        if (check)
+            print("'cfg' usable with 'pipeline' : True", 0);
+        else
+            print("'cfg' usable with 'pipeline' : False", 2);
+}
+
+rs2::pipeline rs2wrapper::initialize_pipeline()
+{
+    if (args.network())
+    {
+        rs2::pipeline pipe(*ctx);
+        return pipe;
+    }
+    else
+    {
+        rs2::pipeline pipe;
+        return pipe;
+    }
 }
 
 bool rs2wrapper::process_color_stream(const std::string &device_sn,
@@ -1305,6 +1109,57 @@ bool rs2wrapper::align_frameset(const std::string &device_sn,
         print(e.what(), 2);
         return false;
     }
+}
+
+void rs2wrapper::query_timestamp_mode(const std::string &device_sn)
+{
+    for (auto &&frame : enabled_devices[device_sn]->pipeline->wait_for_frames())
+    {
+        if (auto vf = frame.as<rs2::video_frame>())
+        {
+            if (vf.supports_frame_metadata(RS2_FRAME_METADATA_SENSOR_TIMESTAMP))
+            {
+                if (verbose)
+                    print("using RS2_FRAME_METADATA_SENSOR_TIMESTAMP", 0);
+                timestamp_mode = RS2_FRAME_METADATA_SENSOR_TIMESTAMP;
+            }
+            else if (vf.supports_frame_metadata(RS2_FRAME_METADATA_FRAME_TIMESTAMP))
+            {
+                if (verbose)
+                    print("using RS2_FRAME_METADATA_FRAME_TIMESTAMP", 0);
+                timestamp_mode = RS2_FRAME_METADATA_FRAME_TIMESTAMP;
+            }
+            else if (vf.supports_frame_metadata(RS2_FRAME_METADATA_TIME_OF_ARRIVAL))
+            {
+                if (verbose)
+                    print("using RS2_FRAME_METADATA_TIME_OF_ARRIVAL", 0);
+                timestamp_mode = RS2_FRAME_METADATA_FRAME_TIMESTAMP;
+            }
+            break;
+        }
+    }
+}
+
+void rs2wrapper::save_timestamp(const std::string &device_sn,
+                                const int64_t &global_timestamp,
+                                const rs2_metadata_type &color_timestamp,
+                                const rs2_metadata_type &depth_timestamp)
+{
+    auto _path = storagepaths_perdev[device_sn].timestamp + "/timestamp.txt";
+    std::fstream filestream;
+    filestream.open(_path, std::fstream::in | std::fstream::out | std::fstream::app);
+    // If file does not exist, Create new file
+    if (!filestream)
+    {
+        filestream.open(_path, std::fstream::in | std::fstream::out | std::fstream::trunc);
+    }
+    filestream << global_timestamp
+               << "::"
+               << color_timestamp
+               << "::"
+               << depth_timestamp
+               << "\n";
+    filestream.close();
 }
 
 void rs2wrapper::print_camera_infos(const std::shared_ptr<rs2::pipeline_profile> profile)
