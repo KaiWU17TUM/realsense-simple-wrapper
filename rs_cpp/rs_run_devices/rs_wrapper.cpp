@@ -432,6 +432,23 @@ void rs2wrapper::reset()
         print("no device enabled, skipping reset()...", 1);
 }
 
+/*
+void rs2wrapper::reset()
+{
+    if (enabled_devices_sn.size() > 0)
+    {
+        std::lock_guard<std::mutex> lock(reset_mux);
+        stop();
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        if (verbose)
+            print("pipelines stopped + paused with 1000ms sleep...", 0);
+        start();
+    }
+    else
+        print("no device enabled, skipping reset()...", 1);
+}
+*/
+
 void rs2wrapper::reset(const std::string &device_sn)
 {
     if (!check_enabled_device(device_sn, __func__))
@@ -440,9 +457,9 @@ void rs2wrapper::reset(const std::string &device_sn)
     std::lock_guard<std::mutex> lock(reset_mux);
 
     stop(device_sn);
-    std::this_thread::sleep_for(std::chrono::milliseconds(3000));
+    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
     if (verbose)
-        print(device_sn + " pipeline stopped + paused with 3000ms sleep...", 0);
+        print(device_sn + " pipeline stopped + paused with 1000ms sleep...", 0);
 
     // rs2::pipeline pipe = initialize_pipeline();
     // enabled_devices[device_sn]->pipeline = std::make_shared<rs2::pipeline>(pipe);
@@ -485,6 +502,24 @@ void rs2wrapper::reset_hardware(const std::string &device_sn)
         print(device_sn + " pipeline restarted with 300ms sleep...", 0);
 }
 
+void rs2wrapper::reset_reset_counter()
+{
+    if (enabled_devices_sn.size() > 0)
+        for (auto &&device_sn : enabled_devices_sn)
+            reset_reset_counter(device_sn);
+    else
+        print("no device enabled, skipping reset_reset_counter()...", 1);
+}
+
+void rs2wrapper::reset_reset_counter(const std::string &device_sn)
+{
+    if (!check_enabled_device(device_sn, __func__))
+        return;
+
+    enabled_devices[device_sn]->color_reset_counter = 0;
+    enabled_devices[device_sn]->depth_reset_counter = 0;
+}
+
 void rs2wrapper::reset_with_high_reset_counter()
 {
     if (enabled_devices_sn.size() > 0)
@@ -506,16 +541,14 @@ void rs2wrapper::reset_with_high_reset_counter(const std::string &device_sn)
             if (verbose)
                 print("Reset " + device_sn + " due to high color stream reset counter", 1);
             reset(device_sn);
-            enabled_devices[device_sn]->color_reset_counter = 0;
-            enabled_devices[device_sn]->depth_reset_counter = 0;
+            reset_reset_counter(device_sn);
         }
         if (enabled_devices[device_sn]->depth_reset_counter > max_reset_counter)
         {
             if (verbose)
                 print("Reset " + device_sn + " due to high depth stream reset counter", 1);
             reset(device_sn);
-            enabled_devices[device_sn]->color_reset_counter = 0;
-            enabled_devices[device_sn]->depth_reset_counter = 0;
+            reset_reset_counter(device_sn);
         }
     }
 }

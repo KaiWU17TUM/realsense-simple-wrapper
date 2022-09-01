@@ -112,6 +112,8 @@ public:
     void reset();
     void reset(const std::string &device_sn);
     void reset_hardware(const std::string &device_sn);
+    void reset_reset_counter();
+    void reset_reset_counter(const std::string &device_sn);
 
     /**
      * @brief checks and resets if the reset counter gets too high.
