@@ -48,6 +48,51 @@ Once kernel patching is done, the RS SDK can be installed/upgraded by following 
 | usbip wifi 640x480         |   X    |    X    |   X    |               |   6   | Fail, randomly drops 1-2 frames        |
 | usbip wifi 640x480         |   X    |    X    |   X    |               |  15   | Fail, randomly jitters between 2-6fps  |
 
+## UVC-stream stuck at pipe.start()
+It is possible that the request sent by the messenger returns error during start. This is caused by libusb having trouble communicating with the usb port. The error combined with `invoke_and_wait` in `concurrency.h` will cause the program to get stuck during pipe.start(). A hack is to keep sending request until no error is returned.
+
+```
+# librealsense/src/uvc/uvc-streamer.cpp:l151
+
+void uvc_streamer::start()
+    {
+        _action_dispatcher.invoke_and_wait([this](dispatcher::cancellable_timer c)
+        {
+            if(_running)
+                return;
+            
+            bool __reset_request = true;
+            while(__reset_request)
+            {
+            __reset_request = false;
+            
+            _context.messenger->reset_endpoint(_read_endpoint, RS2_USB_ENDPOINT_DIRECTION_READ);
+            
+            {
+                std::lock_guard<std::mutex> lock(_running_mutex);
+                _running = true;
+            }
+
+            for(auto&& r : _requests)
+            {
+                auto sts = _context.messenger->submit_request(r);
+                if(sts != platform::RS2_USB_STATUS_SUCCESS)
+                    __reset_request = true;
+                    // throw std::runtime_error("failed to submit UVC request while start streaming");
+                    
+            }
+            
+            if(__reset_request)
+                for(auto&& r : _requests)
+                    _context.messenger->cancel_request(r); 
+            }
+            
+            _publish_frame_thread->start();
+
+        }, [this](){ return _running; });
+    }
+```
+
 ## Good to know
 
 ### 1. [Sensor timestamp](https://github.com/IntelRealSense/librealsense/issues/2188)
