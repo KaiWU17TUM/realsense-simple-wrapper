@@ -47,12 +47,12 @@ void multithreading_function(
     std::this_thread::sleep_for(std::chrono::milliseconds(50 * (th_id + 1)));
     rs2args rs2_arg = rs2args(argc, argv);
 
-    if (rs2_arg.initialize_depth_sensor())
+    // if limit is given the stream needs to reset for it to take effect.
     {
         // Initializing RS devices in parallel can be problematic with libusb.
         std::lock_guard<std::mutex> guard(mux);
-        rs2wrapper rs2_dev(rs2_arg, false, context, device_sn);
-        rs2_dev.initialize_depth_sensor();
+        rs2wrapper _rs2_dev(rs2_arg, false, context, device_sn);
+        _rs2_dev.initialize_depth_sensor_ae();
     }
 
     rs2wrapper rs2_dev(rs2_arg, context, device_sn);
@@ -162,10 +162,10 @@ bool run(int argc, char *argv[])
         rs2::context ctx;
         rs2args rs2_arg = rs2args(argc, argv);
 
-        if (rs2_arg.initialize_depth_sensor())
+        // if limit is given the stream needs to reset for it to take effect.
         {
-            rs2wrapper _rs2_dev(argc, argv, false, ctx, "-1");
-            _rs2_dev.initialize_depth_sensor();
+            rs2wrapper _rs2_dev(rs2_arg, false, ctx, "-1");
+            _rs2_dev.initialize_depth_sensor_ae();
         }
 
         rs2wrapper rs2_dev(rs2_arg, ctx, "-1");

@@ -73,8 +73,8 @@ public:
     void initialize(const std::string &device_sn,
                     const bool &enable_ir_emitter = true,
                     const bool &set_roi = false);
-    void initialize_depth_sensor();
-    void initialize_depth_sensor(const std::string &device_sn);
+    void initialize_depth_sensor_ae();
+    void initialize_depth_sensor_ae(const std::string &device_sn);
 
     /**
      * @brief starts the rs pipeline.
@@ -157,10 +157,6 @@ public:
      * @brief Set functions to change member variables.
      *
      */
-    void set_color_stream_config(const int &width, const int &height,
-                                 const int &fps, const rs2_format &format);
-    void set_depth_stream_config(const int &width, const int &height,
-                                 const int &fps, const rs2_format &format);
     void set_valid_frame_check_flag(const std::string &device_sn,
                                     const bool &flag);
     void set_storagepaths_perdev(const std::map<std::string, storagepaths> &storagepaths_perdev);
@@ -208,18 +204,16 @@ private:
                      std::string device_sn);
 
     /**
-     * @brief configures the rs stream.
+     * @brief configures the rs stream + sensor.
      *
      * @param device_sn device serial number.
-     * @param stream_config_color stream config for color.
-     * @param stream_config_depth stream config for depth.
      */
-    void configure_stream(const std::string &device_sn,
-                          const stream_config &stream_config_color,
-                          const stream_config &stream_config_depth);
-    void configure_stream_with_checks(const std::string &device_sn,
-                                      const stream_config &stream_config_color,
-                                      const stream_config &stream_config_depth);
+    void configure_color_stream_config(const std::string &device_sn);
+    void configure_depth_stream_config(const std::string &device_sn);
+    void configure_stream(const std::string &device_sn);
+
+    void configure_color_sensor(const std::string &device_sn);
+    void configure_depth_sensor(const std::string &device_sn);
 
     /**
      * @brief Initialize the pipeline.
@@ -308,8 +302,8 @@ private:
 
     // Configurations
     std::map<std::string, rs2::config> rs_cfg;
-    stream_config stream_config_color;
-    stream_config stream_config_depth;
+    std::map<std::string, stream_config> stream_config_color;
+    std::map<std::string, stream_config> stream_config_depth;
 
     // Paths for saving data
     std::map<std::string, storagepaths> storagepaths_perdev;

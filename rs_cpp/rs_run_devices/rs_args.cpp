@@ -36,16 +36,18 @@ int rs2args::width()
 
 rs2_format rs2args::color_format()
 {
-    if (_SUPPORTED_FORMATS.count(getarg("--color-format")))
-        return _SUPPORTED_FORMATS[getarg("--color-format")];
+    auto f = getarg("--color-format");
+    if (_SUPPORTED_FORMATS.find(f) != _SUPPORTED_FORMATS.end())
+        return _SUPPORTED_FORMATS[f];
     else
         throw std::invalid_argument("rs color format unknown");
 }
 
 rs2_format rs2args::depth_format()
 {
-    if (_SUPPORTED_FORMATS.count(getarg("--depth-format")))
-        return _SUPPORTED_FORMATS[getarg("--depth-format")];
+    auto f = getarg("--depth-format");
+    if (_SUPPORTED_FORMATS.find(f) != _SUPPORTED_FORMATS.end())
+        return _SUPPORTED_FORMATS[f];
     else
         throw std::invalid_argument("rs depth format unknown");
 }
@@ -89,14 +91,17 @@ std::string rs2args::save_path()
     return getarg("--save-path");
 }
 
-bool rs2args::initialize_depth_sensor()
-{
-    return checkarg("--initialize-depth-sensor") ? getargb("--initialize-depth-sensor") : false;
-}
-
 bool rs2args::autoexposure()
 {
     return checkarg("--autoexposure") ? getargb("--autoexposure") : true;
+}
+
+int rs2args::depth_sensor_autoexposure_limit()
+{
+    // Defaults to full range
+    // https://github.com/IntelRealSense/librealsense/issues/10771
+    auto _arg = "--depth-sensor-autoexposure-limit";
+    return checkarg(_arg) ? getargi(_arg) : 2000000;
 }
 
 // ------------------------------------------------------------------ [OPTIONAL]

@@ -64,11 +64,9 @@ void rs2wrapper::initialize(const std::string &device_sn,
     dev->pipeline = std::make_shared<rs2::pipeline>(pipe);
 
     // 2. configure stream
-    set_color_stream_config(args.width(), args.height(), args.fps(),
-                            args.color_format());
-    set_depth_stream_config(args.width(), args.height(), args.fps(),
-                            args.depth_format());
-    configure_stream_with_checks(device_sn, stream_config_color, stream_config_depth);
+    configure_color_stream_config(device_sn);
+    configure_depth_stream_config(device_sn);
+    configure_stream(device_sn);
 
     // 3. pipeline start
     start(device_sn);
@@ -77,81 +75,25 @@ void rs2wrapper::initialize(const std::string &device_sn,
         print("pipeline started with 100ms sleep...", 0);
 
     // 4. sensors
-
-    // https://github.com/IntelRealSense/librealsense/issues/4015
-    // Set the Auto Exposure (AE) Region of Interest (ROI). Should be done after
-    // starting the pipe, will give an error otherwise
-    // Create the ROI for auto exposure (set these values to whatever you need)
-    rs2::region_of_interest roi;
-    roi.min_x = 124;
-    roi.min_y = 350;
-    roi.max_x = 724;
-    roi.max_y = 450;
-
     std::vector<rs2::sensor> sensors =
         dev->pipeline_profile->get_device().query_sensors();
     for (auto &&sensor : sensors)
     {
         if (auto css = sensor.as<rs2::color_sensor>())
         {
-            dev->color_sensor = std::make_shared<rs2::color_sensor>(css);
             if (verbose)
                 print("color sensor available...", 0);
-
-            if (!args.autoexposure())
-            {
-                dev->color_sensor->set_option(RS2_OPTION_ENABLE_AUTO_EXPOSURE, 0.0f);
-                dev->color_sensor->set_option(RS2_OPTION_EXPOSURE, 100.0);
-                if (verbose)
-                    print("no AE for color sensor...", 0);
-            }
-            else
-            {
-                dev->color_sensor->set_option(RS2_OPTION_ENABLE_AUTO_EXPOSURE, 1.0f);
-                dev->color_sensor->set_option(RS2_OPTION_AUTO_EXPOSURE_PRIORITY, 0.0f);
-                rs2::roi_sensor roi_sensor = dev->color_sensor->as<rs2::roi_sensor>();
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
-                roi_sensor.set_region_of_interest(roi);
-                if (verbose)
-                    print("color sensor roi :\t" +
-                              std::to_string(roi.min_x) + "\t" +
-                              std::to_string(roi.min_y) + "\t" +
-                              std::to_string(roi.max_x) + "\t" +
-                              std::to_string(roi.max_y),
-                          0);
-            }
+            dev->color_sensor = std::make_shared<rs2::color_sensor>(css);
+            configure_color_sensor(device_sn);
         }
         else if (auto dss = sensor.as<rs2::depth_stereo_sensor>())
         {
-            dev->depth_sensor = std::make_shared<rs2::depth_stereo_sensor>(dss);
             if (verbose)
                 print("depth sensor available...", 0);
-
-            if (!args.autoexposure())
-            {
-                dev->depth_sensor->set_option(RS2_OPTION_ENABLE_AUTO_EXPOSURE, 0.0f);
-                dev->depth_sensor->set_option(RS2_OPTION_EXPOSURE, 1000.0);
-                if (verbose)
-                    print("no AE for depth sensor...", 0);
-            }
-            else
-            {
-                // this is done in another init function.
-                // dev->depth_sensor->set_option(RS2_OPTION_ENABLE_AUTO_EXPOSURE, 1.0f);
-                rs2::roi_sensor roi_sensor = dev->depth_sensor->as<rs2::roi_sensor>();
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
-                roi_sensor.set_region_of_interest(roi);
-                if (verbose)
-                    print("depth sensor roi :\t" +
-                              std::to_string(roi.min_x) + "\t" +
-                              std::to_string(roi.min_y) + "\t" +
-                              std::to_string(roi.max_x) + "\t" +
-                              std::to_string(roi.max_y),
-                          0);
-            }
+            dev->depth_sensor = std::make_shared<rs2::depth_stereo_sensor>(dss);
+            configure_depth_sensor(device_sn);
         }
     }
-    // update_roi(device_sn); rs bug
 
     // 5. IR
     if (enable_ir_emitter)
@@ -182,15 +124,15 @@ void rs2wrapper::initialize(const std::string &device_sn,
     print("Initialized RealSense devices " + std::string(device_sn), 0);
 }
 
-void rs2wrapper::initialize_depth_sensor()
+void rs2wrapper::initialize_depth_sensor_ae()
 {
     for (auto &&device_sn : available_devices_sn)
-        initialize_depth_sensor(device_sn);
+        initialize_depth_sensor_ae(device_sn);
 }
 
-void rs2wrapper::initialize_depth_sensor(const std::string &device_sn)
+void rs2wrapper::initialize_depth_sensor_ae(const std::string &device_sn)
 {
-    print("Initializing RealSense device depth sensor " + std::string(device_sn), 0);
+    print("Initializing RealSense depth sensor AE " + std::string(device_sn), 0);
 
     // 0. enabled devices
     std::shared_ptr<device> dev = std::make_shared<device>();
@@ -202,14 +144,18 @@ void rs2wrapper::initialize_depth_sensor(const std::string &device_sn)
     dev->pipeline = std::make_shared<rs2::pipeline>(pipe);
 
     // 2. configure
+    configure_color_stream_config(device_sn);
+    configure_depth_stream_config(device_sn);
     // HACK: sensor AE configuration seems to only work for fps = 6
-    stream_config_color.framerate = 6;
-    stream_config_depth.framerate = 6;
-    configure_stream_with_checks(device_sn, stream_config_color, stream_config_depth);
+    stream_config_color[device_sn].framerate = 6;
+    stream_config_depth[device_sn].framerate = 6;
+    configure_stream(device_sn);
 
     // 3. pipeline start
     start(device_sn);
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    if (verbose)
+        print("pipeline started with 100ms sleep...", 0);
 
     // 4. sensors
     std::vector<rs2::sensor> sensors =
@@ -218,16 +164,19 @@ void rs2wrapper::initialize_depth_sensor(const std::string &device_sn)
     {
         if (auto dss = sensor.as<rs2::depth_stereo_sensor>())
         {
-            // int limit = (100 / args.fps()) * 100;
-            int limit = 8500; // default
-            print("depth sensor exposure limit set to " + std::to_string(limit), 0);
-            dev->depth_sensor = std::make_shared<rs2::depth_stereo_sensor>(dss);
-            dev->depth_sensor->set_option(RS2_OPTION_ENABLE_AUTO_EXPOSURE, 1.0f);
-            dev->depth_sensor->set_option(RS2_OPTION_AUTO_EXPOSURE_LIMIT, float(limit));
-            dev->depth_sensor->set_option(RS2_OPTION_AUTO_EXPOSURE_LIMIT_TOGGLE, 1.0f);
+            // int limit = 8500; // default
+            int limit = args.depth_sensor_autoexposure_limit();
+            dss.set_option(RS2_OPTION_ENABLE_AUTO_EXPOSURE, 1.0f);
+            dss.set_option(RS2_OPTION_AUTO_EXPOSURE_LIMIT_TOGGLE, 1.0f);
+            dss.set_option(RS2_OPTION_AUTO_EXPOSURE_LIMIT, float(limit));
+            print("depth sensor exposure limit : " + std::to_string(limit), 0);
         }
     }
-    print("Initialized RealSense device depth sensor " + std::string(device_sn), 0);
+
+    // 5. pipeline stop
+    stop(device_sn);
+
+    print("Initialized RealSense depth sensor AE " + std::string(device_sn), 0);
 }
 
 void rs2wrapper::start()
@@ -436,23 +385,6 @@ void rs2wrapper::reset()
         print("no device enabled, skipping reset()...", 1);
 }
 
-/*
-void rs2wrapper::reset()
-{
-    if (enabled_devices_sn.size() > 0)
-    {
-        std::lock_guard<std::mutex> lock(reset_mux);
-        stop();
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
-        if (verbose)
-            print("pipelines stopped + paused with 1000ms sleep...", 0);
-        start();
-    }
-    else
-        print("no device enabled, skipping reset()...", 1);
-}
-*/
-
 void rs2wrapper::reset(const std::string &device_sn)
 {
     if (!check_enabled_device(device_sn, __func__))
@@ -461,9 +393,9 @@ void rs2wrapper::reset(const std::string &device_sn)
     std::lock_guard<std::mutex> lock(reset_mux);
 
     stop(device_sn);
-    std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
     if (verbose)
-        print(device_sn + " pipeline stopped + paused with 1000ms sleep...", 0);
+        print(device_sn + " pipeline stopped + paused with 500ms sleep...", 0);
 
     // rs2::pipeline pipe = initialize_pipeline();
     // enabled_devices[device_sn]->pipeline = std::make_shared<rs2::pipeline>(pipe);
@@ -694,26 +626,6 @@ void rs2wrapper::prepare_storage()
  * rs2wrapper PUBLIC FUNCTIONS : SET, GET, CHECK
  ******************************************************************************/
 
-void rs2wrapper::set_color_stream_config(const int &width, const int &height,
-                                         const int &fps, const rs2_format &format)
-{
-    stream_config_color.stream_type = RS2_STREAM_COLOR;
-    stream_config_color.width = width;
-    stream_config_color.height = height;
-    stream_config_color.format = format;
-    stream_config_color.framerate = fps;
-}
-
-void rs2wrapper::set_depth_stream_config(const int &width, const int &height,
-                                         const int &fps, const rs2_format &format)
-{
-    stream_config_depth.stream_type = RS2_STREAM_DEPTH;
-    stream_config_depth.width = width;
-    stream_config_depth.height = height;
-    stream_config_depth.format = format;
-    stream_config_depth.framerate = fps;
-}
-
 void rs2wrapper::set_valid_frame_check_flag(const std::string &device_sn,
                                             const bool &flag)
 {
@@ -898,38 +810,133 @@ void rs2wrapper::constructor(rs2args args,
         available_devices_sn.push_back(available_device[0]);
 }
 
-void rs2wrapper::configure_stream(const std::string &device_sn,
-                                  const stream_config &stream_config_color,
-                                  const stream_config &stream_config_depth)
+void rs2wrapper::configure_color_stream_config(const std::string &device_sn)
 {
-    rs2::config cfg = rs_cfg[device_sn];
-    cfg.enable_stream(stream_config_color.stream_type,
-                      stream_config_color.width,
-                      stream_config_color.height,
-                      stream_config_color.format,
-                      stream_config_color.framerate);
-    cfg.enable_stream(stream_config_depth.stream_type,
-                      stream_config_depth.width,
-                      stream_config_depth.height,
-                      stream_config_depth.format,
-                      stream_config_depth.framerate);
-    rs_cfg[device_sn] = cfg;
+    stream_config_color[device_sn].stream_type = RS2_STREAM_COLOR;
+    stream_config_color[device_sn].width = args.width();
+    stream_config_color[device_sn].height = args.height();
+    stream_config_color[device_sn].format = args.color_format();
+    stream_config_color[device_sn].framerate = args.fps();
 }
 
-void rs2wrapper::configure_stream_with_checks(const std::string &device_sn,
-                                              const stream_config &stream_config_color,
-                                              const stream_config &stream_config_depth)
+void rs2wrapper::configure_depth_stream_config(const std::string &device_sn)
 {
-    rs_cfg[device_sn] = rs2::config();
-    configure_stream(device_sn, stream_config_color, stream_config_depth);
+    stream_config_depth[device_sn].stream_type = RS2_STREAM_DEPTH;
+    stream_config_depth[device_sn].width = args.width();
+    stream_config_depth[device_sn].height = args.height();
+    stream_config_depth[device_sn].format = args.depth_format();
+    stream_config_depth[device_sn].framerate = args.fps();
+}
+
+void rs2wrapper::configure_stream(const std::string &device_sn)
+{
+    if (stream_config_color.find(device_sn) == stream_config_color.end())
+        throw std::invalid_argument("color config not found for " + device_sn);
+
+    if (stream_config_depth.find(device_sn) == stream_config_depth.end())
+        throw std::invalid_argument("depth config not found for " + device_sn);
+
+    rs2::config cfg;
+    cfg.enable_stream(stream_config_color[device_sn].stream_type,
+                      stream_config_color[device_sn].width,
+                      stream_config_color[device_sn].height,
+                      stream_config_color[device_sn].format,
+                      stream_config_color[device_sn].framerate);
+    cfg.enable_stream(stream_config_depth[device_sn].stream_type,
+                      stream_config_depth[device_sn].width,
+                      stream_config_depth[device_sn].height,
+                      stream_config_depth[device_sn].format,
+                      stream_config_depth[device_sn].framerate);
+
     if (!args.network())
-        rs_cfg[device_sn].enable_device(std::string(device_sn));
-    bool check = rs_cfg[device_sn].can_resolve(*enabled_devices[device_sn]->pipeline);
+        cfg.enable_device(std::string(device_sn));
+
     if (verbose)
-        if (check)
+        if (cfg.can_resolve(*enabled_devices[device_sn]->pipeline))
             print("'cfg' usable with 'pipeline' : True", 0);
         else
             print("'cfg' usable with 'pipeline' : False", 2);
+
+    rs_cfg[device_sn] = cfg;
+}
+
+void rs2wrapper::configure_color_sensor(const std::string &device_sn)
+{
+    if (!check_enabled_device(device_sn, __func__))
+        return;
+
+    std::shared_ptr<device> dev = enabled_devices[device_sn];
+
+    if (args.autoexposure())
+    {
+        dev->color_sensor->set_option(RS2_OPTION_ENABLE_AUTO_EXPOSURE, 1.0f);
+        dev->color_sensor->set_option(RS2_OPTION_AUTO_EXPOSURE_PRIORITY, 0.0f);
+        // https://github.com/IntelRealSense/librealsense/issues/4015
+        // Set the Auto Exposure (AE) Region of Interest (ROI). Should be done after
+        // starting the pipe, will give an error otherwise
+        // Create the ROI for auto exposure (set these values to whatever you need)
+        // rs2::region_of_interest roi;
+        // roi.min_x = 124;
+        // roi.min_y = 350;
+        // roi.max_x = 724;
+        // roi.max_y = 450;
+        // rs2::roi_sensor roi_sensor = css.as<rs2::roi_sensor>();
+        // std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        // roi_sensor.set_region_of_interest(roi);
+        // if (verbose)
+        //     print("color sensor roi :\t" +
+        //               std::to_string(roi.min_x) + "\t" +
+        //               std::to_string(roi.min_y) + "\t" +
+        //               std::to_string(roi.max_x) + "\t" +
+        //               std::to_string(roi.max_y),
+        //           0);
+    }
+    else
+    {
+        dev->color_sensor->set_option(RS2_OPTION_ENABLE_AUTO_EXPOSURE, 0.0f);
+        dev->color_sensor->set_option(RS2_OPTION_EXPOSURE, 100.0);
+        if (verbose)
+            print("no AE for color sensor...", 0);
+    }
+}
+
+void rs2wrapper::configure_depth_sensor(const std::string &device_sn)
+{
+    if (!check_enabled_device(device_sn, __func__))
+        return;
+
+    std::shared_ptr<device> dev = enabled_devices[device_sn];
+
+    if (args.autoexposure())
+    {
+        dev->depth_sensor->set_option(RS2_OPTION_ENABLE_AUTO_EXPOSURE, 1.0f);
+        // https://github.com/IntelRealSense/librealsense/issues/4015
+        // Set the Auto Exposure (AE) Region of Interest (ROI). Should be done after
+        // starting the pipe, will give an error otherwise
+        // Create the ROI for auto exposure (set these values to whatever you need)
+        // rs2::region_of_interest roi;
+        // roi.min_x = 124;
+        // roi.min_y = 350;
+        // roi.max_x = 724;
+        // roi.max_y = 450;
+        // rs2::roi_sensor roi_sensor = dss.as<rs2::roi_sensor>();
+        // std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        // roi_sensor.set_region_of_interest(roi);
+        // if (verbose)
+        //     print("depth sensor roi :\t" +
+        //               std::to_string(roi.min_x) + "\t" +
+        //               std::to_string(roi.min_y) + "\t" +
+        //               std::to_string(roi.max_x) + "\t" +
+        //               std::to_string(roi.max_y),
+        //           0);
+    }
+    else
+    {
+        dev->depth_sensor->set_option(RS2_OPTION_ENABLE_AUTO_EXPOSURE, 0.0f);
+        dev->depth_sensor->set_option(RS2_OPTION_EXPOSURE, 1000.0);
+        if (verbose)
+            print("no AE for depth sensor...", 0);
+    }
 }
 
 rs2::pipeline rs2wrapper::initialize_pipeline()

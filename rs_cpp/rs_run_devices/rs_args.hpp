@@ -35,8 +35,8 @@ public:
         "--multithreading",
         "--verbose",
         "--save-path",
-        "--initialize-depth-sensor",
         "--autoexposure",
+        "--depth-sensor-autoexposure-limit",
     };
 
     /**
@@ -143,14 +143,13 @@ public:
      * @return true
      * @return false
      */
-    bool initialize_depth_sensor();
+    bool autoexposure();
     /**
      * @brief
      *
-     * @return true
-     * @return false
+     * @return int
      */
-    bool autoexposure();
+    int depth_sensor_autoexposure_limit();
     /**
      * @brief prints out the raw arguments.
      *
