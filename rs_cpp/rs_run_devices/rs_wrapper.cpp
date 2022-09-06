@@ -165,14 +165,18 @@ void rs2wrapper::initialize(const std::string &device_sn,
         }
     }
 
-    // 6. infos
+    // 6. align instances recreate
+    align_to_color = rs2::align(RS2_STREAM_COLOR);
+    align_to_depth = rs2::align(RS2_STREAM_DEPTH);
+
+    // 7. infos
     print_camera_infos(dev->pipeline_profile);
     print_camera_temperature(device_sn);
 
     if (storagepaths_perdev.size() > 0)
         query_timestamp_mode(std::string(device_sn));
 
-    // 7. get enabled devices_sn.
+    // 8. get enabled devices_sn.
     enabled_devices_sn.push_back(device_sn);
 
     print("Initialized RealSense devices " + std::string(device_sn), 0);

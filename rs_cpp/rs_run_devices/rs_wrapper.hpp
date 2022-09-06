@@ -322,7 +322,7 @@ private:
     // Declare depth colorizer for pretty visualization of depth data
     rs2::colorizer color_map;
 
-    // // Alignment of data from different streams.
+    // Alignment of data from different streams.
     rs2::align align_to_color = rs2::align(RS2_STREAM_COLOR);
     rs2::align align_to_depth = rs2::align(RS2_STREAM_DEPTH);
 
