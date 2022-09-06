@@ -101,7 +101,7 @@ int rs2args::depth_sensor_autoexposure_limit()
     // Defaults to full range
     // https://github.com/IntelRealSense/librealsense/issues/10771
     auto _arg = "--depth-sensor-autoexposure-limit";
-    return checkarg(_arg) ? getargi(_arg) : 2000000;
+    return checkarg(_arg) ? getargi(_arg) : 200000;
 }
 
 // ------------------------------------------------------------------ [OPTIONAL]

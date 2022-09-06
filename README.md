@@ -58,6 +58,8 @@ Once kernel patching is done, the RS SDK can be installed/upgraded by following 
 
 There is an [issue](https://github.com/IntelRealSense/librealsense/issues/7972) with arm-based chips, i.e. pi4, where the backend_timestamp cannot be obtained.
 
+The clocks for depth and color sensors are different. The frameset tries to map the closest frames together. See [here](https://github.com/IntelRealSense/librealsense/issues/1548).
+
 ### 2. [HW Sync](https://dev.intelrealsense.com/docs/external-synchronization-of-intel-realsense-depth-cameras)
 The realsense can be syncroized using an external sync cable so that the cameras captures at the exact same timestamp.
 
@@ -104,3 +106,11 @@ See [here](https://github.com/IntelRealSense/librealsense/blob/jupyter/notebooks
 
 ### 9. Multi IP connection using realsense_net is not supported
 See [here](https://github.com/IntelRealSense/librealsense/issues/6376)
+
+### 10. Auto exposure
+Setting the auto exposure manually may cause drop in FPS. See [here](https://github.com/IntelRealSense/librealsense/issues/1957).
+
+The `RS2_OPTION_AUTO_EXPOSURE_LIMIT` options require stream to restart. Unit in mirco sec. See [here](https://intelrealsense.github.io/librealsense/doxygen/rs__option_8h.html).
+
+### 11. Disparity
+The disparity is given with 1/32 pixel resolution. See [here](https://github.com/IntelRealSense/librealsense/issues/3039) and [here](https://github.com/IntelRealSense/librealsense/issues/3344).
