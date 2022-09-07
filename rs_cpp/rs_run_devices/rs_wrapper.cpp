@@ -739,7 +739,7 @@ void rs2wrapper::query_available_devices()
     auto add_device =
         [](std::string serial,
            std::string product_line,
-           std::vector<std::vector<std::string>> available_devices,
+           std::vector<std::vector<std::string>> &available_devices,
            bool verbose)
     {
         std::vector<std::string> available_device{serial, product_line};

@@ -51,7 +51,7 @@ public:
      * @param argc Number of arguments.
      * @param argv Arguments in an array of char*.
      */
-    rs2args(int argc, char *argv[]){};
+    rs2args(int argc, char *argv[]) : argparser(argc, argv){};
     /**
      * @brief Destroy the rs2args object
      *
