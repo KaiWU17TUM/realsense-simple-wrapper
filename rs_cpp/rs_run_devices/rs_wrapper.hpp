@@ -94,7 +94,8 @@ public:
     void step();
     void step(const std::string &device_sn);
     void step_clear();
-    bool step_frame_received_from_all_devices();
+    bool step_check_if_frames_are_valid(const std::string &device_sn,
+                                        const rs2::frameset &frameset);
 
     /**
      * @brief Stops the devices through rs2::pipeline
@@ -157,25 +158,21 @@ public:
      * @brief Set functions to change member variables.
      *
      */
-    void set_valid_frame_check_flag(const std::string &device_sn,
-                                    const bool &flag);
-    void set_storagepaths_perdev(const std::map<std::string, storagepaths> &storagepaths_perdev);
+    void set_storagepaths(const std::map<std::string, storagepath> &storagepaths);
 
     /**
      * @brief Get functions to expose member variables.
      *
      */
-    int64_t get_empty_frame_check_counter(const std::string &device_sn);
-    std::map<std::string, int64_t> get_empty_frame_check_counter();
+    int64_t get_empty_frame_received_timers(const std::string &device_sn);
+    std::map<std::string, int64_t> get_empty_frame_received_timers();
     std::string get_output_msg();
     std::vector<std::vector<std::string>> get_available_devices();
-    std::vector<std::string> get_available_devices_sn();
     std::map<std::string, std::shared_ptr<device>> get_enabled_devices();
-    std::vector<std::string> get_enabled_devices_sn();
     rs2args get_args();
     rs2_metadata_type get_frame_timestamp(const std::string &device_sn,
                                           const rs2::frame &frame);
-    std::map<std::string, storagepaths> get_storagepaths_perdev();
+    std::map<std::string, storagepath> get_storagepaths();
 
     /**
      * @brief Check functions to see if some condition is true.
@@ -183,10 +180,8 @@ public:
      * @return true
      * @return false
      */
-    bool check_enabled_device(const std::string &device_sn,
-                              const std::string &function_name);
-    bool check_valid_color_depth_streams(const std::string &device_sn,
-                                         const rs2::frameset &frameset);
+    bool check_if_device_is_enabled(const std::string &device_sn,
+                                    const std::string &function_name);
 
 private:
     /**
@@ -203,6 +198,10 @@ private:
                      rs2::context context,
                      std::string device_sn);
 
+    void query_available_devices();
+
+    rs2::pipeline initialize_pipeline();
+
     /**
      * @brief configures the rs stream + sensor.
      *
@@ -211,21 +210,28 @@ private:
     void configure_color_stream_config(const std::string &device_sn);
     void configure_depth_stream_config(const std::string &device_sn);
     void configure_stream(const std::string &device_sn);
-
     void configure_color_sensor(const std::string &device_sn);
     void configure_depth_sensor(const std::string &device_sn);
-
-    /**
-     * @brief Initialize the pipeline.
-     *
-     */
-    rs2::pipeline initialize_pipeline();
+    void configure_color_depth_sensor(const std::string &device_sn);
+    void configure_ir_emitter(const std::string &device_sn);
 
     /**
      * @brief processes the color and depth streams.
      *
+     * The individual processes returns false if
+     * - there is any error,
+     * - timestamp is not valid,
+     * - timestamp is same as before (frozen).
+     * This then causes 'process_color_depth_stream' to return
+     * - 0 : no error
+     * - 1 : color stream error
+     * - 2 : depth stream error
+     * - 3 : color and depth stream error.
+     * Reset counter increment only in 'step(...)' .
+     *
      * @param device_sn device serial number.
      * @param frameset rs2 frameset object, contains multiple frames.
+     * @param global_timestamp timestamp from chrono.
      * @param timestamp timestamp from rs.
      */
     bool process_color_stream(const std::string &device_sn,
@@ -236,14 +242,14 @@ private:
                               const rs2::frameset &frameset,
                               const int64_t &global_timestamp,
                               rs2_metadata_type &timestamp);
-    bool process_color_depth_stream(const std::string &device_sn,
-                                    const rs2::frameset &frameset,
-                                    const int64_t &global_timestamp,
-                                    rs2_metadata_type &color_timestamp,
-                                    rs2_metadata_type &depth_timestamp);
+    int process_color_depth_stream(const std::string &device_sn,
+                                   const rs2::frameset &frameset,
+                                   const int64_t &global_timestamp,
+                                   rs2_metadata_type &color_timestamp,
+                                   rs2_metadata_type &depth_timestamp);
 
     /**
-     * @brief alsigns the frameset to either color or depth.
+     * @brief aligns the frameset to either color or depth.
      *
      * @param device_sn device serial number.
      * @param frameset rs2 frameset object, contains multiple frames.
@@ -292,9 +298,7 @@ private:
 
     // Device data
     std::shared_ptr<rs2::context> ctx;
-    std::vector<std::string> available_devices_sn;
-    std::vector<std::vector<std::string>> available_devices;
-    std::vector<std::string> enabled_devices_sn;
+    std::vector<std::vector<std::string>> available_devices; // [serial + product line]
     std::map<std::string, std::shared_ptr<device>> enabled_devices;
     // std::map calib_data;
 
@@ -302,11 +306,11 @@ private:
 
     // Configurations
     std::map<std::string, rs2::config> rs_cfg;
-    std::map<std::string, stream_config> stream_config_color;
-    std::map<std::string, stream_config> stream_config_depth;
+    std::map<std::string, stream_config> stream_config_colors;
+    std::map<std::string, stream_config> stream_config_depths;
 
     // Paths for saving data
-    std::map<std::string, storagepaths> storagepaths_perdev;
+    std::map<std::string, storagepath> storagepaths;
 
     // Timestamp data
     int camera_temp_printout_interval = 3600;
@@ -322,13 +326,12 @@ private:
 
     // [INTERNAL] --------------------------------------------------------------
     // Reset frozen devices
-    std::map<std::string, bool> reset_flags;
     int max_reset_counter = 500;
     // Output message
-    std::vector<std::pair<std::string, std::string>> output_msg_list;
+    std::vector<std::pair<std::string, std::string>> output_msgs;
     // Frame check, true if poll/wait returns a valid frame.
-    std::map<std::string, bool> valid_frame_check_flag;
-    std::map<std::string, int64_t> empty_frame_check_counter;
+    std::map<std::string, bool> valid_frame_received_flags;
+    std::map<std::string, int64_t> empty_frame_received_timers;
     // IP Mapping
     std::map<std::string, std::string> USBIP_MAPPING{
         {"001622070408", "192.168.1.238"},

@@ -18,6 +18,14 @@
 #include "utils.hpp"
 
 /**
+ * @brief Prints out a message saying no device enabled.
+ *
+ * @param msg message to be printed
+ * @param mode which tags to use
+ */
+void print_no_device_enabled(const std::string &function);
+
+/**
  * @brief Save raw frame data into a binary file.
  *
  * Taken from : https://github.com/IntelRealSense/librealsense/issues/1485
@@ -72,7 +80,7 @@ struct stream_config
  * @brief Storage paths to save data.
  *
  */
-class storagepaths
+class storagepath
 {
 public:
     time_t trial_idx;
@@ -83,7 +91,7 @@ public:
     std::string depth;
     std::string color_metadata;
     std::string depth_metadata;
-    storagepaths();
+    storagepath();
     void create(const std::string &device_sn,
                 const std::string &base_path);
     void show();

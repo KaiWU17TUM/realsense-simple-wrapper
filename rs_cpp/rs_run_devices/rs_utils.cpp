@@ -1,5 +1,10 @@
 #include "rs_utils.hpp"
 
+void print_no_device_enabled(const std::string &function)
+{
+    print("no device enabled, skipping '" + function + "' ...", 1);
+}
+
 bool framedata_to_bin(const rs2::frame &frm, const std::string &filename)
 {
     bool ret = false;
@@ -41,12 +46,12 @@ void metadata_to_csv(const rs2::frame &frm, const std::string &filename)
     csv.close();
 }
 
-storagepaths::storagepaths()
+storagepath::storagepath()
 {
     time(&trial_idx);
 }
 
-void storagepaths::create(const std::string &device_sn,
+void storagepath::create(const std::string &device_sn,
                           const std::string &base_path)
 {
     std::string path;
@@ -79,7 +84,7 @@ void storagepaths::create(const std::string &device_sn,
     mkdir(depth_metadata.c_str(), S_IRWXU | S_IRWXG | S_IROTH | S_IXOTH);
 }
 
-void storagepaths::show()
+void storagepath::show()
 {
     print("calib : " + calib, 0);
     print("color : " + color, 0);

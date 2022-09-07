@@ -39,7 +39,7 @@ void multithreading_function(
     int argc,
     char *argv[],
     rs2::context context,
-    std::map<std::string, storagepaths> storagepaths_perdev,
+    std::map<std::string, storagepath> storagepaths,
     std::string device_sn,
     size_t num_devices,
     std::chrono::steady_clock::time_point global_timestamp)
@@ -56,7 +56,7 @@ void multithreading_function(
     }
 
     rs2wrapper rs2_dev(rs2_arg, context, device_sn);
-    rs2_dev.set_storagepaths_perdev(storagepaths_perdev);
+    rs2_dev.set_storagepaths(storagepaths);
 
     {
         // Initializing RS devices in parallel can be problematic with libusb.
@@ -102,22 +102,22 @@ bool run_multithreading(int argc, char *argv[])
     try
     {
         rs2::context ctx;
-        std::vector<std::string> device_sn_list;
-        std::map<std::string, storagepaths> storagepaths_perdev;
+        std::vector<std::vector<std::string>> device_list;
+        std::map<std::string, storagepath> storagepaths;
 
         {
             rs2wrapper _rs2_dev = rs2wrapper(argc, argv, false, ctx, "-1");
-            device_sn_list = _rs2_dev.get_available_devices_sn();
+            device_list = _rs2_dev.get_available_devices();
             _rs2_dev.prepare_storage();
-            storagepaths_perdev = _rs2_dev.get_storagepaths_perdev();
+            storagepaths = _rs2_dev.get_storagepaths();
         }
 
-        if (device_sn_list.size() == 0)
+        if (device_list.size() == 0)
             throw rs2::error("No RS device detected...");
 
         std::chrono::steady_clock::time_point global_timestamp = std::chrono::steady_clock::now();
 
-        size_t num_threads = device_sn_list.size();
+        size_t num_threads = device_list.size();
         std::vector<std::thread> threads;
         for (size_t i = 0; i < num_threads; ++i)
             threads.push_back(
@@ -126,8 +126,8 @@ bool run_multithreading(int argc, char *argv[])
                                                       argc,
                                                       argv,
                                                       ctx,
-                                                      storagepaths_perdev,
-                                                      device_sn_list[i],
+                                                      storagepaths,
+                                                      device_list[i][0],
                                                       num_threads,
                                                       global_timestamp); }));
 
@@ -170,8 +170,8 @@ bool run(int argc, char *argv[])
 
         rs2wrapper rs2_dev(rs2_arg, ctx, "-1");
 
-        std::vector<std::string> available_devices_sn = rs2_dev.get_available_devices_sn();
-        if (available_devices_sn.size() == 0)
+        auto available_devices = rs2_dev.get_available_devices();
+        if (available_devices.size() == 0)
             throw rs2::error("No RS device detected...");
 
         rs2_dev.prepare_storage();
@@ -180,7 +180,7 @@ bool run(int argc, char *argv[])
         rs2_dev.flush_frames();
 
         size_t dev_reset_loop = 0;
-        size_t num_dev = rs2_dev.get_enabled_devices_sn().size();
+        size_t num_dev = rs2_dev.get_enabled_devices().size();
 
         rs2_dev.reset_global_timestamp();
 
@@ -198,7 +198,7 @@ bool run(int argc, char *argv[])
 
             if (i % rs2_arg.reset_interval() == 0)
             {
-                rs2_dev.reset(available_devices_sn[dev_reset_loop]);
+                rs2_dev.reset(available_devices[dev_reset_loop][0]);
                 dev_reset_loop = (dev_reset_loop + 1) % num_dev;
             }
 
