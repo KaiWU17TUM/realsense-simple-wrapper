@@ -394,9 +394,9 @@ void rs2wrapper::reset(const std::string &device_sn)
         return;
 
     stop(device_sn);
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
     if (verbose)
-        print(device_sn + " pipeline stopped + paused with 100ms sleep...", 0);
+        print(device_sn + " pipeline stopped + paused with 500ms sleep...", 0);
 
     start(device_sn);
     if (verbose)
@@ -959,22 +959,37 @@ void rs2wrapper::configure_ir_emitter(const std::string &device_sn)
     if (!check_if_device_is_enabled(device_sn, __func__))
         return;
 
-    std::shared_ptr<device> dev = enabled_devices[device_sn];
+    auto dss_p = enabled_devices[device_sn]->depth_sensor;
 
-    if (args.enable_ir_emitter())
+    if (dss_p->supports(RS2_OPTION_EMITTER_ENABLED))
     {
-        if (dev->depth_sensor->supports(RS2_OPTION_EMITTER_ENABLED))
+        if (args.enable_ir_emitter())
         {
-            // TODO: add arg for this.
-            dev->depth_sensor->set_option(RS2_OPTION_EMITTER_ENABLED, 1);
+            dss_p->set_option(RS2_OPTION_EMITTER_ENABLED, 1);
+            auto range = dss_p->get_option_range(RS2_OPTION_LASER_POWER);
+            float power = 0.0;
+            if ((float)args.ir_emitter_power() > range.max)
+                power = range.max;
+            else if ((float)args.ir_emitter_power() < range.min)
+                power = range.min;
+            else
+                power = (float)args.ir_emitter_power();
+            dss_p->set_option(RS2_OPTION_LASER_POWER, power);
+            // dss_p->set_option(RS2_OPTION_LASER_POWER, 0.f); // Disable laser
             if (verbose)
                 print("ir emitter enabled...", 0);
         }
         else
         {
+            dss_p->set_option(RS2_OPTION_EMITTER_ENABLED, 0);
             if (verbose)
-                print("ir emitter not supported...", 1);
+                print("ir emitter not enabled...", 0);
         }
+    }
+    else
+    {
+        if (verbose)
+            print("ir emitter not supported...", 1);
     }
 }
 

@@ -38,6 +38,7 @@ public:
         "--autoexposure",
         "--depth-sensor-autoexposure-limit",
         "--enable-ir-emitter",
+        "--ir-emitter-power",
     };
 
     /**
@@ -222,6 +223,17 @@ public:
     {
         auto _arg = "--enable-ir-emitter";
         return checkarg(_arg) ? getargb(_arg) : true;
+    };
+    /**
+     * @brief
+     *
+     * @return true
+     * @return false
+     */
+    int ir_emitter_power()
+    {
+        auto _arg = "--ir-emitter-power";
+        return checkarg(_arg) ? getargi(_arg) : 150;
     };
 
     /**
