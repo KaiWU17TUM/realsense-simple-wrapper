@@ -231,9 +231,11 @@ int main(int argc, char *argv[])
     signal(SIGINT, inthand);
 
     rs2args args(argc, argv);
-    auto valid_args = args.check_rs2args();
-    if (valid_args == EXIT_FAILURE)
+
+    if (args.check_rs2args() == EXIT_FAILURE)
         return EXIT_FAILURE;
+
+    args.print_args();
 
     if (args.multithreading())
         return run_multithreading(argc, argv);

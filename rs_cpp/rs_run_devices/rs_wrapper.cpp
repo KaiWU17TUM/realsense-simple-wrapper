@@ -712,10 +712,6 @@ void rs2wrapper::constructor(rs2args args,
     // whether to printout stuffs
     this->verbose = verbose;
 
-    // prints out CLI args
-    if (this->verbose)
-        this->args.print_args();
-
     // if arg is given, we use only one rs device
     this->single_device_sn = device_sn;
 
@@ -1224,9 +1220,9 @@ void rs2wrapper::print_camera_infos(const std::shared_ptr<rs2::pipeline_profile>
     if (!verbose)
         return;
 
-    std::cout << "\n========================================" << std::endl;
+    std::cout << std::string(80, '=') << std::endl;
     std::cout << ">>>>> RS2_CAMERA_INFO <<<<<" << std::endl;
-    std::cout << "========================================" << std::endl;
+    std::cout << std::string(80, '=') << std::endl;
     std::cout << "Name          : " << profile->get_device().get_info(RS2_CAMERA_INFO_NAME) << std::endl;
     std::cout << "Serial Number : " << profile->get_device().get_info(RS2_CAMERA_INFO_SERIAL_NUMBER) << std::endl;
     try
@@ -1253,8 +1249,7 @@ void rs2wrapper::print_camera_infos(const std::shared_ptr<rs2::pipeline_profile>
     {
         std::cout << "not available, " << e.what() << std::endl;
     }
-    std::cout << "========================================\n"
-              << std::endl;
+    std::cout << std::string(80, '=') << std::endl;
 }
 
 void rs2wrapper::print_camera_temperature(const std::string &device_sn)
