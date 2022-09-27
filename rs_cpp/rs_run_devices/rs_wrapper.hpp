@@ -137,9 +137,9 @@ public:
      *
      * @param num_frames N frames to flush.
      */
+    void flush_frame();
+    void flush_frame(const std::string &device_sn);
     void flush_frames(const int &num_frames = -1);
-    void flush_frames(const std::string &device_sn,
-                      const int &num_frames = -1);
 
     /**
      * @brief resets the global timestamp start

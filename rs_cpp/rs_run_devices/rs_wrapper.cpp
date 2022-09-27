@@ -566,31 +566,35 @@ void rs2wrapper::save_calib(const std::string &device_sn)
 
 void rs2wrapper::flush_frames(const int &num_frames)
 {
-    if (enabled_devices.size() > 0)
-        for (auto const &enabled_device : enabled_devices)
-            flush_frames(enabled_device.first, num_frames);
-    else
-        print("no device enabled, skipping flush_frames()...", 1);
-}
-
-void rs2wrapper::flush_frames(const std::string &device_sn,
-                              const int &num_frames)
-{
-    if (!check_if_device_is_enabled(device_sn, __func__))
-        return;
-
     int _num_frames = 0;
     if (num_frames == -1)
         _num_frames = args.flush_steps();
     else
         _num_frames = num_frames;
 
-    std::shared_ptr<device> dev = enabled_devices[device_sn];
     for (auto i = 0; i < _num_frames; ++i)
-        dev->pipeline->wait_for_frames();
+        flush_frame();
 
     if (verbose)
-        print(device_sn + " Flushed " + std::to_string(_num_frames) + " initial frames...", 0);
+        print(" Flushed " + std::to_string(_num_frames) + " initial frames...", 0);
+}
+
+void rs2wrapper::flush_frame()
+{
+    if (enabled_devices.size() > 0)
+        for (auto const &enabled_device : enabled_devices)
+            flush_frame(enabled_device.first);
+    else
+        print_no_device_enabled(__func__);
+}
+
+void rs2wrapper::flush_frame(const std::string &device_sn)
+{
+    if (!check_if_device_is_enabled(device_sn, __func__))
+        return;
+
+    std::shared_ptr<device> dev = enabled_devices[device_sn];
+    dev->pipeline->wait_for_frames();
 }
 
 void rs2wrapper::reset_global_timestamp()
