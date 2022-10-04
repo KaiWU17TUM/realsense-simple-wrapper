@@ -27,6 +27,13 @@ void print(const std::string &msg, const int &mode);
  */
 std::string pad_zeros(const std::string &in_str, const int &num_zeros);
 
+/**
+ * @brief Get the timestamp/duration in ns
+ * 
+ * @param timestamp_start chrono steady clock timepoint. 
+ * @return int64_t UNIX timestamp in ns using system clock.
+ */
+int64_t get_timestamp_ns();
 int64_t get_timestamp_duration_ns(const std::chrono::steady_clock::time_point &timestamp_start);
 
 /**

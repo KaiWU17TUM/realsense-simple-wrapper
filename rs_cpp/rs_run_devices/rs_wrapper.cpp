@@ -231,8 +231,9 @@ void rs2wrapper::step(const std::string &device_sn)
         if (frameset.size() == dev->num_streams)
         {
             // Timestamp duration using the global start timestamp.
-            int64_t global_timestamp_diff = get_timestamp_duration_ns(
-                global_timestamp_start);
+            // int64_t global_timestamp_diff = get_timestamp_duration_ns(
+            //     global_timestamp_start);
+            int64_t global_timestamp_diff = get_timestamp_ns();
 
             // Check if both frames are valid, skip step if one is invalid.
             if (!step_check_if_frames_are_valid(device_sn, frameset))

@@ -19,6 +19,14 @@ std::string pad_zeros(const std::string &in_str, const int &num_zeros)
     return out_str;
 }
 
+int64_t get_timestamp_ns()
+{
+    int64_t ns = std::chrono::duration_cast<std::chrono::nanoseconds>(
+                     std::chrono::system_clock::now().time_since_epoch())
+                     .count();
+    return ns;
+}
+
 int64_t get_timestamp_duration_ns(const std::chrono::steady_clock::time_point &timestamp_start)
 {
     auto timestamp_now = std::chrono::steady_clock::now();

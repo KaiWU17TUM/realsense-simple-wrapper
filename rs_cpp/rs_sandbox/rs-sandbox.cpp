@@ -261,6 +261,15 @@
 
 int main(int argc, char *argv[])
 {
+    // auto now = std::chrono::system_clock::now();
+    // std::time_t end_time = std::chrono::system_clock::to_time_t(now);
+    // std::cout << std::ctime(&end_time) << std::endl;
+    // int64_t microsecondsUTC = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+    // std::cout << microsecondsUTC << std::endl;
+    // std::time_t t = std::time(nullptr);
+    // std::cout << t << std::endl;
+    // std::cout << std::asctime(std::localtime(&t)) << std::endl;
+    // return EXIT_SUCCESS;
 
     // [TODO: Read from calib] *************************************************
     const int W = 848;
