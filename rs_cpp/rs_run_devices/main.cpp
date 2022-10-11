@@ -163,6 +163,8 @@ bool run(int argc, char *argv[])
         rs2args rs2_arg = rs2args(argc, argv);
 
         // if limit is given the stream needs to reset for it to take effect.
+        if (rs2_arg.depth_sensor_autoexposure_limit() !=
+            rs2_arg.default_depth_sensor_autoexposure_limit)
         {
             rs2wrapper _rs2_dev(rs2_arg, false, ctx, "-1");
             _rs2_dev.initialize_depth_sensor_ae();

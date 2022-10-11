@@ -139,7 +139,7 @@ void rs2wrapper::initialize_depth_sensor_ae(const std::string &device_sn)
             dss.set_option(RS2_OPTION_ENABLE_AUTO_EXPOSURE, 1.0f);
             dss.set_option(RS2_OPTION_AUTO_EXPOSURE_LIMIT_TOGGLE, 1.0f);
             dss.set_option(RS2_OPTION_AUTO_EXPOSURE_LIMIT, float(limit));
-            print("depth sensor exposure limit : " + std::to_string(limit), 0);
+            print("depth sensor auto exposure limit : " + std::to_string(limit), 0);
         }
     }
 
@@ -897,6 +897,10 @@ void rs2wrapper::configure_depth_sensor(const std::string &device_sn)
     if (args.autoexposure())
     {
         dev->depth_sensor->set_option(RS2_OPTION_ENABLE_AUTO_EXPOSURE, 1.0f);
+        auto limit = dev->depth_sensor->get_option(RS2_OPTION_AUTO_EXPOSURE_LIMIT);
+        if (verbose)
+            print("depth sensor auto exposure limit : " + std::to_string(limit), 0);
+
         // https://github.com/IntelRealSense/librealsense/issues/4015
         // Set the Auto Exposure (AE) Region of Interest (ROI). Should be done after
         // starting the pipe, will give an error otherwise
