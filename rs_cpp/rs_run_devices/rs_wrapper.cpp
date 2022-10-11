@@ -92,7 +92,7 @@ void rs2wrapper::initialize(const std::string &device_sn,
     if (storagepaths.size() > 0)
         query_timestamp_mode(std::string(device_sn));
 
-    print("Initialized RealSense devices " + std::string(device_sn), 0);
+    print("Initialized RealSense devices " + std::string(device_sn) + "\n", 0);
 }
 
 void rs2wrapper::initialize_depth_sensor_ae()
@@ -146,7 +146,7 @@ void rs2wrapper::initialize_depth_sensor_ae(const std::string &device_sn)
     // 5. pipeline stop
     stop(device_sn);
 
-    print("Initialized RealSense depth sensor AE " + std::string(device_sn), 0);
+    print("Initialized RealSense depth sensor AE " + std::string(device_sn) + "\n", 0);
 }
 
 void rs2wrapper::start()
@@ -577,7 +577,7 @@ void rs2wrapper::flush_frames(const int &num_frames)
         flush_frame();
 
     if (verbose)
-        print(" Flushed " + std::to_string(_num_frames) + " initial frames...", 0);
+        print("Flushed " + std::to_string(_num_frames) + " initial frames...", 0);
 }
 
 void rs2wrapper::flush_frame()

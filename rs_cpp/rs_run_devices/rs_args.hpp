@@ -13,6 +13,8 @@ class rs2args : public argparser
 {
 
 public:
+    int default_depth_sensor_autoexposure_limit = 200000;
+
     std::map<std::string, rs2_format> _SUPPORTED_FORMATS{
         {"z16", RS2_FORMAT_Z16},
         {"bgr8", RS2_FORMAT_BGR8},
@@ -26,22 +28,20 @@ public:
         "--width",
         "--color-format",
         "--depth-format",
-    };
-
-    std::vector<std::string> _OPTIONAL_ARGS{
-        "--reset-interval",
-        "--flush-steps",
-        "--ip",
-        "--multithreading",
-        "--verbose",
         "--save-path",
-        "--autoexposure",
-        "--depth-sensor-autoexposure-limit",
-        "--enable-ir-emitter",
-        "--ir-emitter-power",
     };
 
-    int default_depth_sensor_autoexposure_limit = 200000;
+    std::map<std::string, std::string> _OPTIONAL_ARGS{
+        {"--reset-interval", "120"},
+        {"--flush-steps", "30"},
+        {"--ip", ""},
+        {"--multithreading", "false"},
+        {"--verbose", "false"},
+        {"--autoexposure", "true"},
+        {"--depth-sensor-autoexposure-limit", std::to_string(default_depth_sensor_autoexposure_limit)},
+        {"--enable-ir-emitter", "true"},
+        {"--ir-emitter-power", "150"},
+    };
 
     /**
      * @brief Construct a new rs2args object (empty)
@@ -138,7 +138,8 @@ public:
      */
     std::string ip()
     {
-        return getarg("--ip");
+        auto _arg = "--ip";
+        return checkarg(_arg) ? getarg("--ip") : _OPTIONAL_ARGS[_arg];
     };
     /**
      * @brief Checks whether the realsense device is connected over the network.
@@ -148,7 +149,8 @@ public:
      */
     bool network()
     {
-        return checkarg("--ip") ? true : false;
+        auto _arg = "--ip";
+        return checkarg(_arg) ? true : false;
     };
     /**
      * @brief steps to flush initial frames.
@@ -158,7 +160,7 @@ public:
     int flush_steps()
     {
         auto _arg = "--flush-steps";
-        return checkarg(_arg) ? getargi(_arg) : 30;
+        return checkarg(_arg) ? getargi(_arg) : std::stoi(_OPTIONAL_ARGS[_arg]);
     };
     /**
      * @brief interval to reset pipeline.
@@ -168,7 +170,7 @@ public:
     int reset_interval()
     {
         auto _arg = "--reset-interval";
-        return checkarg(_arg) ? getargi(_arg) : 120;
+        return checkarg(_arg) ? getargi(_arg) : std::stoi(_OPTIONAL_ARGS[_arg]);
     };
     /**
      * @brief
@@ -179,7 +181,7 @@ public:
     bool verbose()
     {
         auto _arg = "--verbose";
-        return checkarg(_arg) ? getargb(_arg) : false;
+        return checkarg(_arg) ? getargb(_arg) : stob(_OPTIONAL_ARGS[_arg]);
     };
     /**
      * @brief
@@ -190,7 +192,7 @@ public:
     bool multithreading()
     {
         auto _arg = "--multithreading";
-        return checkarg(_arg) ? getargb(_arg) : false;
+        return checkarg(_arg) ? getargb(_arg) : stob(_OPTIONAL_ARGS[_arg]);
     };
     /**
      * @brief
@@ -201,7 +203,7 @@ public:
     bool autoexposure()
     {
         auto _arg = "--autoexposure";
-        return checkarg(_arg) ? getargb(_arg) : true;
+        return checkarg(_arg) ? getargb(_arg) : stob(_OPTIONAL_ARGS[_arg]);
     };
     /**
      * @brief
@@ -224,7 +226,7 @@ public:
     bool enable_ir_emitter()
     {
         auto _arg = "--enable-ir-emitter";
-        return checkarg(_arg) ? getargb(_arg) : true;
+        return checkarg(_arg) ? getargb(_arg) : stob(_OPTIONAL_ARGS[_arg]);
     };
     /**
      * @brief
@@ -235,7 +237,7 @@ public:
     int ir_emitter_power()
     {
         auto _arg = "--ir-emitter-power";
-        return checkarg(_arg) ? getargi(_arg) : 150;
+        return checkarg(_arg) ? getargi(_arg) : std::stoi(_OPTIONAL_ARGS[_arg]);
     };
 
     /**
@@ -264,8 +266,8 @@ public:
             }
         }
         for (auto &&arg : _OPTIONAL_ARGS)
-            if (!checkarg(arg))
-                print(arg + " is not used", 1);
+            if (!checkarg(arg.first))
+                print(arg.first + " not defined, using default : " + arg.second, 1);
         return EXIT_SUCCESS;
     };
 };

@@ -1,5 +1,12 @@
 #include "utils.hpp"
 
+bool stob(const std::string &x)
+{
+    bool o;
+    std::istringstream(x) >> std::boolalpha >> o;
+    return o;
+}
+
 void print(const std::string &msg, const int &mode)
 {
     if (mode == 0)
@@ -70,9 +77,7 @@ int argparser::getargi(const std::string &option)
 
 bool argparser::getargb(const std::string &option)
 {
-    bool o;
-    std::istringstream(getarg(option)) >> std::boolalpha >> o;
-    return o;
+    return stob(getarg(option));
 }
 
 bool argparser::checkarg(const std::string &option)
@@ -83,7 +88,7 @@ bool argparser::checkarg(const std::string &option)
 void argparser::printout()
 {
     std::cout << std::string(80, '=') << std::endl;
-    std::cout << ">>>>> rs2args <<<<<" << std::endl;
+    std::cout << ">>>>> args <<<<<" << std::endl;
     std::cout << std::string(80, '=') << std::endl;
     for (int i = 0; i < args.size(); i += 2)
         std::cout << args[i] + " : " + args[i + 1] << std::endl;

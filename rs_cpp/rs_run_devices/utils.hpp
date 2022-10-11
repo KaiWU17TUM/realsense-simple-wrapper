@@ -8,6 +8,8 @@
 #include <algorithm>
 #include <vector>
 
+bool stob(const std::string &x);
+
 /**
  * @brief Prints out a message using cout with either INFO/WARN/ERR tags.
  *
@@ -29,8 +31,8 @@ std::string pad_zeros(const std::string &in_str, const int &num_zeros);
 
 /**
  * @brief Get the timestamp/duration in ns
- * 
- * @param timestamp_start chrono steady clock timepoint. 
+ *
+ * @param timestamp_start chrono steady clock timepoint.
  * @return int64_t UNIX timestamp in ns using system clock.
  */
 int64_t get_timestamp_ns();
