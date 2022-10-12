@@ -325,6 +325,8 @@ private:
     rs2::align align_to_depth = rs2::align(RS2_STREAM_DEPTH);
 
     // [INTERNAL] --------------------------------------------------------------
+    // FPS counter
+    std::map<std::string, std::vector<int64_t>> fps_counter;
     // Reset frozen devices
     int max_reset_counter = 500;
     // Output message

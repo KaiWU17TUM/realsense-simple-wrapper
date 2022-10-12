@@ -177,6 +177,8 @@ bool run(int argc, char *argv[])
             throw rs2::error("No RS device detected...");
 
         rs2_dev.prepare_storage();
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+
         rs2_dev.initialize(true);
         rs2_dev.save_calib();
         rs2_dev.flush_frames();

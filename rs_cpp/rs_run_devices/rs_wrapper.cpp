@@ -52,12 +52,16 @@ void rs2wrapper::initialize(const std::string &device_sn,
 {
     // reset after 0.5s
     max_reset_counter = std::round(0.5 * (float)args.fps());
+    
+    // every 1 minutes
+    camera_temp_printout_interval = args.fps() * 60 * 1;
 
     print("Initializing RealSense devices " + std::string(device_sn), 0);
 
     // 0. enabled devices
     std::shared_ptr<device> dev = std::make_shared<device>();
     enabled_devices[device_sn] = dev;
+    fps_counter[device_sn] = std::vector<int64_t>(args.fps(), 0);
 
     // 1. pipeline
     rs2::pipeline pipe = initialize_pipeline();
@@ -273,7 +277,7 @@ void rs2wrapper::step(const std::string &device_sn)
                                     " Resetting, error in processing color stream, c=" +
                                     std::to_string(dev->color_reset_counter),
                                 1);
-                        output_msg = device_sn + " :: Error in stream...";
+                        output_msg = device_sn + " :: ERROR IN STREAM :: ";
                     }
 
                     // Something was wrong with depth stream.
@@ -286,7 +290,7 @@ void rs2wrapper::step(const std::string &device_sn)
                                     " Resetting, error in processing depth stream, c=" +
                                     std::to_string(dev->depth_reset_counter),
                                 1);
-                        output_msg = device_sn + " :: Error in stream...";
+                        output_msg = device_sn + " :: ERROR IN STREAM :: ";
                     }
 
                     // nothing is wrong with stream
@@ -301,11 +305,16 @@ void rs2wrapper::step(const std::string &device_sn)
                         valid_frame_received_flags[device_sn] = true;
                         empty_frame_received_timers[device_sn] = 0;
 
+                        float time_diff = 0;
+                        for (size_t i = 0; i < fps_counter[device_sn].size() - 1; i++)
+                            time_diff += float(fps_counter[device_sn][i + 1] - fps_counter[device_sn][i]) * 1e-9;
+                        fps_counter[device_sn].erase(fps_counter[device_sn].begin());
+                        fps_counter[device_sn].push_back(global_timestamp_diff);
+
                         output_msg =
                             device_sn + "::" +
                             std::to_string(global_timestamp_diff) + "::" +
-                            std::to_string(current_color_timestamp) + "::" +
-                            std::to_string(current_depth_timestamp) + "  ";
+                            std::to_string(static_cast<int>((float(fps_counter[device_sn].size()) - 1) / time_diff)) + "  ";
                     }
                 }
             }

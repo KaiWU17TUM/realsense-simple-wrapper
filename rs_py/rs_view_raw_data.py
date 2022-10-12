@@ -124,7 +124,9 @@ def get_filepaths(base_path: str, sensor: str) -> dict:
         for ts in sorted(os.listdir(device_path)):
             path[device][ts] = []
             sensor_path = os.path.join(base_path, device, ts, sensor)
-            for filename in sorted(os.listdir(sensor_path)):
+            filenames = sorted(os.listdir(sensor_path))
+            # filenames.reverse()
+            for filename in filenames:
                 path[device][ts].append(os.path.join(sensor_path, filename))
     return path
 
@@ -148,7 +150,10 @@ def get_filepaths_with_timestamps(base_path: str) -> Tuple[dict, dict, list]:
 
     def _ts_from_filepath(path: str) -> int:
         ts = path.split('/')[-1]
-        ts = int(ts.split('.')[0])
+        try:
+            ts = int(ts.split('.')[0])
+        except:
+            ts = -1
         return ts
 
     # trial(as timestamp) > dev > timestamps > [filepath, calib]
@@ -328,7 +333,8 @@ def data_process_fn(**kwargs):
     cv2.moveWindow(name, 0, 0)
     cv2.imshow(name, output)
     # cv2.waitKey(1000//fps)
-    cv2.waitKey(0)
+    # cv2.waitKey(0)
+    cv2.waitKey(10)
 
 
 if __name__ == "__main__":

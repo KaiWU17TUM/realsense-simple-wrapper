@@ -257,6 +257,8 @@ public:
      */
     bool check_rs2args()
     {
+        std::cout << " " << std::endl;
+
         for (auto &&arg : _REQUIRED_ARGS)
         {
             if (!checkarg(arg))
@@ -265,9 +267,13 @@ public:
                 return EXIT_FAILURE;
             }
         }
+
         for (auto &&arg : _OPTIONAL_ARGS)
             if (!checkarg(arg.first))
                 print(arg.first + " not defined, using default : " + arg.second, 1);
+
+        std::cout << " " << std::endl;
+
         return EXIT_SUCCESS;
     };
 };
