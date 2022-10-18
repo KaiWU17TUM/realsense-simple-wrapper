@@ -24,13 +24,7 @@ The code in [realsense](realsense) folder uses the [pyrealsense2](https://pypi.o
 
 ## Running RS in RaspberryPi-4B
 
-To run RS in raspberrypi 3/4, the linux kernel needs to be patched. This can be done either:
-
-1. Compile from source : The official github repo contains [scripts](https://github.com/IntelRealSense/librealsense/tree/master/scripts) to do so, but they are not raspberrypi specific. A raspberrypi-4 speific instructions for patching can be found in this [guide](https://github.com/NobuoTsukamoto/realsense_examples/blob/master/doc/installation_raspberry_pi_64.md).
-
-2. Flash a pre-build image : In one of he official [guide](https://dev.intelrealsense.com/docs/open-source-ethernet-networking-for-intel-realsense-depth-cameras) there is an image for (kernel-patched) Raspberrypi-OS built with RS-SDK-V2.34 . 
-
-Once kernel patching is done, the RS SDK can be installed/upgraded by following the steps shown in this [guide](https://github.com/datasith/Ai_Demos_RPi/wiki/Raspberry-Pi-4-and-Intel-RealSense-D435). This [script](scripts/install_realsense_pi4.sh) follows the steps and performs the installation (except OpenGL and VNC). **BUT, the swapsize needs to be done manually first according to the [guide](https://github.com/datasith/Ai_Demos_RPi/wiki/Raspberry-Pi-4-and-Intel-RealSense-D435).**
+See [here](pi4_scripts/README.md).
 
 ## Data transmission testing
 
