@@ -24,22 +24,41 @@
 #include "utils.hpp"
 #include "rs_wrapper.hpp"
 
+// GLOBAL PARAMETERS
 volatile sig_atomic_t stop = 0;
 const int num_zeros_to_pad = 16;
 std::mutex mux;
 
+/**
+ * @brief A handler to detect when ctrl+c hotkey is pressed.
+ *
+ * @param signum An atomic signal that can be used in multithreading.
+ */
 void inthand(int signum)
 {
     stop = 1;
     print("ctrl + c detected", 1);
 }
 
+/**
+ * @brief Function to run per thread in multithreading.
+ *
+ * @param th_id Thread id.
+ * @param argc From main.
+ * @param argv From main.
+ * @param context A rs::context object.
+ * @param storagepaths A storagepath object. Used to create a set of
+ *                     specific data storage paths.
+ * @param device_sn Device serial number of the realsense camera.
+ * @param num_devices Number of devices used in multithreading.
+ * @param global_timestamp Steady clock time point to be used as the
+ *                         initial time in the rs_wrapper.
+ */
 void multithreading_function(
     size_t th_id,
     int argc,
     char *argv[],
     rs2::context context,
-    std::map<std::string, storagepath> storagepaths,
     std::string device_sn,
     size_t num_devices,
     std::chrono::steady_clock::time_point global_timestamp)
@@ -56,7 +75,7 @@ void multithreading_function(
     }
 
     rs2wrapper rs2_dev(rs2_arg, context, device_sn);
-    rs2_dev.set_storagepaths(storagepaths);
+    rs2_dev.prepare_storage();
 
     {
         // Initializing RS devices in parallel can be problematic with libusb.
@@ -66,10 +85,11 @@ void multithreading_function(
         rs2_dev.flush_frames();
     }
 
+    // Uses the global timestamp as the initial time.
     rs2_dev.reset_global_timestamp(global_timestamp);
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    int i = 1;
+    // std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    int i = 0;
     int i_offset = rs2_arg.reset_interval() * th_id;
     int i_range = rs2_arg.reset_interval() * num_devices;
     while (!stop)
@@ -77,39 +97,52 @@ void multithreading_function(
         std::string i_str = pad_zeros(std::to_string(i), num_zeros_to_pad);
         std::string o_str = "";
 
+        // so that files are saved periodically in different folders.
+        if (i % (rs2_arg.fps() * 60 * 15) == 0)
+            rs2_dev.prepare_storage();
+
+        // Runs + collects frame data from realsense.
         rs2_dev.step();
         o_str += rs2_dev.get_output_msg();
+        i++;
 
         if (i % rs2_arg.fps() == 0)
             print("Step " + i_str + "   " + o_str, 0);
 
+        // Occasionally resets the realsense device.
         if ((i + i_offset) % i_range == 0)
             rs2_dev.reset(device_sn);
 
+        // Runs + collects framne data from realsense.
         if (i >= rs2_arg.steps())
             break;
-        else
-            i++;
     }
 
     rs2_dev.stop();
-
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    // std::this_thread::sleep_for(std::chrono::milliseconds(100));
 }
 
+/**
+ * @brief Runs realsense in multithreading mo0de, 1 camera per thread.
+ *
+ * @param argc From main.
+ * @param argv From main.
+ * @return true
+ * @return false If error occurs.
+ */
 bool run_multithreading(int argc, char *argv[])
 {
     try
     {
         rs2::context ctx;
         std::vector<std::vector<std::string>> device_list;
-        std::map<std::string, storagepath> storagepaths;
+        storagepath storagepaths;
 
         {
             rs2wrapper _rs2_dev = rs2wrapper(argc, argv, false, ctx, "-1");
             device_list = _rs2_dev.get_available_devices();
-            _rs2_dev.prepare_storage();
-            storagepaths = _rs2_dev.get_storagepaths();
+            // _rs2_dev.prepare_storage();
+            // storagepaths = _rs2_dev.get_storagepaths();
         }
 
         if (device_list.size() == 0)
@@ -126,7 +159,6 @@ bool run_multithreading(int argc, char *argv[])
                                                       argc,
                                                       argv,
                                                       ctx,
-                                                      storagepaths,
                                                       device_list[i][0],
                                                       num_threads,
                                                       global_timestamp); }));
@@ -155,6 +187,14 @@ bool run_multithreading(int argc, char *argv[])
     }
 }
 
+/**
+ * @brief Runs realsense cameras in sequential mode.
+ *
+ * @param argc From main.
+ * @param argv From main.
+ * @return true
+ * @return false If error occurs.
+ */
 bool run(int argc, char *argv[])
 {
     try
@@ -176,8 +216,8 @@ bool run(int argc, char *argv[])
         if (available_devices.size() == 0)
             throw rs2::error("No RS device detected...");
 
-        rs2_dev.prepare_storage();
-        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        // rs2_dev.prepare_storage();
+        // std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 
         rs2_dev.initialize(true);
         rs2_dev.save_calib();
@@ -186,20 +226,28 @@ bool run(int argc, char *argv[])
         size_t dev_reset_loop = 0;
         size_t num_dev = rs2_dev.get_enabled_devices().size();
 
+        // Uses the current timestamp as the initial time.
         rs2_dev.reset_global_timestamp();
 
-        int i = 1;
+        int i = 0;
         while (!stop)
         {
             std::string i_str = pad_zeros(std::to_string(i), num_zeros_to_pad);
             std::string o_str = "";
 
+            // so that files are saved periodically in different folders.
+            if (i % (rs2_arg.fps() * 60 * 15) == 0)
+                rs2_dev.prepare_storage();
+
+            // Runs + collects frame data from realsense.
             rs2_dev.step();
             o_str += rs2_dev.get_output_msg();
+            i++;
 
             if (i % rs2_arg.fps() == 0)
                 print("Step " + i_str + "   " + o_str, 0);
 
+            // Occasionally resets the realsense device.
             if (i % rs2_arg.reset_interval() == 0)
             {
                 rs2_dev.reset(available_devices[dev_reset_loop][0]);
@@ -208,8 +256,6 @@ bool run(int argc, char *argv[])
 
             if (i >= rs2_arg.steps())
                 break;
-            else
-                i++;
         }
         rs2_dev.stop();
         return EXIT_SUCCESS;
@@ -235,11 +281,10 @@ int main(int argc, char *argv[])
     signal(SIGINT, inthand);
 
     rs2args args(argc, argv);
+    args.print_args();
 
     if (args.check_rs2args() == EXIT_FAILURE)
         return EXIT_FAILURE;
-
-    args.print_args();
 
     if (args.multithreading())
         return run_multithreading(argc, argv);

@@ -68,11 +68,9 @@ public:
      *
      * @param enable_ir_emitter Whether to use the ir emmiter.
      */
-    void initialize(const bool &enable_ir_emitter = true,
-                    const bool &set_roi = false);
+    void initialize(const bool &enable_ir_emitter = true);
     void initialize(const std::string &device_sn,
-                    const bool &enable_ir_emitter = true,
-                    const bool &set_roi = false);
+                    const bool &enable_ir_emitter = true);
     void initialize_depth_sensor_ae();
     void initialize_depth_sensor_ae(const std::string &device_sn);
 
@@ -87,15 +85,13 @@ public:
      * @brief Collects a set of frames and postprocesses them.
      *
      * Currently this function polls for a set of frames and
-     * saves the color & depth (as colormap) images as png,
+     * saves the color & depth (as colormap) images as bin,
      * and their metadata as csv.
      *
      */
     void step();
     void step(const std::string &device_sn);
     void step_clear();
-    bool step_check_if_frames_are_valid(const std::string &device_sn,
-                                        const rs2::frameset &frameset);
 
     /**
      * @brief Stops the devices through rs2::pipeline
@@ -120,8 +116,15 @@ public:
      * @brief checks and resets if the reset counter gets too high.
      *
      */
-    void reset_with_high_reset_counter();
-    void reset_with_high_reset_counter(const std::string &device_sn);
+    void reset_due_to_high_reset_counter();
+    void reset_due_to_high_reset_counter(const std::string &device_sn);
+
+    /**
+     * @brief checks and resets if empty frame is received for x amount of time.
+     *
+     */
+    void reset_due_to_empty_frame_received();
+    void reset_due_to_empty_frame_received(const std::string &device_sn);
 
     /**
      * @brief Saves the camera calibration data.
@@ -155,24 +158,15 @@ public:
     void prepare_storage();
 
     /**
-     * @brief Set functions to change member variables.
+     * @brief Set/Get functions to expose member variables.
      *
      */
-    void set_storagepaths(const std::map<std::string, storagepath> &storagepaths);
-
-    /**
-     * @brief Get functions to expose member variables.
-     *
-     */
-    int64_t get_empty_frame_received_timers(const std::string &device_sn);
-    std::map<std::string, int64_t> get_empty_frame_received_timers();
     std::string get_output_msg();
     std::vector<std::vector<std::string>> get_available_devices();
     std::map<std::string, std::shared_ptr<device>> get_enabled_devices();
     rs2args get_args();
-    rs2_metadata_type get_frame_timestamp(const std::string &device_sn,
-                                          const rs2::frame &frame);
-    std::map<std::string, storagepath> get_storagepaths();
+    void set_storagepaths(const storagepath &storagepaths);
+    storagepath get_storagepaths();
 
     /**
      * @brief Check functions to see if some condition is true.
@@ -270,25 +264,24 @@ private:
     void query_timestamp_mode(const std::string &device_sn);
 
     /**
-     * @brief saves the timestamp.
+     * @brief gets the timestamp from rs2 frame.
      *
-     * @param device_sn device serial number.
-     * @param global_timestamp global system timestamp. (difference from start)
-     * @param color_timestamp color timestamp from rs.
-     * @param depth_timestamp depth timestamp from rs.
+     * @param device_sn
+     * @param frame
+     * @return rs2_metadata_type
      */
-    void save_timestamp(const std::string &device_sn,
-                        const int64_t &global_timestamp,
-                        const rs2_metadata_type &color_timestamp,
-                        const rs2_metadata_type &depth_timestamp);
+    rs2_metadata_type query_frame_timestamp(const std::string &device_sn,
+                                            const rs2::frame &frame);
 
     /**
-     * @brief print camera infos
+     * @brief calculate and returns the fps
      *
-     * @param profile
+     * @param device_sn
+     * @param timstamp_diff time diff in ns
+     * @return int
      */
-    void print_camera_infos(const std::shared_ptr<rs2::pipeline_profile> profile);
-    void print_camera_temperature(const std::string &device_sn);
+    int query_fps(const std::string &device_sn,
+                  const int64_t &timstamp_diff);
 
     // [MEMBER VARIABLES] ------------------------------------------------------
     bool verbose = false;
@@ -310,10 +303,10 @@ private:
     std::map<std::string, stream_config> stream_config_depths;
 
     // Paths for saving data
-    std::map<std::string, storagepath> storagepaths;
+    storagepath storagepaths;
 
     // Timestamp data
-    int camera_temp_printout_interval = 3600;
+    int camera_temp_printout_interval = 0;
     rs2_frame_metadata_value timestamp_mode = RS2_FRAME_METADATA_TIME_OF_ARRIVAL;
     std::chrono::steady_clock::time_point global_timestamp_start = std::chrono::steady_clock::now();
 
@@ -328,7 +321,9 @@ private:
     // FPS counter
     std::map<std::string, std::vector<int64_t>> fps_counter;
     // Reset frozen devices
-    int max_reset_counter = 500;
+    int max_reset_counter = 10;
+    // Reset if too much emoty frames received
+    int max_empty_frame_time_buffer = 5e8; // .5s
     // Output message
     std::vector<std::pair<std::string, std::string>> output_msgs;
     // Frame check, true if poll/wait returns a valid frame.

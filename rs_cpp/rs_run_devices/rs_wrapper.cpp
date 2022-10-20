@@ -39,27 +39,20 @@ rs2wrapper::rs2wrapper(rs2args args,
     constructor(args, verbose, context, device_sn);
 }
 
-void rs2wrapper::initialize(const bool &enable_ir_emitter,
-                            const bool &set_roi)
+void rs2wrapper::initialize(const bool &enable_ir_emitter)
 {
     for (auto const &available_device : available_devices)
-        initialize(available_device[0], enable_ir_emitter, set_roi);
+        initialize(available_device[0], enable_ir_emitter);
 }
 
 void rs2wrapper::initialize(const std::string &device_sn,
-                            const bool &enable_ir_emitter,
-                            const bool &set_roi)
+                            const bool &enable_ir_emitter)
 {
-    // reset after 0.5s
-    max_reset_counter = std::round(0.5 * (float)args.fps());
-    
-    // every 1 minutes
-    camera_temp_printout_interval = args.fps() * 60 * 1;
-
     print("Initializing RealSense devices " + std::string(device_sn), 0);
 
     // 0. enabled devices
     std::shared_ptr<device> dev = std::make_shared<device>();
+    dev->sn = device_sn;
     enabled_devices[device_sn] = dev;
     fps_counter[device_sn] = std::vector<int64_t>(args.fps(), 0);
 
@@ -89,11 +82,13 @@ void rs2wrapper::initialize(const std::string &device_sn,
     align_to_depth = rs2::align(RS2_STREAM_DEPTH);
 
     // 7. infos
-    print_camera_infos(dev->pipeline_profile);
-    print_camera_temperature(device_sn);
+    print_rs2_device_infos(dev->pipeline_profile->get_device(), args.verbose());
+    print_camera_temperature(*enabled_devices[device_sn],
+                             camera_temp_printout_interval,
+                             args.verbose());
 
     // 8. timestamp mode
-    if (storagepaths.size() > 0)
+    if (storagepaths.device_sns.size() > 0)
         query_timestamp_mode(std::string(device_sn));
 
     print("Initialized RealSense devices " + std::string(device_sn) + "\n", 0);
@@ -111,6 +106,7 @@ void rs2wrapper::initialize_depth_sensor_ae(const std::string &device_sn)
 
     // 0. enabled devices
     std::shared_ptr<device> dev = std::make_shared<device>();
+    dev->sn = device_sn;
     enabled_devices[device_sn] = dev;
 
     // 1. pipeline
@@ -188,14 +184,10 @@ void rs2wrapper::step()
         {
             auto device_sn = enabled_device.first;
             step(device_sn);
-            reset_with_high_reset_counter(device_sn);
+            reset_due_to_high_reset_counter(device_sn);
             // In case a device is not sending anything at all.
             // empty frame for 0.5 seconds.
-            if (empty_frame_received_timers[device_sn] > 5e8)
-            {
-                empty_frame_received_timers[device_sn] = 0;
-                reset(device_sn);
-            }
+            reset_due_to_empty_frame_received(device_sn);
         }
     }
 }
@@ -211,55 +203,56 @@ void rs2wrapper::step(const std::string &device_sn)
     rs2_metadata_type current_color_timestamp = 0;
     rs2_metadata_type current_depth_timestamp = 0;
 
-    // Getting the enabled device 'device' class object
+    // 1. Getting the enabled device 'device' class object
     std::shared_ptr<device> dev = enabled_devices[device_sn];
 
     // Timestamp used to track empty frames.
     std::chrono::steady_clock::time_point local_timestamp =
         std::chrono::steady_clock::now();
 
-    // Poll for frames.
+    // 2. Poll for frames.
     bool valid_frame = dev->pipeline->poll_for_frames(&frameset);
 
-    // Polled frames are empty.
+    // 3.a. Polled frames are empty.
     if (!valid_frame)
     {
         empty_frame_received_timers[device_sn] +=
             get_timestamp_duration_ns(local_timestamp);
         // output_msg = device_sn + " :: Invalid frame...";
     }
-    // Polled frames are not empty.
+    // 3.b. Polled frames are not empty.
     else
     {
-        // Make sure both color and depth frames are there.
+        // 4. Make sure both color and depth frames are there.
         if (frameset.size() == dev->num_streams)
         {
             // Timestamp duration using the global start timestamp.
-            // int64_t global_timestamp_diff = get_timestamp_duration_ns(
-            //     global_timestamp_start);
-            int64_t global_timestamp_diff = get_timestamp_ns();
+            // This will be used as the filenames of the sdaved data.
+            int64_t global_timestamp_diff = get_timestamp_duration_ns(
+                global_timestamp_start);
+            // int64_t global_timestamp_diff = get_timestamp_ns();
 
-            // Check if both frames are valid, skip step if one is invalid.
-            if (!step_check_if_frames_are_valid(device_sn, frameset))
+            // 5.a. Check if both frames are valid, skip step if one is invalid.
+            if (!check_if_color_depth_frames_are_valid(frameset))
             {
                 dev->color_reset_counter += 1;
                 dev->depth_reset_counter += 1;
                 output_msg = device_sn + " :: One of the streams is missing...";
             }
-            // Both color and depth streams are valid.
+            // 5.b. Both color and depth streams are valid.
             else
             {
-                // Tries to align the frames, and skip step if exception occurs.
+                // 6.a. Tries to align the frames, and skip step if exception occurs.
                 if (!align_frameset(device_sn, frameset, aligned_frameset, 1))
                 {
                     dev->color_reset_counter += 1;
                     dev->depth_reset_counter += 1;
                     output_msg = device_sn + " :: Align failed...";
                 }
-                // Framesets are aligned.
+                // 6.b. Framesets are aligned.
                 else
                 {
-                    // Loops through the streams to get color and depth.
+                    // 7. Loops through the streams to get color and depth.
                     int error_status = process_color_depth_stream(
                         device_sn,
                         aligned_frameset,
@@ -267,7 +260,7 @@ void rs2wrapper::step(const std::string &device_sn)
                         current_color_timestamp,
                         current_depth_timestamp);
 
-                    // Something was wrong with color stream.
+                    // 8.a. Something was wrong with color stream.
                     if (error_status == 1 || error_status == 3)
                     {
                         dev->color_reset_counter += 1;
@@ -280,7 +273,7 @@ void rs2wrapper::step(const std::string &device_sn)
                         output_msg = device_sn + " :: ERROR IN STREAM :: ";
                     }
 
-                    // Something was wrong with depth stream.
+                    // 8.b. Something was wrong with depth stream.
                     if (error_status == 2 || error_status == 3)
                     {
                         dev->depth_reset_counter += 1;
@@ -293,28 +286,23 @@ void rs2wrapper::step(const std::string &device_sn)
                         output_msg = device_sn + " :: ERROR IN STREAM :: ";
                     }
 
-                    // nothing is wrong with stream
+                    // 8.c. nothing is wrong with stream
                     // Saves the timestamps and generate output message.
                     if (error_status == 0)
                     {
-                        save_timestamp(device_sn,
-                                       global_timestamp_diff,
-                                       current_color_timestamp,
-                                       current_depth_timestamp);
+                        std::string txt_file = storagepaths.timestamp[device_sn] + "/timestamp.txt";
+                        timestamp_to_txt(global_timestamp_diff,
+                                         current_color_timestamp,
+                                         current_depth_timestamp,
+                                         txt_file);
 
                         valid_frame_received_flags[device_sn] = true;
                         empty_frame_received_timers[device_sn] = 0;
 
-                        float time_diff = 0;
-                        for (size_t i = 0; i < fps_counter[device_sn].size() - 1; i++)
-                            time_diff += float(fps_counter[device_sn][i + 1] - fps_counter[device_sn][i]) * 1e-9;
-                        fps_counter[device_sn].erase(fps_counter[device_sn].begin());
-                        fps_counter[device_sn].push_back(global_timestamp_diff);
-
                         output_msg =
                             device_sn + "::" +
                             std::to_string(global_timestamp_diff) + "::" +
-                            std::to_string(static_cast<int>((float(fps_counter[device_sn].size()) - 1) / time_diff)) + "  ";
+                            std::to_string(query_fps(device_sn, global_timestamp_diff)) + "  ";
                     }
                 }
             }
@@ -326,7 +314,7 @@ void rs2wrapper::step(const std::string &device_sn)
         // }
     }
 
-    // Message to be printed out.
+    // 9. Message to be printed out.
     std::pair<std::string, std::string> msg(device_sn, output_msg);
     output_msgs.push_back(msg);
 }
@@ -337,17 +325,6 @@ void rs2wrapper::step_clear()
     output_msgs.clear();
     valid_frame_received_flags.clear();
     empty_frame_received_timers.clear();
-}
-
-bool rs2wrapper::step_check_if_frames_are_valid(const std::string &device_sn,
-                                                const rs2::frameset &frameset)
-{
-    rs2::frame cf = frameset.first_or_default(RS2_STREAM_COLOR);
-    rs2::frame df = frameset.first_or_default(RS2_STREAM_DEPTH);
-    if (!cf || !df)
-        return false;
-    else
-        return true;
 }
 
 void rs2wrapper::stop()
@@ -461,16 +438,16 @@ void rs2wrapper::reset_reset_counter(const std::string &device_sn)
     enabled_devices[device_sn]->depth_reset_counter = 0;
 }
 
-void rs2wrapper::reset_with_high_reset_counter()
+void rs2wrapper::reset_due_to_high_reset_counter()
 {
     if (enabled_devices.size() > 0)
         for (auto const &enabled_device : enabled_devices)
-            reset_with_high_reset_counter(enabled_device.first);
+            reset_due_to_high_reset_counter(enabled_device.first);
     else
         print_no_device_enabled(__func__);
 }
 
-void rs2wrapper::reset_with_high_reset_counter(const std::string &device_sn)
+void rs2wrapper::reset_due_to_high_reset_counter(const std::string &device_sn)
 {
     if (!check_if_device_is_enabled(device_sn, __func__))
         return;
@@ -491,6 +468,27 @@ void rs2wrapper::reset_with_high_reset_counter(const std::string &device_sn)
     }
 }
 
+void rs2wrapper::reset_due_to_empty_frame_received()
+{
+    if (enabled_devices.size() > 0)
+        for (auto const &enabled_device : enabled_devices)
+            reset_due_to_empty_frame_received(enabled_device.first);
+    else
+        print_no_device_enabled(__func__);
+}
+
+void rs2wrapper::reset_due_to_empty_frame_received(const std::string &device_sn)
+{
+    if (!check_if_device_is_enabled(device_sn, __func__))
+        return;
+
+    if (empty_frame_received_timers[device_sn] > max_empty_frame_time_buffer)
+    {
+        reset(device_sn);
+        empty_frame_received_timers[device_sn] = 0;
+    }
+}
+
 void rs2wrapper::save_calib()
 {
     if (enabled_devices.size() > 0)
@@ -506,7 +504,7 @@ void rs2wrapper::save_calib(const std::string &device_sn)
         return;
 
     std::shared_ptr<device> dev = enabled_devices[device_sn];
-    std::string csv_file = storagepaths[device_sn].calib + "/calib.csv";
+    std::string csv_file = storagepaths.calib[device_sn] + "/calib.csv";
     std::ofstream csv;
     csv.open(csv_file);
 
@@ -574,21 +572,6 @@ void rs2wrapper::save_calib(const std::string &device_sn)
     print(device_sn + " Saved camera calibration data...", 0);
 }
 
-void rs2wrapper::flush_frames(const int &num_frames)
-{
-    int _num_frames = 0;
-    if (num_frames == -1)
-        _num_frames = args.flush_steps();
-    else
-        _num_frames = num_frames;
-
-    for (auto i = 0; i < _num_frames; ++i)
-        flush_frame();
-
-    if (verbose)
-        print("Flushed " + std::to_string(_num_frames) + " initial frames...", 0);
-}
-
 void rs2wrapper::flush_frame()
 {
     if (enabled_devices.size() > 0)
@@ -607,6 +590,21 @@ void rs2wrapper::flush_frame(const std::string &device_sn)
     dev->pipeline->wait_for_frames();
 }
 
+void rs2wrapper::flush_frames(const int &num_frames)
+{
+    int _num_frames = 0;
+    if (num_frames == -1)
+        _num_frames = args.flush_steps();
+    else
+        _num_frames = num_frames;
+
+    for (auto i = 0; i < _num_frames; ++i)
+        flush_frame();
+
+    if (verbose)
+        print("Flushed " + std::to_string(_num_frames) + " initial frames...\n", 0);
+}
+
 void rs2wrapper::reset_global_timestamp()
 {
     this->global_timestamp_start = std::chrono::steady_clock::now();
@@ -619,33 +617,29 @@ void rs2wrapper::reset_global_timestamp(std::chrono::steady_clock::time_point gl
 
 void rs2wrapper::prepare_storage()
 {
-    // storage
+    storagepath sp;
+    std::vector<std::string> device_names;
     for (auto const &available_device : available_devices)
     {
-        auto device_sn = available_device[0];
-        storagepath sp;
-        sp.create(device_sn, args.save_path());
-        storagepaths[device_sn] = sp;
+        device_names.push_back(available_device[0]);
     }
+    sp.create(device_names, args.save_path());
+    storagepaths = sp;
+    // std::this_thread::sleep_for(std::chrono::milliseconds(100));
 }
 
 /*******************************************************************************
  * rs2wrapper PUBLIC FUNCTIONS : SET, GET, CHECK
  ******************************************************************************/
 
-void rs2wrapper::set_storagepaths(const std::map<std::string, storagepath> &storagepaths)
+void rs2wrapper::set_storagepaths(const storagepath &storagepaths)
 {
     this->storagepaths = storagepaths;
 }
 
-int64_t rs2wrapper::get_empty_frame_received_timers(const std::string &device_sn)
+storagepath rs2wrapper::get_storagepaths()
 {
-    return this->empty_frame_received_timers[device_sn];
-}
-
-std::map<std::string, int64_t> rs2wrapper::get_empty_frame_received_timers()
-{
-    return this->empty_frame_received_timers;
+    return this->storagepaths;
 }
 
 std::string rs2wrapper::get_output_msg()
@@ -672,34 +666,6 @@ rs2args rs2wrapper::get_args()
     return this->args;
 }
 
-rs2_metadata_type rs2wrapper::get_frame_timestamp(const std::string &device_sn,
-                                                  const rs2::frame &frame)
-{
-    try
-    {
-        return frame.get_frame_metadata(this->timestamp_mode);
-    }
-    catch (const rs2::error &e)
-    {
-        std::string _msg = device_sn + " :: " +
-                           e.get_failed_function() +
-                           "(" + e.get_failed_args() + "): " +
-                           e.what();
-        print(_msg, 2);
-        return -1;
-    }
-    catch (const std::exception &e)
-    {
-        print(e.what(), 2);
-        return -1;
-    }
-}
-
-std::map<std::string, storagepath> rs2wrapper::get_storagepaths()
-{
-    return this->storagepaths;
-}
-
 bool rs2wrapper::check_if_device_is_enabled(const std::string &device_sn,
                                             const std::string &function_name)
 {
@@ -722,6 +688,14 @@ void rs2wrapper::constructor(rs2args args,
 {
     // CLI args
     this->args = args;
+
+    // reset after 0.5s
+    max_reset_counter =
+        std::round((float)this->args.fps() *
+                   ((float)this->args.max_reset_counter()) / 1000);
+    // every 1 minutes
+    camera_temp_printout_interval =
+        this->args.fps() * this->args.camera_temperature_printout_interval();
 
     // whether to printout stuffs
     this->verbose = verbose;
@@ -758,9 +732,11 @@ void rs2wrapper::query_available_devices()
             print("using : " + std::string(serial), 0);
     };
 
+    print("Querying available devices", 0);
+
     if (args.network())
     {
-        print("Network mode", 0);
+        print("NETWORK mode", 0);
         rs2::net_device dev(args.ip());
         if (verbose)
             print("Network device found", 0);
@@ -772,7 +748,7 @@ void rs2wrapper::query_available_devices()
     }
     else
     {
-        print("Local mode", 0);
+        print("LOCAL mode", 0);
 
         if (single_device_sn == "-1")
         {
@@ -790,6 +766,8 @@ void rs2wrapper::query_available_devices()
             add_device(serial, product_line, available_devices, verbose);
         }
     }
+
+    print(" ", 0);
 }
 
 rs2::pipeline rs2wrapper::initialize_pipeline()
@@ -1019,7 +997,7 @@ bool rs2wrapper::process_color_stream(const std::string &device_sn,
         rs2::frame frame = frameset.first_or_default(RS2_STREAM_COLOR);
 
         // Setting reset flag if timestamp is frozen or not valid.
-        timestamp = get_frame_timestamp(device_sn, frame);
+        timestamp = query_frame_timestamp(device_sn, frame);
         if (timestamp == -1)
         {
             if (verbose)
@@ -1036,12 +1014,12 @@ bool rs2wrapper::process_color_stream(const std::string &device_sn,
         std::string filename = pad_zeros(std::to_string(global_timestamp), 20);
 
         // Record per-frame metadata for UVC streams
-        std::string csv_file = storagepaths[device_sn].color_metadata +
+        std::string csv_file = storagepaths.color_metadata[device_sn] +
                                "/" + filename + ".csv";
         metadata_to_csv(frame, csv_file);
 
         // Write images to disk
-        std::string png_file = storagepaths[device_sn].color +
+        std::string png_file = storagepaths.color[device_sn] +
                                "/" + filename + ".bin";
         framedata_to_bin(frame, png_file);
 
@@ -1079,7 +1057,7 @@ bool rs2wrapper::process_depth_stream(const std::string &device_sn,
         rs2::frame frame = frameset.first_or_default(RS2_STREAM_DEPTH);
 
         // Setting reset flag if timestamp is frozen or not valid.
-        timestamp = get_frame_timestamp(device_sn, frame);
+        timestamp = query_frame_timestamp(device_sn, frame);
         if (timestamp == -1)
         {
             if (verbose)
@@ -1096,12 +1074,12 @@ bool rs2wrapper::process_depth_stream(const std::string &device_sn,
         std::string filename = pad_zeros(std::to_string(global_timestamp), 20);
 
         // Record per-frame metadata for UVC streams
-        std::string csv_file = storagepaths[device_sn].depth_metadata +
+        std::string csv_file = storagepaths.depth_metadata[device_sn] +
                                "/" + filename + ".csv";
         metadata_to_csv(frame, csv_file);
 
         // Write images to disk
-        std::string png_file = storagepaths[device_sn].depth +
+        std::string png_file = storagepaths.depth[device_sn] +
                                "/" + filename + ".bin";
         framedata_to_bin(frame, png_file);
 
@@ -1137,7 +1115,9 @@ int rs2wrapper::process_color_depth_stream(const std::string &device_sn,
     if (!process_color_stream(device_sn, frameset,
                               global_timestamp, color_timestamp))
         error_status += 1;
-    print_camera_temperature(device_sn);
+    print_camera_temperature(*enabled_devices[device_sn],
+                             camera_temp_printout_interval,
+                             args.verbose());
     if (!process_depth_stream(device_sn, frameset,
                               global_timestamp, depth_timestamp))
         error_status += 2;
@@ -1211,85 +1191,36 @@ void rs2wrapper::query_timestamp_mode(const std::string &device_sn)
     }
 }
 
-void rs2wrapper::save_timestamp(const std::string &device_sn,
-                                const int64_t &global_timestamp,
-                                const rs2_metadata_type &color_timestamp,
-                                const rs2_metadata_type &depth_timestamp)
+rs2_metadata_type rs2wrapper::query_frame_timestamp(const std::string &device_sn,
+                                                    const rs2::frame &frame)
 {
-    auto _path = storagepaths[device_sn].timestamp + "/timestamp.txt";
-    std::fstream filestream;
-    filestream.open(_path, std::fstream::in | std::fstream::out | std::fstream::app);
-    // If file does not exist, Create new file
-    if (!filestream)
+    try
     {
-        filestream.open(_path, std::fstream::in | std::fstream::out | std::fstream::trunc);
+        return frame.get_frame_metadata(this->timestamp_mode);
     }
-    filestream << global_timestamp
-               << "::"
-               << color_timestamp
-               << "::"
-               << depth_timestamp
-               << "\n";
-    filestream.close();
+    catch (const rs2::error &e)
+    {
+        std::string _msg = device_sn + " :: " +
+                           e.get_failed_function() +
+                           "(" + e.get_failed_args() + "): " +
+                           e.what();
+        print(_msg, 2);
+        return -1;
+    }
+    catch (const std::exception &e)
+    {
+        print(e.what(), 2);
+        return -1;
+    }
 }
 
-void rs2wrapper::print_camera_infos(const std::shared_ptr<rs2::pipeline_profile> profile)
+int rs2wrapper::query_fps(const std::string &device_sn,
+                          const int64_t &timstamp_diff)
 {
-    if (!verbose)
-        return;
-
-    std::cout << std::string(80, '=') << std::endl;
-    std::cout << ">>>>> RS2_CAMERA_INFO <<<<<" << std::endl;
-    std::cout << std::string(80, '=') << std::endl;
-    std::cout << "Name          : " << profile->get_device().get_info(RS2_CAMERA_INFO_NAME) << std::endl;
-    std::cout << "Serial Number : " << profile->get_device().get_info(RS2_CAMERA_INFO_SERIAL_NUMBER) << std::endl;
-    try
-    {
-        std::cout << "Product Line  : " << profile->get_device().get_info(RS2_CAMERA_INFO_PRODUCT_LINE) << std::endl;
-    }
-    catch (const rs2::error &e)
-    {
-        std::cout << "not available, " << e.what() << std::endl;
-    }
-    try
-    {
-        std::cout << "Firmware      : " << profile->get_device().get_info(RS2_CAMERA_INFO_FIRMWARE_VERSION) << std::endl;
-    }
-    catch (const rs2::error &e)
-    {
-        std::cout << "not available, " << e.what() << std::endl;
-    }
-    try
-    {
-        std::cout << "USB type      : " << profile->get_device().get_info(RS2_CAMERA_INFO_USB_TYPE_DESCRIPTOR) << std::endl;
-    }
-    catch (const rs2::error &e)
-    {
-        std::cout << "not available, " << e.what() << std::endl;
-    }
-    std::cout << std::string(80, '=') << std::endl;
-}
-
-void rs2wrapper::print_camera_temperature(const std::string &device_sn)
-{
-    if (!verbose)
-        return;
-
-    int c = enabled_devices[device_sn]->camera_temp_printout_counter;
-    if (c >= camera_temp_printout_interval || c == -1)
-    {
-        enabled_devices[device_sn]->camera_temp_printout_counter = 0;
-        auto dss = enabled_devices[device_sn]->depth_sensor;
-        if (dss->supports(RS2_OPTION_ASIC_TEMPERATURE))
-        {
-            auto temp = dss->get_option(RS2_OPTION_ASIC_TEMPERATURE);
-            print(device_sn + " Temperature ASIC      : " + std::to_string(temp), 0);
-        }
-        if (dss->supports(RS2_OPTION_PROJECTOR_TEMPERATURE))
-        {
-            auto temp = dss->get_option(RS2_OPTION_PROJECTOR_TEMPERATURE);
-            print(device_sn + " Temperature Projector : " + std::to_string(temp), 0);
-        }
-    }
-    enabled_devices[device_sn]->camera_temp_printout_counter += 1;
+    float time_diff = 0;
+    for (size_t i = 0; i < fps_counter[device_sn].size() - 1; i++)
+        time_diff += float(fps_counter[device_sn][i + 1] - fps_counter[device_sn][i]) * 1e-9;
+    fps_counter[device_sn].erase(fps_counter[device_sn].begin());
+    fps_counter[device_sn].push_back(timstamp_diff);
+    return static_cast<int>((float(fps_counter[device_sn].size()) - 1) / time_diff);
 }

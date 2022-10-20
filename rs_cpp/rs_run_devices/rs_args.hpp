@@ -32,15 +32,17 @@ public:
     };
 
     std::map<std::string, std::string> _OPTIONAL_ARGS{
-        {"--reset-interval", "120"},
-        {"--flush-steps", "30"},
         {"--ip", ""},
-        {"--multithreading", "false"},
+        {"--flush-steps", "30"},
+        {"--reset-interval", "120"},
         {"--verbose", "false"},
+        {"--multithreading", "false"},
         {"--autoexposure", "true"},
         {"--depth-sensor-autoexposure-limit", std::to_string(default_depth_sensor_autoexposure_limit)},
         {"--enable-ir-emitter", "true"},
         {"--ir-emitter-power", "150"},
+        {"--camera-temperature-printout-interval", "60"},
+        {"--max-reset-counter", "500"},
     };
 
     /**
@@ -48,6 +50,7 @@ public:
      *
      */
     rs2args(){};
+
     /**
      * @brief Construct a new rs2args object
      *
@@ -55,11 +58,13 @@ public:
      * @param argv Arguments in an array of char*.
      */
     rs2args(int argc, char *argv[]) : argparser(argc, argv){};
+
     /**
      * @brief Destroy the rs2args object
      *
      */
     ~rs2args(){};
+
     /**
      * @brief Steps to run the realsense device.
      *
@@ -69,6 +74,7 @@ public:
     {
         return getargi("--steps");
     };
+
     /**
      * @brief FPS of the realsense device.
      *
@@ -78,6 +84,7 @@ public:
     {
         return getargi("--fps");
     };
+
     /**
      * @brief Height of the realsense frames.
      *
@@ -87,6 +94,7 @@ public:
     {
         return getargi("--height");
     };
+
     /**
      * @brief Width of the realsense frames.
      *
@@ -96,6 +104,7 @@ public:
     {
         return getargi("--width");
     };
+
     /**
      * @brief checks and return color format for rs.
      *
@@ -109,6 +118,7 @@ public:
         else
             throw std::invalid_argument("rs color format unknown");
     };
+
     /**
      * @brief checks and return depth format for rs.
      *
@@ -122,6 +132,7 @@ public:
         else
             throw std::invalid_argument("rs depth format unknown");
     };
+
     /**
      * @brief Path to save the frames.
      *
@@ -131,6 +142,7 @@ public:
     {
         return getarg("--save-path");
     };
+
     /**
      * @brief IP address of the remote realsense device (optional).
      *
@@ -141,6 +153,7 @@ public:
         auto _arg = "--ip";
         return checkarg(_arg) ? getarg("--ip") : _OPTIONAL_ARGS[_arg];
     };
+
     /**
      * @brief Checks whether the realsense device is connected over the network.
      *
@@ -152,6 +165,7 @@ public:
         auto _arg = "--ip";
         return checkarg(_arg) ? true : false;
     };
+
     /**
      * @brief steps to flush initial frames.
      *
@@ -162,6 +176,7 @@ public:
         auto _arg = "--flush-steps";
         return checkarg(_arg) ? getargi(_arg) : std::stoi(_OPTIONAL_ARGS[_arg]);
     };
+
     /**
      * @brief interval to reset pipeline.
      *
@@ -172,8 +187,9 @@ public:
         auto _arg = "--reset-interval";
         return checkarg(_arg) ? getargi(_arg) : std::stoi(_OPTIONAL_ARGS[_arg]);
     };
+
     /**
-     * @brief
+     * @brief printouts
      *
      * @return true
      * @return false
@@ -183,8 +199,9 @@ public:
         auto _arg = "--verbose";
         return checkarg(_arg) ? getargb(_arg) : stob(_OPTIONAL_ARGS[_arg]);
     };
+
     /**
-     * @brief
+     * @brief multithreading mode. 1 thread per camera.
      *
      * @return true
      * @return false
@@ -194,8 +211,9 @@ public:
         auto _arg = "--multithreading";
         return checkarg(_arg) ? getargb(_arg) : stob(_OPTIONAL_ARGS[_arg]);
     };
+
     /**
-     * @brief
+     * @brief Autoexposure mode for depth and color sensors.
      *
      * @return true
      * @return false
@@ -205,6 +223,7 @@ public:
         auto _arg = "--autoexposure";
         return checkarg(_arg) ? getargb(_arg) : stob(_OPTIONAL_ARGS[_arg]);
     };
+
     /**
      * @brief
      *
@@ -217,6 +236,7 @@ public:
         auto _arg = "--depth-sensor-autoexposure-limit";
         return checkarg(_arg) ? getargi(_arg) : default_depth_sensor_autoexposure_limit;
     };
+
     /**
      * @brief
      *
@@ -228,11 +248,11 @@ public:
         auto _arg = "--enable-ir-emitter";
         return checkarg(_arg) ? getargb(_arg) : stob(_OPTIONAL_ARGS[_arg]);
     };
+
     /**
      * @brief
      *
-     * @return true
-     * @return false
+     * @return int
      */
     int ir_emitter_power()
     {
@@ -241,13 +261,32 @@ public:
     };
 
     /**
+     * @brief Interval for printing camera temperature in sec.
+     *
+     * @return int
+     */
+    int camera_temperature_printout_interval()
+    {
+        auto _arg = "--camera-temperature-printout-interval";
+        return checkarg(_arg) ? getargi(_arg) : std::stoi(_OPTIONAL_ARGS[_arg]);
+    };
+
+    /**
+     * @brief Maximum reset counter expressed in millisec.
+     *
+     * @return int
+     */
+    int max_reset_counter()
+    {
+        auto _arg = "--max-reset-counter";
+        return checkarg(_arg) ? getargi(_arg) : std::stoi(_OPTIONAL_ARGS[_arg]);
+    };
+
+    /**
      * @brief prints out the raw arguments.
      *
      */
-    void print_args()
-    {
-        printout();
-    };
+    void print_args() { printout(); };
 
     /**
      * @brief check if the args are valid.
@@ -257,8 +296,6 @@ public:
      */
     bool check_rs2args()
     {
-        std::cout << " " << std::endl;
-
         for (auto &&arg : _REQUIRED_ARGS)
         {
             if (!checkarg(arg))

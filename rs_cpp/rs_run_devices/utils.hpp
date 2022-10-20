@@ -8,6 +8,13 @@
 #include <algorithm>
 #include <vector>
 
+/**
+ * @brief String to boolean
+ * 
+ * @param x input string
+ * @return true 
+ * @return false 
+ */
 bool stob(const std::string &x);
 
 /**
