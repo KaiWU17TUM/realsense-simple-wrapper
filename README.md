@@ -31,8 +31,8 @@ See [here](pi4_scripts/README.md).
 | Setting                    | C Read | C Write | D Read |    D Write    |  FPS  | Status                                 |
 | :------------------------- | :----: | :-----: | :----: | :-----------: | :---: | :------------------------------------- |
 | pyrealsense2_net 640x480   |   X    |    X    |   X    |       X       |   6   | OK                                     |
-| pXrealsense2_net 640x480   |   X    |    X    |   X    |       X       |  15   | OK                                     |
-| pXrealsense2_net 640x480   |   X    |    X    |   X    |       X       |  30   | Fail, randomly jitters between 5-15fps |
+| pyrealsense2_net 640x480   |   X    |    X    |   X    |       X       |  15   | OK                                     |
+| pyrealsense2_net 640x480   |   X    |    X    |   X    |       X       |  30   | Fail, randomly jitters between 5-15fps |
 | realsense2-net c++ 640x480 |   X    |    X    |   X    | X (+colormap) |   6   | OK                                     |
 | realsense2-net c++ 640x480 |   X    |    X    |   X    | X (+colormap) |  15   | Fail, randomly jitters between 5fps    |
 | realsense2-net c++ 640x480 |   X    |    X    |   X    | X (+colormap) |  30   | Fail, randomly jitters between 5fps    |
