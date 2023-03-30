@@ -1,65 +1,48 @@
 #! /bin/sh
 
 LIBRS_VERSION="2.50.0"
-IMAGE_NAME="librealsense"
+IMAGE_NAME="cheneeheng/librealsense"
 
-if [ $# -eq 1 ] || [ $# -eq 2 ]; then
+if [ $# -eq 1 ]; then
 
-    if [ "$1" = "ubuntu18" ]; then
-        DOCKER_FILE="dockerfiles/Dockerfile.Ubuntu18"
+    if [ "$1" = "ubuntu20compactuvc" ]; then
+        BASE_IMAGE="ubuntu:20.04"
+        DOCKER_FILE="dockerfiles/Dockerfile.Ubuntu20CompactUVC"
+        IMAGE_NAME="${IMAGE_NAME}:u20.04-v${LIBRS_VERSION}-compact-uvc"
+    elif [ "$1" = "ubuntu20compact" ]; then
+        BASE_IMAGE="ubuntu:20.04"
+        DOCKER_FILE="dockerfiles/Dockerfile.Ubuntu20Compact"
+        IMAGE_NAME="${IMAGE_NAME}:u20.04-v${LIBRS_VERSION}-compact"
     elif [ "$1" = "ubuntu20" ]; then
+        BASE_IMAGE="ubuntu:20.04"
         DOCKER_FILE="dockerfiles/Dockerfile.Ubuntu20"
-    elif [ "$1" = "ubuntu20full" ]; then
-        DOCKER_FILE="dockerfiles/Dockerfile.Ubuntu20Full"
+        IMAGE_NAME="${IMAGE_NAME}:u20.04-v${LIBRS_VERSION}"
+    elif [ "$1" = "ubuntu20cuda1171" ]; then
+        BASE_IMAGE="nvidia/cuda:11.7.1-cudnn8-devel-ubuntu20.04"
+        DOCKER_FILE="dockerfiles/Dockerfile.Ubuntu20"
+        IMAGE_NAME="${IMAGE_NAME}:u20.04-cu11.7.1-v${LIBRS_VERSION}"
+    elif [ "$1" = "ubuntu20cuda1171vtkopcvpcl" ]; then
+        BASE_IMAGE="nvidia/cuda:11.7.1-cudnn8-devel-ubuntu20.04"
+        DOCKER_FILE="dockerfiles/Dockerfile.Ubuntu20VTKOpenCVPCL"
+        IMAGE_NAME="${IMAGE_NAME}:u20.04-cu11.7.1-v${LIBRS_VERSION}-vtk-opcv-pcl"
     else
-        echo "Unknown argument, should be {ubuntu18/ubuntu20/ubuntu20full}"
+        echo "Unknown argument, should be {ubuntu20compactuvc/ubuntu20compact/ubuntu20/ubuntu20cuda1171/ubuntu20cuda1171vtkopcvpcl}"
         exit 1
     fi
 
-    if [ $# -eq 1 ]; then
-
-        if [ "$1" = "ubuntu18" ]; then
-            IMAGE_NAME="${IMAGE_NAME}:ubuntu18.04-v${LIBRS_VERSION}"
-        elif [ "$1" = "ubuntu20" ]; then
-            IMAGE_NAME="${IMAGE_NAME}:ubuntu20.04-v${LIBRS_VERSION}"
-        elif [ "$1" = "ubuntu20full" ]; then
-            IMAGE_NAME="${IMAGE_NAME}-full:ubuntu20.04-v${LIBRS_VERSION}"
-        fi
-
-        echo "Building image : ${IMAGE_NAME}"
-        DOCKER_BUILDKIT=1 docker build \
-            --file ${DOCKER_FILE} \
-            --target librealsense \
-            --build-arg LIBRS_VERSION=${LIBRS_VERSION} \
-            --tag ${IMAGE_NAME} \
-            .
-        echo "Built image : ${IMAGE_NAME}\n"
-
-    else
-
-        if [ "$1" = "ubuntu18" ]; then
-            IMAGE_NAME="${2%:*}-${IMAGE_NAME}:${2#*:}-v${LIBRS_VERSION}"
-        elif [ "$1" = "ubuntu20" ]; then
-            IMAGE_NAME="${2%:*}-${IMAGE_NAME}:${2#*:}-v${LIBRS_VERSION}"
-        elif [ "$1" = "ubuntu20full" ]; then
-            IMAGE_NAME="${2%:*}-${IMAGE_NAME}-full:${2#*:}-v${LIBRS_VERSION}"
-        fi
-
-        echo "Building image : ${IMAGE_NAME}"
-        DOCKER_BUILDKIT=1 docker build \
-            --file ${DOCKER_FILE} \
-            --target librealsense \
-            --build-arg BASE_IMAGE=$2 \
-            --build-arg LIBRS_VERSION=${LIBRS_VERSION} \
-            --tag "${IMAGE_NAME}" \
-            .
-        echo "Built image : ${IMAGE_NAME}\n"
-
-    fi
+    echo "Building image : ${IMAGE_NAME}"
+    DOCKER_BUILDKIT=1 docker build \
+        --file ${DOCKER_FILE} \
+        --target librealsense \
+        --build-arg BASE_IMAGE=${BASE_IMAGE} \
+        --build-arg LIBRS_VERSION=${LIBRS_VERSION} \
+        --tag ${IMAGE_NAME} \
+        .
+    echo "Built image : ${IMAGE_NAME}\n"
 
 else
 
-    echo "1 or 2 arguments are expected : {ubuntu18/ubuntu20/ubuntu20full}, {BASE_IMAGE}"
+    echo "1 argument is expected : {ubuntu20compactuvc/ubuntu20compact/ubuntu20/ubuntu20cuda1171/ubuntu20cuda1171vtkopcvpcl}"
     exit 1
 
 fi

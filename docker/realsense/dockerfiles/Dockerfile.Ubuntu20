@@ -3,25 +3,30 @@
 
 ARG BASE_IMAGE=ubuntu:20.04 
 
-#################################
-#   Librealsense Builder Stage  #
-#################################
-FROM ${BASE_IMAGE} as librealsense-builder
+FROM ${BASE_IMAGE} as librealsense
 
 ARG LIBRS_VERSION
-# Make sure that we have a version number of librealsense as argument
 RUN test -n "$LIBRS_VERSION"
 
-# To avoid waiting for input during package installation
+ENV LANG en_US.UTF-8
+ENV TZ=Europe/Berlin
 ENV DEBIAN_FRONTEND=noninteractive
 
+# ------------------------------------------------------------------------------
 # Builder dependencies installation
 RUN rm -rf /var/lib/apt/lists/* \
     && apt-get update \
     && apt-get install -qq -y --no-install-recommends \
-    build-essential \
-    cmake \
+    sudo \
+    nano \
+    unzip \
+    wget \
+    curl \
     git \
+    cmake \
+    tzdata \
+    ssh \
+    build-essential \
     libssl-dev \
     libusb-1.0-0-dev \
     pkg-config \
@@ -30,33 +35,43 @@ RUN rm -rf /var/lib/apt/lists/* \
     libgl1-mesa-dev \
     libglu1-mesa-dev \    
     curl \
-    python3 \
-    python3-dev \
     ca-certificates \
-    && rm -rf /var/lib/apt/lists/*
+    libusb-1.0-0 \
+    udev \
+    apt-transport-https \
+    software-properties-common \
+    libopencv-dev
 
+# Python 3.8
+RUN apt-get install -y python3.8 python3.8-dev && \
+    rm /usr/bin/python3 && \
+    ln -s /usr/bin/python3.8 /usr/bin/python && \
+    ln -s /usr/bin/python3.8 /usr/bin/python3 && \
+    apt-get install -y python3-pip python3-tk
+## Keeps Python from generating .pyc files in the container
+ENV PYTHONDONTWRITEBYTECODE=1
+## Turns off buffering for easier container logging
+ENV PYTHONUNBUFFERED=1
+
+# ------------------------------------------------------------------------------
 # Download sources
-WORKDIR /usr/src
-RUN git clone --depth=1 -b v2.50.0 https://github.com/IntelRealSense/librealsense.git
-# RUN curl https://codeload.github.com/IntelRealSense/librealsense/tar.gz/refs/tags/v$LIBRS_VERSION -o librealsense.tar.gz 
-# RUN tar -zxf librealsense.tar.gz \
-#     && rm librealsense.tar.gz 
-# RUN ln -s /usr/src/librealsense-$LIBRS_VERSION /usr/src/librealsense
+WORKDIR /usr/local/src
+RUN git clone --depth=1 -b v${LIBRS_VERSION} https://github.com/IntelRealSense/librealsense.git
 
 # fixing python module import error
-RUN sed -i '217s/.*/    pybind11_add_module(pyrealsense2_net SHARED pyrs_net.cpp)/' /usr/src/librealsense/wrappers/python/CMakeLists.txt
-RUN sed -i '218s/.*/    target_link_libraries(pyrealsense2_net PRIVATE realsense2-net)/' /usr/src/librealsense/wrappers/python/CMakeLists.txt
-RUN sed -i '219s/.*/    set_target_properties(pyrealsense2_net PROPERTIES FOLDER Wrappers\/python)/' /usr/src/librealsense/wrappers/python/CMakeLists.txt
-RUN sed -i '220s/.*/    set_target_properties(pyrealsense2_net PROPERTIES/' /usr/src/librealsense/wrappers/python/CMakeLists.txt
-RUN sed -i '225s/.*/    install(TARGETS pyrealsense2_net/' /usr/src/librealsense/wrappers/python/CMakeLists.txt
+RUN sed -i '217s/pyrealsense2-net/pyrealsense2_net/' /usr/local/src/librealsense/wrappers/python/CMakeLists.txt && \
+    sed -i '218s/pyrealsense2-net/pyrealsense2_net/' /usr/local/src/librealsense/wrappers/python/CMakeLists.txt && \
+    sed -i '219s/pyrealsense2-net/pyrealsense2_net/' /usr/local/src/librealsense/wrappers/python/CMakeLists.txt && \
+    sed -i '220s/pyrealsense2-net/pyrealsense2_net/' /usr/local/src/librealsense/wrappers/python/CMakeLists.txt && \
+    sed -i '225s/pyrealsense2-net/pyrealsense2_net/' /usr/local/src/librealsense/wrappers/python/CMakeLists.txt
 
 # Build and install
-RUN cd /usr/src/librealsense \
+RUN cd /usr/local/src/librealsense \
     && mkdir build && cd build \
     && cmake \
     -DCMAKE_C_FLAGS_RELEASE="${CMAKE_C_FLAGS_RELEASE} -s" \
     -DCMAKE_CXX_FLAGS_RELEASE="${CMAKE_CXX_FLAGS_RELEASE} -s" \
-    -DCMAKE_INSTALL_PREFIX=/opt/librealsense \    
+    # -DCMAKE_INSTALL_PREFIX=/opt/librealsense \
     -DBUILD_EXAMPLES=ON \
     -DBUILD_GRAPHICAL_EXAMPLES=OFF \
     -DBUILD_PYTHON_BINDINGS:bool=true \
@@ -68,66 +83,11 @@ RUN cd /usr/src/librealsense \
     && make -j$(($(nproc)-1)) all \
     && make install 
 
-#################################
-#   librealsense Image Stage    #
-#################################
-FROM ${BASE_IMAGE} AS librealsense
-
-ENV LANG en_US.UTF-8
-
-ENV DEBIAN_FRONTEND=noninteractive
-
-ENV TZ=Europe/Berlin
-
-# ------------------------------------------------------------------------------
-# Main apts 
-RUN rm -rf /var/lib/apt/lists/* \
-    && apt-get update \
-    && apt-get install -y --no-install-recommends \	
-    sudo \
-    nano \
-    unzip \
-    wget \
-    curl \
-    git \
-    cmake \
-    tzdata \
-    ssh
-
-# ------------------------------------------------------------------------------
-# Python 3.8
-RUN apt-get install -y python3.8 python3.8-dev && \
-    ln -s /usr/bin/python3.8 /usr/bin/python && \
-    ln -s /usr/bin/python3.8 /usr/bin/python3 && \
-    apt-get install -y python3-pip python3-tk; exit 0
-## Keeps Python from generating .pyc files in the container
-ENV PYTHONDONTWRITEBYTECODE=1
-## Turns off buffering for easier container logging
-ENV PYTHONUNBUFFERED=1
-
-# ------------------------------------------------------------------------------
-# Install dep packages
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \	
-    libusb-1.0-0 \
-    udev \
-    apt-transport-https \
-    ca-certificates \
-    curl \
-    software-properties-common \
-    libopencv-dev \  
-    && rm -rf /var/lib/apt/lists/*
-
-# ------------------------------------------------------------------------------
-# Copy binaries from builder stage
-COPY --from=librealsense-builder /opt/librealsense /usr/local/
-COPY --from=librealsense-builder /usr/lib/python3/dist-packages/pyrealsense2 /usr/lib/python3/dist-packages/pyrealsense2
-COPY --from=librealsense-builder /usr/src/librealsense/config/99-realsense-libusb.rules /etc/udev/rules.d/
-COPY --from=librealsense-builder /usr/src/librealsense/wrappers/python/pyrealsense2/__init__.py /usr/lib/python3/dist-packages/pyrealsense2
+RUN cp /usr/local/src/librealsense/config/99-realsense-libusb.rules /etc/udev/rules.d/ && \
+    cp /usr/local/src/librealsense/wrappers/python/pyrealsense2/__init__.py /usr/lib/python3/dist-packages/pyrealsense2
 ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
 
-RUN pip install numpy
-RUN pip install opencv-python
+RUN pip install numpy opencv-python opencv-contrib-python tqdm
 # RUN pip install pyrealsense2
 
 WORKDIR /code

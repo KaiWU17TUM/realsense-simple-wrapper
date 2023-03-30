@@ -1,0 +1,285 @@
+# BASED ON:
+# https://github.com/IntelRealSense/librealsense/blob/master/scripts/Docker/Dockerfile
+
+# This dockerfile does the follows:
+# - install vtk 9.2.6
+# - install opencv 4.6.0
+# - install librealsense 2.5.0
+# - update opencv install
+# - install PCL 1.13.0
+
+# ------------------------------------------------------------------------------
+# Setup
+
+### ARG BASE_IMAGE=ubuntu:20.04 
+ARG BASE_IMAGE=nvidia/cuda:11.7.1-cudnn8-devel-ubuntu20.04
+
+FROM ${BASE_IMAGE} AS librealsense
+
+ARG LIBRS_VERSION
+RUN test -n "${LIBRS_VERSION}"
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV LANG en_US.UTF-8
+ENV TZ=Europe/Berlin
+
+# Main apts 
+RUN rm -rf /var/lib/apt/lists/* \
+    && apt-get update \
+    && apt-get install -qq -y --no-install-recommends \
+    sudo \
+    nano \
+    unzip \
+    wget \
+    curl \
+    git \
+    cmake \
+    tzdata \
+    ssh \
+    qt5-default \
+    intel-mkl \
+    libeigen3-dev\
+    libboost-all-dev \
+    cmake-curses-gui
+
+# Python 3.8
+RUN apt-get install -y python3.8 python3.8-dev && \
+    rm /usr/bin/python3 && \
+    ln -s /usr/bin/python3.8 /usr/bin/python && \
+    ln -s /usr/bin/python3.8 /usr/bin/python3 && \
+    apt-get install -y python3-pip python3-tk
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+RUN pip install numpy tqdm
+
+# ------------------------------------------------------------------------------
+# INSTALLING OPENCL ON INTEL CPU
+# https://www.intel.com/content/www/us/en/docs/oneapi/installation-guide-linux/2023-0/apt.html#GUID-560A487B-1B5B-4406-BB93-22BC7B526BCD
+RUN wget -O- https://apt.repos.intel.com/intel-gpg-keys/GPG-PUB-KEY-INTEL-SW-PRODUCTS.PUB \
+    | gpg --dearmor | sudo tee /usr/share/keyrings/oneapi-archive-keyring.gpg > /dev/null && \
+    echo "deb [signed-by=/usr/share/keyrings/oneapi-archive-keyring.gpg] https://apt.repos.intel.com/oneapi all main" \
+    | sudo tee /etc/apt/sources.list.d/oneAPI.list
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+    # ocl-icd-opencl-dev \
+    intel-oneapi-runtime-opencl \
+    intel-oneapi-runtime-compilers \
+    intel-oneapi-runtime-compilers-common \
+    # pocl-opencl-icd \
+    # opencl-headers \
+    clinfo
+
+# ------------------------------------------------------------------------------
+# Install opencv 4.6.0
+
+# Dependencies installation
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+    ffmpeg \
+    net-tools \
+    libjpeg-dev \
+    libpng-dev \
+    libtiff-dev \
+    libavcodec-dev \
+    libavformat-dev\
+    libswscale-dev \
+    libavresample-dev \
+    libgstreamer1.0-dev \
+    libgstreamer-plugins-base1.0-dev \
+    libxvidcore-dev \
+    x264 \
+    libx264-dev \
+    libfaac-dev \
+    libmp3lame-dev \
+    libtheora-dev \
+    libfaac-dev \
+    libmp3lame-dev \
+    libvorbis-dev \
+    libopencore-amrnb-dev \
+    libopencore-amrwb-dev \
+    libdc1394-22 \
+    libdc1394-22-dev \
+    libxine2-dev \
+    libv4l-dev \
+    v4l-utils \
+    libgtk-3-dev \
+    libtbb-dev \
+    libatlas-base-dev \
+    gfortran \
+    mpi
+RUN ln -s -f /usr/include/libv4l1-videodev.h /usr/include/linux/videodev.h
+ENV LD_LIBRARY_PATH=/usr/lib/x86_64-linux-gnu/:$LD_LIBRARY_PATH
+
+# Compiling VTK
+WORKDIR /usr/local/src
+RUN wget https://github.com/Kitware/VTK/archive/refs/tags/v9.2.6.zip && \
+    unzip v9.2.6.zip && \
+    mkdir -p VTK-9.2.6/build && \
+    cd VTK-9.2.6/build && \
+    cmake \
+    -DVTK_USE_CUDA:BOOL=ON \
+    -DVTK_USE_MPI:BOOL=ON \
+    .. && \
+    make -j$(($(nproc)-1)) && make install
+
+# Compiling OpenCV + contrib
+WORKDIR /usr/local/src
+RUN wget -O opencv.zip https://github.com/opencv/opencv/archive/4.6.0.zip && \
+    unzip opencv.zip && \
+    wget -O opencv_contrib.zip https://github.com/opencv/opencv_contrib/archive/4.6.0.zip && \
+    unzip opencv_contrib.zip
+RUN mkdir -p /usr/local/src/opencv-4.6.0/build && \
+    cd /usr/local/src/opencv-4.6.0/build && \
+    cmake \
+    -DCMAKE_BUILD_TYPE:STRING=Release \
+    -DCMAKE_INSTALL_PREFIX:STRING=/usr/local \
+    -DBUILD_SHARED_LIBS:BOOL=ON \
+    -DBUILD_EXAMPLES:BOOL=OFF \
+    ..
+RUN mkdir -p /usr/local/src/opencv-4.6.0/build && \
+    cd /usr/local/src/opencv-4.6.0/build && \
+    cmake \
+    -DMKL_LAPACKE_INCLUDE_DIR:STRING=/usr/include/mkl \
+    -DMKL_ROOT_DIR:STRING=/usr/lib/x86_64-linux-gnu/mkl \
+    -DMKL_WITH_TBB:BOOL=ON \
+    -DMKL_USE_SINGLE_DYNAMIC_LIBRARY:BOOL=ON \
+    -DOPENCL_INCLUDE_DIR:STRING=/usr/local/src/opencv-4.6.0/3rdparty/include/opencl/1.2 \
+    -DOPENCV_PYTHON3_VERSION:BOOL=ON \
+    -DWITH_VTK:BOOL=ON \
+    -DWITH_V4L:BOOL=ON \
+    -DWITH_FFMPEG:BOOL=ON \
+    -DWITH_GSTREAMER:BOOL=ON \
+    -DWITH_MSMF:BOOL=ON \
+    -DWITH_DSHOW:BOOL=ON \
+#    -DWITH_AVFOUNDATION:BOOL=ON \
+    -DWITH_1394:BOOL=ON \
+    -DWITH_LIBREALSENSE:BOOL=ON \
+    -DWITH_PTHREADS_PF:BOOL=ON \
+    -DWITH_TBB:BOOL=ON \
+    -DWITH_OPENMP:BOOL=ON \
+    -DWITH_GTK:BOOL=ON \
+    -DWITH_QT:BOOL=ON \
+    -DWITH_OPENGL:BOOL=ON \
+    -DWITH_OPENCL:BOOL=ON \
+    # -DOPENCV_DNN_OPENCL:BOOL=ON \
+    -DOPENCV_DNN_CUDA:BOOL=ON \
+    -DWITH_CUDA:BOOL=ON \
+    -DWITH_CUDNN:BOOL=ON \
+    -DWITH_CUBLAS:BOOL=ON \
+    -DOPENCV_EXTRA_MODULES_PATH:STRING=/usr/local/src/opencv_contrib-4.6.0/modules \
+    -DBUILD_CV_KINFU_EXAMPLE:BOOL=ON \
+    -DOPENCV_ENABLE_NONFREE:BOOL=ON \
+    # -DINSTALL_C_EXAMPLES:BOOL=OFF \
+    # -DINSTALL_PYTHON_EXAMPLES:BOOL=OFF \
+    # -DBUILD_EXAMPLES:BOOL=ON \
+    # -DBUILD_CV_EXAMPLES:BOOL=ON \
+    # -DBUILD_CV_KINFU_EXAMPLE:BOOL=ON \
+    # -DOPENCV_ENABLE_NONFREE:BOOL=ON ..
+    # -DWITH_PROTOBUF:BOOL=ON \
+    # -DBUILD_PROTOBUF:BOOL=ON \
+    # -DOPENCV_DNN_OPENCL:BOOL=ON \
+    # -DWITH_OPENVINO:BOOL=OFF \
+    # -DWITH_HALIDE:BOOL=OFF\
+    # -DWITH_VULKAN:BOOL=OFF \
+    ..
+RUN cd /usr/local/src/opencv-4.6.0/build && make -j$(($(nproc)-1)) && make install 
+RUN ldconfig
+
+# ------------------------------------------------------------------------------
+# Install Realsense
+
+# Dependencies installation
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+    build-essential \
+    libssl-dev \
+    libusb-1.0-0-dev \
+    pkg-config \
+    libgtk-3-dev \
+    libglfw3-dev \
+    libgl1-mesa-dev \
+    libglu1-mesa-dev \
+    ca-certificates \
+    libusb-1.0-0 \
+    udev \
+    apt-transport-https \
+    ca-certificates \
+    curl \
+    software-properties-common
+    # libopencv-dev
+
+# Download sources
+WORKDIR /usr/local/src
+RUN git clone --depth=1 -b v${LIBRS_VERSION} https://github.com/IntelRealSense/librealsense.git
+
+# fixing python module import error
+RUN sed -i '217s/pyrealsense2-net/pyrealsense2_net/' /usr/local/src/librealsense/wrappers/python/CMakeLists.txt && \
+    sed -i '218s/pyrealsense2-net/pyrealsense2_net/' /usr/local/src/librealsense/wrappers/python/CMakeLists.txt && \
+    sed -i '219s/pyrealsense2-net/pyrealsense2_net/' /usr/local/src/librealsense/wrappers/python/CMakeLists.txt && \
+    sed -i '220s/pyrealsense2-net/pyrealsense2_net/' /usr/local/src/librealsense/wrappers/python/CMakeLists.txt && \
+    sed -i '225s/pyrealsense2-net/pyrealsense2_net/' /usr/local/src/librealsense/wrappers/python/CMakeLists.txt
+
+# Build and install
+WORKDIR /usr/local/src/librealsense
+RUN mkdir build \
+    && cd build \
+    && cmake \
+    -DCMAKE_C_FLAGS_RELEASE="${CMAKE_C_FLAGS_RELEASE} -s" \
+    -DCMAKE_CXX_FLAGS_RELEASE="${CMAKE_CXX_FLAGS_RELEASE} -s" \
+    -DCMAKE_BUILD_TYPE:STRING=Release \
+    -DCMAKE_INSTALL_PREFIX:STRING=/usr/local \
+    -DBUILD_EXAMPLES:BOOL=ON \
+    -DBUILD_GRAPHICAL_EXAMPLES:BOOL=ON \
+    -DBUILD_CV_EXAMPLES:BOOL=ON \
+    -DBUILD_CV_KINFU_EXAMPLE:BOOL=ON \
+    -DBUILD_PYTHON_BINDINGS:BOOL=ON \
+    -DPYTHON_EXECUTABLE:STRING=$(which python3) \
+    -DBUILD_SHARED_LIBS:BOOL=ON \
+    -DBUILD_NETWORK_DEVICE:BOOL=ON \
+    -DFORCE_RSUSB_BACKEND:BOOL=ON \
+    .. \
+    && make -j$(($(nproc)-1)) all && make install 
+
+RUN cp /usr/local/src/librealsense/config/99-realsense-libusb.rules /etc/udev/rules.d/ && \
+    cp /usr/local/src/librealsense/wrappers/python/pyrealsense2/__init__.py /usr/lib/python3/dist-packages/pyrealsense2
+ENV LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
+
+# Update opencv with realsense flag
+RUN cd /usr/local/src/opencv-4.6.0/build && \
+    cmake \
+    -DCMAKE_BUILD_TYPE:STRING=Release \
+    -DCMAKE_INSTALL_PREFIX:STRING=/usr/local \
+    -DBUILD_SHARED_LIBS:BOOL=ON \
+    -DBUILD_EXAMPLES:BOOL=OFF \
+    -DWITH_LIBREALSENSE:BOOL=ON \
+    .. && make -j$(($(nproc)-1)) && make install
+
+# ------------------------------------------------------------------------------
+# Install PCL
+
+# Dependencies installation
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+    libflann-dev \
+    libboost-all-dev \
+    libpcap-dev \
+    libglew-dev
+
+# Compile PCL
+WORKDIR /usr/local/src
+RUN wget https://github.com/PointCloudLibrary/pcl/releases/download/pcl-1.13.0/source.zip && \
+    unzip source.zip && \
+    mkdir -p pcl/build && \
+    cd pcl/build && \
+    cmake \
+    -DBUILD_CUDA:BOOL=ON \
+    -DBUILD_GPU:BOOL=ON \
+    -DBUILD_gpu_tracking:BOOL=ON \
+    -DBUILD_gpu_people:BOOL=ON \
+    -DBUILD_gpu_surface:BOOL=ON \
+    .. &&  make -j$(($(nproc)-1)) && make install
+
+WORKDIR /code
+
+# Shows a list of connected Realsense devices
+CMD [ "rs-enumerate-devices", "--compact" ]

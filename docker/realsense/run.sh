@@ -1,15 +1,19 @@
-+#! /bin/sh
+#! /bin/sh
 
 LIBRS_VERSION="2.50.0"
 
 if [ $# -eq 2 ]; then
 
-    if [ "$1" = "ubuntu18" ]; then
-        TARGET_TAG="librealsense-full-user:ubuntu18.04-v${LIBRS_VERSION}"
+    if [ "$1" = "ubuntu20compact" ]; then
+        IMAGE_NAME="${IMAGE_NAME}:u20.04-v${LIBRS_VERSION}-compact"
     elif [ "$1" = "ubuntu20" ]; then
-        TARGET_TAG="librealsense-full-user:ubuntu20.04-v${LIBRS_VERSION}"
+        IMAGE_NAME="${IMAGE_NAME}:u20.04-v${LIBRS_VERSION}"
+    elif [ "$1" = "ubuntu20cuda1171" ]; then
+        IMAGE_NAME="${IMAGE_NAME}:u20.04-cu11.7.1-v${LIBRS_VERSION}"
+    elif [ "$1" = "ubuntu20cuda1171vtkopcvpcl" ]; then
+        IMAGE_NAME="${IMAGE_NAME}:u20.04-cu11.7.1-v${LIBRS_VERSION}-vtk-opcv-pcl"
     else
-        echo "Unknown argument, should be {ubuntu18/ubuntu20}"
+        echo "Unknown argument, should be {ubuntu20compact/ubuntu20/ubuntu20cuda1171/ubuntu20cuda1171vtkopcvpcl}"
         exit 1
     fi
 
@@ -25,7 +29,7 @@ if [ $# -eq 2 ]; then
 
 else
 
-    echo "at least 1 argument is expected : {ubuntu18/ubuntu20}"
+    echo "2 arguments are expected : {ubuntu20compact/ubuntu20/ubuntu20cuda1171/ubuntu20cuda1171vtkopcvpcl} {cmd}"
     exit 1
 
 fi
