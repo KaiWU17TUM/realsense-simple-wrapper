@@ -3,11 +3,9 @@ import json
 import sys
 import os
 
-
-from rs_py.rs_view_raw_data import iterate_over_raw_data
-from rs_py.rs_view_raw_data import read_color_file
-
-from rs_py import printout
+from rs_py.utility import printout
+from rs_py.utility import read_color_file
+from rs_py.utility import iterate_over_raw_data
 
 
 def data_process_fn(**kwargs):

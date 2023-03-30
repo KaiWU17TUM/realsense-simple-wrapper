@@ -7,7 +7,7 @@
 # TAKEN FROM :
 # https://github.com/IntelRealSense/librealsense/blob/master/wrappers/python/examples/box_dimensioner_multicam/realsense_device_manager.py
 
-from pyrealsense2 import pyrealsense2 as rs
+from rs_py import rs
 import numpy as np
 
 """

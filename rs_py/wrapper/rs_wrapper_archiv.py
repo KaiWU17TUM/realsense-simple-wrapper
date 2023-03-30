@@ -12,10 +12,10 @@ from datetime import datetime
 from functools import partial
 from typing import Optional, Tuple, Union, Any
 
-from rs_py.realsense_device_manager import enumerate_connected_devices
-from rs_py.realsense_device_manager import post_process_depth_frame
-from rs_py.utils import str2bool
-from rs_py.utils import printout
+from .realsense_device_manager import enumerate_connected_devices
+from .realsense_device_manager import post_process_depth_frame
+from ..utility.utils import str2bool
+from ..utility.utils import printout
 
 from rs_py import rs
 from rs_py import rsnet

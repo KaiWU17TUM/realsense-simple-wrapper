@@ -1,7 +1,7 @@
 import sys
 import numpy as np
 
-from rs_py import get_filepaths
+from rs_py.utility import get_filepaths
 
 PATH = sys.argv[1]
 FPS = int(sys.argv[2])

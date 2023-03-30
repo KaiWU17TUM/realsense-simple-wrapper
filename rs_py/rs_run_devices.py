@@ -5,10 +5,10 @@ import sys
 import os
 import subprocess
 
-from rs_py import printout
-from rs_py import get_rs_parser
-from rs_py import RealsenseWrapper
-from rs_py import str2bool
+from rs_py.wrapper import get_rs_parser
+from rs_py.wrapper import RealsenseWrapper
+from rs_py.utility import printout
+from rs_py.utility import str2bool
 
 
 def get_parser() -> argparse.ArgumentParser:
@@ -34,7 +34,7 @@ def test_device_init(args: argparse.Namespace):
     rsw = RealsenseWrapper(args, args.rs_dev)
     rsw.initialize()
     rsw.set_ir_laser_power(args.rs_laser_power)
-    rsw.dummy_capture(args.rs_fps * 5)
+    rsw.flush_frames(args.rs_fps * 5)
     rsw.stop()
 
     N = 10
@@ -58,7 +58,7 @@ def test_hardware_reset_runtime(args: argparse.Namespace):
     rsw = RealsenseWrapper(args, args.rs_dev)
     rsw.initialize()
     rsw.set_ir_laser_power(args.rs_laser_power)
-    rsw.dummy_capture(args.rs_fps * 5)
+    rsw.flush_frames(args.rs_fps * 5)
 
     N = 10
     t = time.time()
@@ -90,13 +90,18 @@ def run_devices(args: argparse.Namespace):
     """
 
     rsw = RealsenseWrapper(args, args.rs_dev)
+    rsw.initialize_depth_sensor_ae()
+
+    if len(rsw.enabled_devices) == 0:
+        raise ValueError("no devices connected")
+
+    rsw = RealsenseWrapper(args, args.rs_dev)
     rsw.initialize()
-    rsw.set_ir_laser_power(args.rs_laser_power)
 
-    if args.rs_save_data:
-        rsw.save_calibration()
+    rsw.save_calib()
 
-    rsw.dummy_capture(args.rs_fps * 5)
+    rsw.flush_frames(args.rs_fps * 5)
+    time.sleep(3)
 
     try:
         c = 0
@@ -104,20 +109,23 @@ def run_devices(args: argparse.Namespace):
 
         while True:
 
-            frames = rsw.step(
+            rsw.step(
                 display=args.rs_display_frame,
                 display_and_save_with_key=args.rs_save_with_key
             )
 
+            if rsw.key & 0xFF == ord('q'):
+                break
+
             if c % args.rs_fps == 0:
                 printout(
                     f"Step {c:8d} :: "
-                    f"{[i.get('color_timestamp', None) for i in frames.values()]} :: "  # noqa
-                    f"{[i.get('depth_timestamp', None) for i in frames.values()]}",  # noqa
+                    f"{[i.get('color_timestamp', None) for i in rsw.frames.values()]} :: "  # noqa
+                    f"{[i.get('depth_timestamp', None) for i in rsw.frames.values()]}",  # noqa
                     'i'
                 )
 
-            if not len(frames) > 0:
+            if not len(rsw.frames) > 0:
                 printout(f"Empty...", 'w')
                 continue
 

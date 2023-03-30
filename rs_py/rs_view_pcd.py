@@ -12,9 +12,9 @@ import plotly.io as pio
 
 import open3d as o3d
 
-from rs_py.rs_view_raw_data import iterate_over_raw_data
-from rs_py.rs_view_raw_data import read_color_file
-from rs_py.rs_view_raw_data import read_depth_file
+from rs_py.utility import read_depth_file
+from rs_py.utility import read_color_file
+from rs_py.utility import iterate_over_raw_data
 
 
 def data_process_fn(**kwargs):

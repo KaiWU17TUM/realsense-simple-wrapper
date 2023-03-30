@@ -5,9 +5,9 @@ import time
 
 from rs_py import rs
 
-from rs_py import printout
-from rs_py import get_rs_parser
-from rs_py import RealsenseWrapper
+from rs_py.utility import printout
+from rs_py.wrapper import get_rs_parser
+from rs_py.wrapper import RealsenseWrapper
 
 ctx = None
 
@@ -24,9 +24,9 @@ def thread(dev_sn, arg):
     rsw = RealsenseWrapper(arg, dev_sn, ctx)
     rsw.initialize()
     rsw.set_ir_laser_power(arg.rs_laser_power)
-    rsw.save_calibration()
+    rsw.save_calib()
 
-    rsw.dummy_capture(arg.rs_fps * 5)
+    rsw.flush_frames(arg.rs_fps * 5)
 
     try:
         c = 0

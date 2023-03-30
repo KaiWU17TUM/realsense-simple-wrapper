@@ -6,11 +6,11 @@ import os
 
 from typing import Tuple, Optional, Union
 
-from rs_py import printout
-from rs_py import RealsenseWrapper
-from rs_py import get_rs_parser
+from rs_py.wrapper.rs_wrapper import RealsenseWrapper
+from rs_py.wrapper.rs_wrapper import get_rs_parser
 
-from rs_py.utils import str2bool
+from rs_py.utility import printout
+from rs_py.utility import str2bool
 
 
 THICKNESS = 2
@@ -550,8 +550,8 @@ if __name__ == '__main__':
     RSW = RealsenseWrapper(rs_args, rs_args.rs_dev)
     RSW.initialize()
     RSW.set_ir_laser_power(rs_args.rs_laser_power)
-    RSW.save_calibration()
-    RSW.dummy_capture(rs_args.rs_fps * 5)
+    RSW.save_calib()
+    RSW.flush_frames(rs_args.rs_fps * 5)
 
     # 2. Setting up AR
     ARW = ArucoWrapper(ar_args, rsw=RSW)
