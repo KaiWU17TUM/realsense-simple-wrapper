@@ -40,4 +40,8 @@ sudo nano /etc/wpa_supplicant/wpa_supplicant.conf
 sudo reboot  
 
 ## Installing RS
-RS SDK can be installed/upgraded by following the steps shown in this [guide](https://github.com/datasith/Ai_Demos_RPi/wiki/Raspberry-Pi-4-and-Intel-RealSense-D435). This [script](pi4_scripts/install_realsense_pi4.sh) follows the steps and performs the installation (except OpenGL and VNC).
+RS SDK can be installed/upgraded by following the steps shown in this [guide](https://github.com/datasith/Ai_Demos_RPi/wiki/Raspberry-Pi-4-and-Intel-RealSense-D435). This [script](install_realsense_pi4.sh) follows the steps and performs the installation (except OpenGL and VNC).
+
+## Misc
+- [unused_programs.sh](unused_programs.sh) removes unused programs.
+- [script](install_realsense_with_network.sh) installs rs with network function.
