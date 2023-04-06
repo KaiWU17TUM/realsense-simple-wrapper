@@ -90,6 +90,7 @@ class RealsenseWrapper:
             self.storage_paths = StoragePaths(
                 [device_sn for device_sn, _ in self.available_devices],
                 arg.rs_save_path)
+            self.storage_paths.create()
         else:
             self.storage_paths = DefaultStoragePaths()
 

@@ -60,6 +60,9 @@ class DefaultStoragePaths:
     @save.setter
     def save(self, x):
         return
+    
+    def create(self):
+        return
 
 
 class StoragePaths(DefaultStoragePaths):
@@ -74,10 +77,13 @@ class StoragePaths(DefaultStoragePaths):
         self._save = x
 
     def __init__(self, device_sns: list, base_path: str):
+        self.base_path = base_path
         self.device_sns = device_sns
+    
+    def create(self):
         self.trial = datetime.now().strftime("%y%m%d%H%M%S")
         for device_sn in self.device_sns:
-            self._create(device_sn, base_path)
+            self._create(device_sn, self.base_path)
 
     def _create(self, device_sn: str, base_path: str):
         device_path = os.path.join(base_path, device_sn, self.trial)

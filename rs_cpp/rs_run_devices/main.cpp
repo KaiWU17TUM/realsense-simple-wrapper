@@ -97,8 +97,8 @@ void multithreading_function(
         std::string i_str = pad_zeros(std::to_string(i), num_zeros_to_pad);
         std::string o_str = "";
 
-        // so that files are saved periodically in different folders.
-        if (i % (rs2_arg.fps() * 60 * 15) == 0)
+        // so that files are saved periodically (1hr) in different folders.
+        if (i % (rs2_arg.fps() * 60 * 60) == 0)
             rs2_dev.prepare_storage();
 
         // Runs + collects frame data from realsense.
@@ -235,8 +235,8 @@ bool run(int argc, char *argv[])
             std::string i_str = pad_zeros(std::to_string(i), num_zeros_to_pad);
             std::string o_str = "";
 
-            // so that files are saved periodically in different folders.
-            if (i % (rs2_arg.fps() * 60 * 15) == 0)
+            // so that files are saved periodically (1hr) in different folders.
+            if (i % (rs2_arg.fps() * 60 * 60) == 0)
                 rs2_dev.prepare_storage();
 
             // Runs + collects frame data from realsense.
