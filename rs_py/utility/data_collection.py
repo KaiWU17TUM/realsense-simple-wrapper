@@ -6,9 +6,6 @@ from typing import Tuple, Optional
 from .utils import printout
 
 
-# ------------------------------------------------------------------------------
-
-
 def get_filepaths(base_path: str, sensor: str) -> dict:
     path = {}
     for device in sorted(os.listdir(base_path)):
@@ -44,7 +41,8 @@ def get_filepaths_with_timestamps(base_path: str) -> Tuple[dict, dict, list]:
     def _ts_from_filepath(path: str) -> int:
         ts = path.split('/')[-1]
         try:
-            ts = int(ts.split('.')[0])
+            ts, extension = os.path.splitext(ts)
+            # ts = int(ts.split('.')[0])
         except:
             ts = -1
         return ts
@@ -94,6 +92,8 @@ def iterate_over_raw_data(base_path: Optional[str] = None,
 
     # 1. loop through each trial
     for trial in trial_list:
+        print(f"trial : {trial}")
+
         # #dev
         color_files, depth_files = [], []
 
@@ -124,8 +124,9 @@ def iterate_over_raw_data(base_path: Optional[str] = None,
         else:
             raise ValueError("Unknown SYNC mode...")
 
+        next_trial = True
         try:
-            while True:
+            while next_trial:
 
                 if sync_ts == 0:
                     _color_ts_idxs = [ts_max for _ in range(len(color_files))]
@@ -133,6 +134,10 @@ def iterate_over_raw_data(base_path: Optional[str] = None,
                     ts_max += 1
 
                 elif sync_ts == 1:
+                    # only 1 camera
+                    if len(color_files) == 1:
+                        continue
+
                     _color_ts = []
                     _depth_ts = []
                     _color_ts_idxs = []
@@ -155,6 +160,17 @@ def iterate_over_raw_data(base_path: Optional[str] = None,
                         _depth_ts_idxs.append(ts_idx)
                     ts_max = max(_color_ts + _depth_ts)
 
+                for idx, files in zip(_color_ts_idxs, color_files):
+                    if idx >= len(files):
+                        next_trial = False
+
+                for idx, files in zip(_depth_ts_idxs, depth_files):
+                    if idx >= len(files):
+                        next_trial = False
+                
+                if not next_trial:
+                    continue
+
                 if data_process_fn is not None:
                     data_process_fn(color_files=color_files,
                                     depth_files=depth_files,
@@ -168,6 +184,3 @@ def iterate_over_raw_data(base_path: Optional[str] = None,
         except Exception as e:
             printout(e, 'x')
             exit(1)
-
-        finally:
-            exit(0)

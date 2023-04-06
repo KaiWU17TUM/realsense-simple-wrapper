@@ -119,7 +119,7 @@ def run_devices(args: argparse.Namespace):
 
             if c % args.rs_fps == 0:
                 printout(
-                    f"Step {c:8d} :: "
+                    f"Step {c:12d} :: "
                     f"{[i.get('color_timestamp', None) for i in rsw.frames.values()]} :: "  # noqa
                     f"{[i.get('depth_timestamp', None) for i in rsw.frames.values()]}",  # noqa
                     'i'
@@ -150,12 +150,12 @@ def run_devices(args: argparse.Namespace):
 
 if __name__ == "__main__":
     args, remain_args = get_rs_parser().parse_known_args()
-    print("========================================")
-    print(">>>>> args <<<<<")
-    print("========================================")
+    print("="*80)
+    print(">>>>> realnsense args <<<<<")
+    print("="*80)
     for k, v in vars(args).items():
-        print(f"{k} : {v}")
-    print("========================================")
+        print(f"{k: <40} : {v}")
+    print("="*80)
 
     args_local, _ = get_parser().parse_known_args(remain_args)
     if args_local.rs_test_init_runtime:

@@ -287,14 +287,3 @@ def read_metadata(frame: rs.frame) -> dict:
         if frame.supports_frame_metadata(i):
             output[i.name] = frame.get_frame_metadata(i)
     return output
-
-
-a = DefaultStoragePaths()
-print(a.save)
-a.save = 123
-print(a.save)
-
-a = StoragePaths([], '')
-print(a.save)
-a.save = 123
-print(a.save)

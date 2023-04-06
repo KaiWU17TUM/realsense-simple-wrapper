@@ -21,6 +21,7 @@ def data_process_fn(**kwargs):
     imgs = []
     num_dev = len(color_files)
     for dev_idx in range(num_dev):
+
         # (ts, file, calib)
         color_dc = color_files[dev_idx][color_ts_idxs[dev_idx]]
         depth_dc = depth_files[dev_idx][depth_ts_idxs[dev_idx]]
@@ -74,20 +75,20 @@ def data_process_fn(**kwargs):
     cv2.imshow(name, output)
     # cv2.waitKey(1000//fps)
     # cv2.waitKey(0)
-    cv2.waitKey(10)
+    cv2.waitKey(1)
 
 
 if __name__ == "__main__":
 
-    PATH = sys.argv[1]
-    SYNC = int(sys.argv[2])
-    FPS = int(sys.argv[3])
-    SCALE = float(sys.argv[4])
+    # PATH = sys.argv[1]
+    # SYNC = int(sys.argv[2])
+    # FPS = int(sys.argv[3])
+    # SCALE = float(sys.argv[4])
 
-    # PATH = '/code/realsense-simple-wrapper/output/calibration_848_480'
-    # SYNC = 1
-    # FPS = 5
-    # SCALE = 0.75
+    PATH = '/code/realsense-simple-wrapper/data'
+    SYNC = 0
+    FPS = 5
+    SCALE = 0.75
 
     iterate_over_raw_data(PATH, SYNC, FPS, SCALE,
                           data_process_fn=data_process_fn)

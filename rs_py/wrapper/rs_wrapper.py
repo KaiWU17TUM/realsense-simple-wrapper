@@ -378,7 +378,7 @@ class RealsenseWrapper:
                                   0, 0, 1],
                 'model': str(intr_color.model),
                 'coeffs': intr_color.coeffs,
-                'format': self.stream_config_color.format,
+                'format': str(self.stream_config_color.format),
                 'fps': self.stream_config_color.framerate,
             })
             calib_config.depth.append({
@@ -391,7 +391,7 @@ class RealsenseWrapper:
                 'coeffs': intr_depth.coeffs,
                 'depth_scale': depth_scale,
                 'depth_baseline': depth_baseline,
-                'format': self.stream_config_depth.format,
+                'format': str(self.stream_config_depth.format),
                 'fps': self.stream_config_color.framerate,
             })
             calib_config.T_color_depth.append({
@@ -606,7 +606,7 @@ class RealsenseWrapper:
         # 4. Make sure both color and depth frames are there.
         if frameset.size() >= self.enabled_devices[device_sn].num_streams:
 
-            self.internal_timestamp[device_sn] = time.time()
+            self.internal_timestamp[device_sn] = time.time_ns()
 
             # 5. Check if both frames are valid, skip step if one is invalid.
             if not check_if_color_depth_frames_are_valid(frameset):
