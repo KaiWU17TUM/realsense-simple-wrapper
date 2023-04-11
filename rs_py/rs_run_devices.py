@@ -98,6 +98,9 @@ def run_devices(args: argparse.Namespace):
     rsw = RealsenseWrapper(args, args.rs_dev)
     rsw.initialize()
 
+    # THIS IS NOT DONE IN THE CLASS INIT.
+    rsw.storage_paths.create()
+
     rsw.save_calib()
 
     rsw.flush_frames(args.rs_fps * 5)
