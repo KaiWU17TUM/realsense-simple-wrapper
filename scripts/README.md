@@ -39,6 +39,9 @@ sudo nano /lib/dhcpcd/dhcpcd-hooks/10-wpa_supplicant
 sudo nano /etc/wpa_supplicant/wpa_supplicant.conf  
 sudo reboot  
 
+7. To disable WIFI: [link](https://raspberrytips.com/disable-wifi-raspberry-pi/)
+
+
 ## Installing RS
 RS SDK can be installed/upgraded by following the steps shown in this [guide](https://github.com/datasith/Ai_Demos_RPi/wiki/Raspberry-Pi-4-and-Intel-RealSense-D435). This [script](install_realsense_pi4.sh) follows the steps and performs the installation (except OpenGL and VNC).
 
