@@ -65,6 +65,8 @@ def data_process_fn(**kwargs):
                     cv2.LINE_AA)
         imgs.append(np.vstack([image, depth]))
 
+        # break
+
     output = np.hstack(imgs)
     output = cv2.resize(output, (int(output.shape[1]*scale),
                                  int(output.shape[0]*scale)))
@@ -75,7 +77,7 @@ def data_process_fn(**kwargs):
     cv2.imshow(name, output)
     # cv2.waitKey(1000//fps)
     # cv2.waitKey(0)
-    cv2.waitKey(1)
+    cv2.waitKey(100)
 
 
 if __name__ == "__main__":
@@ -85,7 +87,7 @@ if __name__ == "__main__":
     # FPS = int(sys.argv[3])
     # SCALE = float(sys.argv[4])
 
-    PATH = '/code/realsense-simple-wrapper/data'
+    PATH = '/code/realsense-simple-wrapper/data/local/realsense-15fps'
     SYNC = 0
     FPS = 5
     SCALE = 0.75

@@ -8,16 +8,15 @@ from typing import Optional
 
 # https://github.com/IntelRealSense/librealsense/issues/4646
 def _get_brg_from_yuv(data_array: np.ndarray) -> np.ndarray:
-    # Input: Intel handle to 16-bit YU/YV data
+    # Input: Intel handle to 16-bit YU/YV data, 1 dim array
     # Output: BGR8
     UV = np.uint8(data_array >> 8)
     Y = np.uint8((data_array << 8) >> 8)
     YUV = np.zeros((data_array.shape[0], 2), 'uint8')
     YUV[:, 0] = Y
     YUV[:, 1] = UV
-    YUV = YUV.reshape(-1, 1, 2)
+    YUV = YUV.reshape(1, -1, 2)
     BGR = cv2.cvtColor(YUV, cv2.COLOR_YUV2BGR_YUYV)
-    BGR = BGR.reshape(-1, 3)
     return BGR
 
 

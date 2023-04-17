@@ -216,8 +216,8 @@ bool run(int argc, char *argv[])
         if (available_devices.size() == 0)
             throw rs2::error("No RS device detected...");
 
-        // rs2_dev.prepare_storage();
-        // std::this_thread::sleep_for(std::chrono::milliseconds(1000));
+        rs2_dev.prepare_storage();
+        std::this_thread::sleep_for(std::chrono::milliseconds(1000));
 
         rs2_dev.initialize(true);
         rs2_dev.save_calib();
@@ -236,7 +236,7 @@ bool run(int argc, char *argv[])
             std::string o_str = "";
 
             // so that files are saved periodically (1hr) in different folders.
-            if (i % (rs2_arg.fps() * 60 * 60) == 0)
+            if ((i % (rs2_arg.fps() * 60 * 60) == 0) && (i > 0))
                 rs2_dev.prepare_storage();
 
             // Runs + collects frame data from realsense.
