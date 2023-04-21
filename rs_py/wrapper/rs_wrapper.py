@@ -58,6 +58,9 @@ class RealsenseWrapper:
                 with this sn will be used. Defaults to None.
             ctx
         """
+
+        self._colorizer = rs.colorizer()
+
         self.arg = arg
         self.verbose = arg.rs_verbose
 
@@ -539,6 +542,7 @@ class RealsenseWrapper:
     def step(self,
              display: int = 0,
              display_and_save_with_key: bool = False,
+             use_colorizer: bool = False,
              save_depth_colormap: bool = False) -> None:
         """Gets the frames streamed from the enabled rs devices.
 
@@ -548,6 +552,8 @@ class RealsenseWrapper:
                 0 = no display, > 0 = display scale
             display_and_save_with_key (bool): Display data and start saving
                 on 'c' key stroke.
+            use_colorizer (bool): Whether to use rs colorizer.
+                Defaults to False.
             save_depth_colormap (bool): Whether to save the depth colormaps.
         """
         if len(self.enabled_devices) == 0:
@@ -560,6 +566,7 @@ class RealsenseWrapper:
             for device_sn, _ in self.enabled_devices.items():
                 frames = self.step_device(device_sn,
                                           display_and_save_with_key,
+                                          use_colorizer,
                                           save_depth_colormap)
 
         if display > 0 or display_and_save_with_key:
@@ -568,6 +575,7 @@ class RealsenseWrapper:
     def step_device(self,
                     device_sn: str,
                     display_and_save_with_key: bool = False,
+                    use_colorizer: bool = False,
                     save_depth_colormap: bool = False) -> dict:
         """Gets the frames streamed from an enabled rs device.
 
@@ -575,6 +583,8 @@ class RealsenseWrapper:
             device_sn (str): device serial number.
             display_and_save_with_key (bool): Display data and start saving
                 on 'c' key stroke.
+            use_colorizer (bool): Whether to use rs colorizer.
+                Defaults to False.
             save_depth_colormap (bool): Whether to save the depth colormaps.
         """
         self.check_if_device_is_enabled(device_sn)
@@ -637,6 +647,7 @@ class RealsenseWrapper:
             depth_frame_dict, framedata = self.process_depth_stream(
                 frameset=aligned_frameset,
                 device_sn=device_sn,
+                use_colorizer=use_colorizer,
                 save_colormap=save_depth_colormap
             )
             frame_dict.update(depth_frame_dict)
@@ -740,6 +751,7 @@ class RealsenseWrapper:
     def process_depth_stream(self,
                              frameset: rs.composite_frame,
                              device_sn: str,
+                             use_colorizer: bool = False,
                              save_colormap: bool = False
                              ) -> Tuple[dict, np.ndarray]:
         """Get depth stream data.
@@ -748,6 +760,8 @@ class RealsenseWrapper:
             frameset (rs.composite_frame): frameset from pipeline.
             storage_paths (Optional[StoragePaths], optional): If not None,
                 data from frameset will be stored. Defaults to None.
+            use_colorizer (bool): Whether to use rs colorizer.
+                Defaults to False.
             save_colormap (bool): Whether to save depth image as colormap.
                 Defaults to False.
 
@@ -763,6 +777,10 @@ class RealsenseWrapper:
         frame_dict['depth_framedata'] = framedata
         metadata = read_metadata(frame)
         frame_dict['depth_metadata'] = metadata
+        if use_colorizer:
+            color_framedata = np.asanyarray(
+                self._colorizer.colorize(frame).get_data())
+            frame_dict['depth_color_framedata'] = color_framedata
         # No storage
         if not self.storage_paths.save:
             return frame_dict, framedata
@@ -777,15 +795,16 @@ class RealsenseWrapper:
                     frame_dict['depth_framedata'])
         # save depth colormap
         if save_colormap:
-            # Apply colormap on depth image
-            # (image must be converted to 8-bit per pixel first)
-            image = cv2.applyColorMap(
-                cv2.convertScaleAbs(
-                    frame_dict['depth_framedata'], alpha=0.03),
-                cv2.COLORMAP_JET
-            )
+            if not use_colorizer:
+                # Apply colormap on depth image
+                # (image must be converted to 8-bit per pixel first)
+                color_framedata = cv2.applyColorMap(
+                    cv2.convertScaleAbs(
+                        frame_dict['depth_framedata'], alpha=0.03),
+                    cv2.COLORMAP_JET
+                )
             image_name = os.path.join(filedir, f'{self.internal_timestamp[device_sn]}.jpg')  # noqa
-            cv2.imwrite(image_name, image)
+            cv2.imwrite(image_name, color_framedata)
         # save meta
         filedir = self.storage_paths.depth_metadata[device_sn]
         if filedir is not None:
@@ -806,9 +825,13 @@ class RealsenseWrapper:
         q_press = False
         for device_sn, data_dict in frames.items():
             # Render images
-            depth_colormap = cv2.applyColorMap(
-                cv2.convertScaleAbs(data_dict['depth_framedata'], alpha=0.03),
-                cv2.COLORMAP_JET)
+            if data_dict.get('depth_color_framedata', None) is not None:
+                depth_colormap = data_dict['depth_color_framedata']
+            else:
+                depth_colormap = cv2.applyColorMap(
+                    cv2.convertScaleAbs(data_dict['depth_framedata'],
+                                        alpha=0.03),
+                    cv2.COLORMAP_JET)
             # # Set pixels further than clipping_distance to grey
             # clipping_distance = 10
             # grey_color = 153
