@@ -72,7 +72,7 @@ class RealsenseWrapper:
         # # timestamp
         self.timestamp_mode = None
         # # calibration
-        self.calib_data = {}
+        self.calib_data = CalibrationConfig()
         # # rs align method
         # align depth to color frame
         self._align = rs.align(rs.stream.color)
@@ -321,6 +321,66 @@ class RealsenseWrapper:
         self.poll_counter_per_dev = {sn: [0, 0]  # [time elapsed, current time]
                                      for sn, _ in self.available_devices}
 
+    def query_camera_calib(self) -> None:
+        for device_sn, _ in self.enabled_devices.items():
+            self.query_camera_calib_device(device_sn)
+
+    def query_camera_calib_device(self, device_sn: str) -> None:
+        self.calib_data.device_sn.append(device_sn)
+        dev = self.enabled_devices[device_sn]
+        profile = dev.pipeline_profile
+        # Intrinsics of color & depth frames -----------------------------------
+        profile_color = profile.get_stream(rs.stream.color)
+        intr_color = profile_color.as_video_stream_profile()
+        intr_color = intr_color.get_intrinsics()
+        # Fetch stream profile for depth stream
+        # Downcast to video_stream_profile and fetch intrinsics
+        profile_depth = profile.get_stream(rs.stream.depth)
+        intr_depth = profile_depth.as_video_stream_profile()
+        intr_depth = intr_depth.get_intrinsics()
+        # Extrinsic matrix from color sensor to Depth sensor -------------------
+        profile_vid = profile_color.as_video_stream_profile()
+        extr = profile_vid.get_extrinsics_to(profile_depth)
+        extr_mat = np.eye(4)
+        extr_mat[:3, :3] = np.array(extr.rotation).reshape(3, 3)
+        extr_mat[:3, 3] = extr.translation
+        # Depth scale ----------------------------------------------------------
+        # for sensor in profile.get_device().query_sensors():
+        #     if sensor.is_depth_sensor():
+        depth_sensor = profile.get_device().first_depth_sensor()
+        depth_sensor = rs.depth_stereo_sensor(depth_sensor)
+        depth_scale = depth_sensor.get_depth_scale()
+        depth_baseline = depth_sensor.get_stereo_baseline()
+        # Calibrations ---------------------------------------------------------
+        self.calib_data.color.append({
+            'width': intr_color.width,
+            'height': intr_color.height,
+            'intrinsic_mat': [intr_color.fx, 0, intr_color.ppx,
+                              0, intr_color.fy, intr_color.ppy,
+                              0, 0, 1],
+            'model': str(intr_color.model),
+            'coeffs': intr_color.coeffs,
+            'format': str(self.stream_config_color.format),
+            'fps': self.stream_config_color.framerate,
+        })
+        self.calib_data.depth.append({
+            'width': intr_depth.width,
+            'height': intr_depth.height,
+            'intrinsic_mat': [intr_depth.fx, 0, intr_depth.ppx,
+                              0, intr_depth.fy, intr_depth.ppy,
+                              0, 0, 1],
+            'model': str(intr_depth.model),
+            'coeffs': intr_depth.coeffs,
+            'depth_scale': depth_scale,
+            'depth_baseline': depth_baseline,
+            'format': str(self.stream_config_depth.format),
+            'fps': self.stream_config_color.framerate,
+        })
+        self.calib_data.T_color_depth.append({
+            'rotation': extr.rotation,
+            'translation': extr.translation
+        })
+
     def save_calib(self) -> None:
         """Saves camera calibration. """
 
@@ -331,9 +391,7 @@ class RealsenseWrapper:
         if not self.storage_paths.save:
             return
 
-        calib_config = CalibrationConfig()
-        for device_sn, dev in self.enabled_devices.items():
-
+        for device_sn, _ in self.enabled_devices.items():
             assert os.path.exists(self.storage_paths.calib[device_sn])
             if os.path.isfile(self.storage_paths.calib[device_sn]):
                 save_path = self.storage_paths.calib[device_sn]
@@ -341,68 +399,8 @@ class RealsenseWrapper:
                 filename = f'dev{device_sn}_calib.json'
                 save_path = os.path.join(
                     self.storage_paths.calib[device_sn], filename)
-
-            calib_config.device_sn.append(device_sn)
-
-            profile = dev.pipeline_profile
-
-            # Intrinsics of color & depth frames -------------------------------
-            profile_color = profile.get_stream(rs.stream.color)
-            intr_color = profile_color.as_video_stream_profile()
-            intr_color = intr_color.get_intrinsics()
-
-            # Fetch stream profile for depth stream
-            # Downcast to video_stream_profile and fetch intrinsics
-            profile_depth = profile.get_stream(rs.stream.depth)
-            intr_depth = profile_depth.as_video_stream_profile()
-            intr_depth = intr_depth.get_intrinsics()
-
-            # Extrinsic matrix from color sensor to Depth sensor ---------------
-            profile_vid = profile_color.as_video_stream_profile()
-            extr = profile_vid.get_extrinsics_to(profile_depth)
-            extr_mat = np.eye(4)
-            extr_mat[:3, :3] = np.array(extr.rotation).reshape(3, 3)
-            extr_mat[:3, 3] = extr.translation
-
-            # Depth scale ------------------------------------------------------
-            # for sensor in profile.get_device().query_sensors():
-            #     if sensor.is_depth_sensor():
-            depth_sensor = profile.get_device().first_depth_sensor()
-            depth_sensor = rs.depth_stereo_sensor(depth_sensor)
-            depth_scale = depth_sensor.get_depth_scale()
-            depth_baseline = depth_sensor.get_stereo_baseline()
-
-            # Write calibration data to json file ------------------------------
-            calib_config.color.append({
-                'width': intr_color.width,
-                'height': intr_color.height,
-                'intrinsic_mat': [intr_color.fx, 0, intr_color.ppx,
-                                  0, intr_color.fy, intr_color.ppy,
-                                  0, 0, 1],
-                'model': str(intr_color.model),
-                'coeffs': intr_color.coeffs,
-                'format': str(self.stream_config_color.format),
-                'fps': self.stream_config_color.framerate,
-            })
-            calib_config.depth.append({
-                'width': intr_depth.width,
-                'height': intr_depth.height,
-                'intrinsic_mat': [intr_depth.fx, 0, intr_depth.ppx,
-                                  0, intr_depth.fy, intr_depth.ppy,
-                                  0, 0, 1],
-                'model': str(intr_depth.model),
-                'coeffs': intr_depth.coeffs,
-                'depth_scale': depth_scale,
-                'depth_baseline': depth_baseline,
-                'format': str(self.stream_config_depth.format),
-                'fps': self.stream_config_color.framerate,
-            })
-            calib_config.T_color_depth.append({
-                'rotation': extr.rotation,
-                'translation': extr.translation
-            })
-
-            calib_config.save(save_path, device_sn)
+            self.query_camera_calib_device(device_sn)
+            self.calib_data.save(save_path, device_sn)
 
         printout(f"Saved camera calibration data...", 'i')
 
@@ -451,6 +449,9 @@ class RealsenseWrapper:
         # 8. Check which timestamp is available.
         if len(self.enabled_devices) > 0:
             self.query_timestamp_mode(device_sn)
+
+        # 9. Calib
+        self.query_camera_calib_device(device_sn)
 
         printout(f"Initialized RealSense devices {device_sn}", 'i')
 
@@ -625,7 +626,7 @@ class RealsenseWrapper:
                 printout("One of the streams is missing...", 'w')
 
             frame_dict = {}
-            frame_dict['calib'] = self.calib_data.get(device_sn, {})
+            frame_dict['calib'] = self.calib_data.get_data(device_sn)
 
             # 6. Tries to align the frames, and skip step if exception occurs.
             try:
