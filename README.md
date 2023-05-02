@@ -153,3 +153,6 @@ The `RS2_OPTION_AUTO_EXPOSURE_LIMIT` options require stream to restart. Unit in 
 
 ### 11. Disparity
 The disparity is given with 1/32 pixel resolution. See [here](https://github.com/IntelRealSense/librealsense/issues/3039) and [here](https://github.com/IntelRealSense/librealsense/issues/3344).
+
+### 12. frame alignment
+The rs.align function is slow. Compile it with cuda to make it faster. Uses about 100mb gpu memory for 30fs 848x480 color + depth stream.

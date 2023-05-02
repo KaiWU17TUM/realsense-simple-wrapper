@@ -3,13 +3,10 @@ cmake_minimum_required(VERSION 3.1.0)
 
 project(RealSenseImShowExample)
 
-#find_package(OpenCV REQUIRED)
-#find_package(OpenCL REQUIRED)
+find_package(OpenCV REQUIRED)
+include_directories( ${OpenCV_INCLUDE_DIRS})
 
-include_directories( ${OpenCV_INCLUDE_DIRS} ${OpenCL_INCLUDE_DIR} )
-message("${OpenCL_LIBRARIES}")
-
-set(DEPENDENCIES pthread ${OpenCV_LIBS} ${DEPENDENCIES})
+set(DEPENDENCIES realsense2 pthread ${OpenCV_LIBS} ${DEPENDENCIES})
 
 add_executable(rs-imshow rs-imshow.cpp)
 set_property(TARGET rs-imshow PROPERTY CXX_STANDARD 11)

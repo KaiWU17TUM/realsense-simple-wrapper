@@ -1,25 +1,25 @@
 // License: Apache 2.0. See LICENSE file in root directory.
 // Copyright(c) 2017 Intel Corporation. All Rights Reserved.
 
-// #include <librealsense2/rs.hpp> // Include RealSense Cross Platform API
-// #include <opencv2/opencv.hpp>   // Include OpenCV API
+#include <librealsense2/rs.hpp> // Include RealSense Cross Platform API
+#include <opencv2/opencv.hpp>   // Include OpenCV API
 
 #include <iostream>
 
-#define CL_HPP_TARGET_OPENCL_VERSION 210
-#include <CL/cl2.hpp>
-#include <opencv2/core/ocl.hpp>
+// #define CL_HPP_TARGET_OPENCL_VERSION 210
+// // #include <CL/cl2.hpp>
+// #include <opencv2/core/ocl.hpp>
 
 using namespace cv;
 
 int main(int argc, char * argv[]) try
 {
-    char env[]="OPENCV_OPENCL_DEVICE=Intel:CPU:"; 
-    // char env[]="OPENCV_OPENCL_DEVICE=:GPU:"; 
-    putenv(env);     
-    setUseOptimized(true);
-    printf("OpenCL Found : %s\n", cv::ocl::haveOpenCL() ? "true" : "false");
-    printf("Using OpenCL : %s\n", cv::ocl::useOpenCL() ? "true" : "false");
+    // char env[]="OPENCV_OPENCL_DEVICE=Intel:CPU:"; 
+    // // char env[]="OPENCV_OPENCL_DEVICE=:GPU:"; 
+    // putenv(env);     
+    // setUseOptimized(true);
+    // printf("OpenCL Found : %s\n", cv::ocl::haveOpenCL() ? "true" : "false");
+    // printf("Using OpenCL : %s\n", cv::ocl::useOpenCL() ? "true" : "false");
 
     rs2::context ctx;
 
@@ -58,7 +58,7 @@ int main(int argc, char * argv[]) try
         Mat color_image(Size(w, h), CV_8UC3, (void*)color.get_data(), Mat::AUTO_STEP);
 
         // Update the window with new data
-        imshow(depth_window_name1, depth_image);
+        imshow(depth_window_name1, depth_image*0);
         imshow(color_window_name1, color_image);
     }
 

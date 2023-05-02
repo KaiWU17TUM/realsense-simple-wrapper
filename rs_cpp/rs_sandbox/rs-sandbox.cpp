@@ -23,270 +23,86 @@
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 #include "stb_image_write.h"
 
-#include <iostream>
 #include <fstream>
+#include <iostream>
+#include <filesystem>
 #include <map>
 #include <chrono>
 #include <mutex>
 #include <thread>
 #include <vector>
+#include <string>
+#include <algorithm>
 
 #include <unistd.h>
 #include <stdio.h>
 #include <signal.h>
 #include <bitset>
+#include <string.h>
 
 #include <atomic>
 
-// // https://github.com/IntelRealSense/librealsense/blob/master/examples/post-processing/rs-post-processing.cpp
-// /**
-// Class to encapsulate a filter alongside its options
-// */
-// class filter_options
-// {
-// public:
-//     filter_options(const std::string name, rs2::filter &filter);
-//     filter_options(filter_options &&other);
-//     std::string filter_name;     // Friendly name of the filter
-//     rs2::filter &filter;         // The filter in use
-//     std::atomic_bool is_enabled; // A boolean controlled by the user that determines whether to apply the filter or not
-// };
+#include <dirent.h>
+#include <opencv2/opencv.hpp> // Include OpenCV API
 
-// // https://github.com/IntelRealSense/librealsense/tree/master/examples/software-device
+// Usefull links:
+// https://github.com/IntelRealSense/librealsense/tree/master/examples/software-device
+// https://github.com/IntelRealSense/librealsense/blob/master/examples/post-processing/rs-post-processing.cpp
+// https://github.com/IntelRealSense/librealsense/blob/development/unit-tests/unit-tests-post-processing.cpp#L221-L241
 
 // int main(int argc, char *argv[])
 // {
-
-//     const int W = 848;
-//     const int H = 480;
-//     const int BPP = 2;
-
-//     char buffer[W * H * BPP];
-//     uint16_t buffer_u16[W * H];
-
-//     std::string path = "/code/realsense-simple-wrapper/output/testing_cpp/001622070408/1660659930/depth/000210127864.bin";
-//     std::ifstream input(path, std::ios::in | std::ios::binary);
-//     input.read(buffer, W * H * BPP);
-
-//     // uint16_t result;
-//     // result = (uint16_t)((((u_char)buffer[0] & 0xF) << 8) | (u_char)buffer[1]);
-//     // std::cout << result << std::endl;
-//     // result = (uint16_t)((((u_char)buffer[1] & 0xF) << 8) | (u_char)buffer[0]);
-//     // std::cout << result << std::endl;
-//     // std::bitset<16> y(result);
-//     // std::cout << y << std::endl;
-
-//     // {
-//     //     auto a = (uint16_t)(u_char)buffer[1] << 8 | (uint16_t)(u_char)buffer[0];
-//     //     std::bitset<16> y((uint16_t)(u_char)buffer[1] << 8 | (uint16_t)(u_char)buffer[0]);
-//     //     std::cout << y << a << std::endl;
-//     // }
-
-//     // for (int i = 0; i < H * W; i + 2)
-//     // {
-//     //     buffer_u16[i / 2] = (uint16_t)(u_char)buffer[i + 1] << 8 | (uint16_t)(u_char)buffer[i];
-//     // }
-
-//     int frame_number = 0;
-//     rs2_time_t timestamp = (rs2_time_t)16 * frame_number;
-//     auto domain = RS2_TIMESTAMP_DOMAIN_HARDWARE_CLOCK;
-
-//     rs2_intrinsics depth_intrinsics = {
-//         848,
-//         480,
-//         421.801,
-//         238.788,
-//         421.251,
-//         421.251,
-//         RS2_DISTORTION_BROWN_CONRADY,
-//         {0, 0, 0, 0, 0}};
-
-//     rs2::software_device dev; // Create software-only device
-
-//     auto depth_sensor = dev.add_sensor("Depth"); // Define single sensor
-
-//     auto depth_stream = depth_sensor.add_video_stream(
-//         {RS2_STREAM_DEPTH, 0, 0,
-//          W, H, 6, BPP,
-//          RS2_FORMAT_Z16, depth_intrinsics});
-
-//     depth_sensor.add_read_only_option(RS2_OPTION_DEPTH_UNITS, 0.001f);
-//     depth_sensor.add_read_only_option(RS2_OPTION_STEREO_BASELINE, 50.1609f);
-//     // auto ds = depth_sensor.as<rs2::depth_sensor>();
-//     // std::cout << ds.get_depth_scale() << std::endl;
-
-//     rs2::syncer sync;
-//     depth_sensor.open(depth_stream);
-//     depth_sensor.start(sync);
-
-//     depth_sensor.on_video_frame({buffer,        // Frame pixels from capture API
-//                                  [](void *) {}, // Custom deleter (if required)
-//                                  W * BPP,       // Stride
-//                                  BPP,
-//                                  timestamp,
-//                                  domain,
-//                                  frame_number,
-//                                  depth_stream});
-
-//     rs2::frameset fset = sync.wait_for_frames();
-//     rs2::frame depth = fset.first_or_default(RS2_STREAM_DEPTH);
-
-//     // Declare filters
-//     rs2::decimation_filter dec_filter;                // Decimation - reduces depth frame density
-//     rs2::threshold_filter thr_filter(0.1, 5.0);       // Threshold  - removes values outside recommended range
-//     rs2::spatial_filter spat_filter(0.5, 25, 3.0, 2); // Spatial    - edge-preserving spatial smoothing
-//     rs2::temporal_filter temp_filter;                 // Temporal   - reduces temporal noise
-//     const std::string disparity_filter_name = "Disparity";
-//     rs2::disparity_transform depth_to_disparity(true);
-//     rs2::disparity_transform disparity_to_depth(false);
-
-//     // std::vector<filter_options> filters;
-//     // filters.emplace_back("Decimate", dec_filter);
-//     // filters.emplace_back("Threshold", thr_filter);
-//     // filters.emplace_back(disparity_filter_name, depth_to_disparity);
-//     // filters.emplace_back("Spatial", spat_filter);
-//     // filters.emplace_back("Temporal", temp_filter);
-
-//     /* Apply filters.
-//     The implemented flow of the filters pipeline is in the following order:
-//     1. apply decimation filter
-//     2. apply threshold filter
-//     3. transform the scene into disparity domain
-//     4. apply spatial filter
-//     5. apply temporal filter
-//     6. revert the results back (if step Disparity filter was applied
-//     to depth domain (each post processing block is optional and can be applied independantly).
-//     */
-//     // bool revert_disparity = false;
-//     // for (auto &&filter : filters)
-//     // {
-//     //     if (filter.is_enabled)
-//     //     {
-//     //         depth = filter.filter.process(depth);
-//     //         if (filter.filter_name == disparity_filter_name)
-//     //         {
-//     //             revert_disparity = true;
-//     //         }
-//     //     }
-//     // }
-//     // if (revert_disparity)
-//     // {
-//     //     depth = disparity_to_depth.process(depth);
-//     // }
-
-//     // depth = dec_filter.process(depth);
-//     // depth = thr_filter.process(depth);
-//     // depth = depth_to_disparity.process(depth);
-//     // depth = spat_filter.process(depth);
-//     // depth = temp_filter.process(depth);
-//     // depth = disparity_to_depth.process(depth);
-
-//     // auto dss = rs2::depth_stereo_sensor(depth_sensor).get_depth_scale();
-//     // std::cout << dss << std::endl;
-
-//     // std::cout << depth_sensor.get_option(RS2_OPTION_DEPTH_UNITS) << std::endl;
-
-//     // rs2_error **e = nullptr;
-//     // auto p = depth.get();
-//     // auto out = rs2_get_frame_metadata(p, RS2_FRAME_METADATA_FRAME_TIMESTAMP, e);
-//     // std::cout << out << std::endl;
-
-//     auto orig = dynamic_cast<librealsense::depth_frame *>((librealsense::frame_interface *)depth.get());
-//     auto ad = orig->additional_data;
-//     ad.depth_units = 0.001;
-//     orig->additional_data = ad;
-//     std::cout << "Depth units : " << ad.depth_units << std::endl;
-
-//     // bool _transform_to_disparity;
-//     // rs2::stream_profile _source_stream_profile;
-//     // rs2::stream_profile _target_stream_profile;
-//     // bool _update_target;
-//     // bool _stereoscopic_depth;
-//     // float _stereo_baseline_meter; // in meters
-//     // float _d2d_convert_factor;
-//     // size_t _width, _height;
-//     // size_t _bpp;
-
-//     // if (depth.get_profile().get() != _source_stream_profile.get())
-//     // {
-//     //     _source_stream_profile = depth.get_profile();
-
-//     //     auto info = librealsense::disparity_info::update_info_from_frame(depth);
-//     //     _stereoscopic_depth = info.stereoscopic_depth;
-//     //     _d2d_convert_factor = info.d2d_convert_factor;
-
-//     //     auto vp = _source_stream_profile.as<rs2::video_stream_profile>();
-//     //     _width = vp.width();
-//     //     _height = vp.height();
-//     //     _update_target = true;
-
-//     //     auto tgt_format = _transform_to_disparity ? RS2_FORMAT_DISPARITY32 : RS2_FORMAT_Z16;
-//     //     _target_stream_profile = _source_stream_profile.clone(RS2_STREAM_DEPTH, 0, tgt_format);
-//     //     auto src_vspi = dynamic_cast<librealsense::video_stream_profile_interface *>(_source_stream_profile.get()->profile);
-//     //     auto tgt_vspi = dynamic_cast<librealsense::video_stream_profile_interface *>(_target_stream_profile.get()->profile);
-//     //     rs2_intrinsics src_intrin = src_vspi->get_intrinsics();
-
-//     //     tgt_vspi->set_intrinsics([src_intrin]()
-//     //                              { return src_intrin; });
-//     //     tgt_vspi->set_dims(src_intrin.width, src_intrin.height);
-//     // }
-//     // std::cout << "_stereoscopic_depth : " << _stereoscopic_depth << std::endl;
-//     // std::cout << "_d2d_convert_factor : " << _d2d_convert_factor << std::endl;
-
-//     // depth = dec_filter.process(depth);
-//     depth = thr_filter.process(depth);
-
-//     // auto t = (uint16_t *)depth.get_data();
-//     // t[1] = 1000;
-
-//     // std::cout << ((uint16_t *)depth.get_data())[1] << std::endl;
-
-//     depth = depth_to_disparity.process(depth);
-//     depth = spat_filter.process(depth);
-//     depth = temp_filter.process(depth);
-//     depth = disparity_to_depth.process(depth);
-
-//     // std::cout << ((float *)depth.get_data())[1] << std::endl;
-
-//     auto vf = depth.as<rs2::video_frame>();
-//     rs2::colorizer color_map;
-//     vf = color_map.process(depth);
-
-//     std::stringstream png_file;
-//     png_file << "rs-save-to-disk-output-" << vf.get_profile().stream_name() << ".png";
-//     stbi_write_png(png_file.str().c_str(), vf.get_width(), vf.get_height(),
-//                    vf.get_bytes_per_pixel(), vf.get_data(), vf.get_stride_in_bytes());
-//     std::cout << "Saved " << png_file.str() << std::endl;
+//     bool _transform_to_disparity;
+//     rs2::stream_profile _source_stream_profile;
+//     rs2::stream_profile _target_stream_profile;
+//     bool _update_target;
+//     bool _stereoscopic_depth;
+//     float _stereo_baseline_meter; // in meters
+//     float _d2d_convert_factor;
+//     size_t _width, _height;
+//     size_t _bpp;
+//     if (depth.get_profile().get() != _source_stream_profile.get())
+//     {
+//         _source_stream_profile = depth.get_profile();
+//         auto info = librealsense::disparity_info::update_info_from_frame(depth);
+//         _stereoscopic_depth = info.stereoscopic_depth;
+//         _d2d_convert_factor = info.d2d_convert_factor;
+//         auto vp = _source_stream_profile.as<rs2::video_stream_profile>();
+//         _width = vp.width();
+//         _height = vp.height();
+//         _update_target = true;
+//         auto tgt_format = _transform_to_disparity ? RS2_FORMAT_DISPARITY32 : RS2_FORMAT_Z16;
+//         _target_stream_profile = _source_stream_profile.clone(RS2_STREAM_DEPTH, 0, tgt_format);
+//         auto src_vspi = dynamic_cast<librealsense::video_stream_profile_interface *>(_source_stream_profile.get()->profile);
+//         auto tgt_vspi = dynamic_cast<librealsense::video_stream_profile_interface *>(_target_stream_profile.get()->profile);
+//         rs2_intrinsics src_intrin = src_vspi->get_intrinsics();
+//         tgt_vspi->set_intrinsics([src_intrin]()
+//                                  { return src_intrin; });
+//         tgt_vspi->set_dims(src_intrin.width, src_intrin.height);
+//     }
+//     std::cout << "_stereoscopic_depth : " << _stereoscopic_depth << std::endl;
+//     std::cout << "_d2d_convert_factor : " << _d2d_convert_factor << std::endl;
 // }
 
-int main(int argc, char *argv[])
+class LocalDepthSensor
 {
-    // auto now = std::chrono::system_clock::now();
-    // std::time_t end_time = std::chrono::system_clock::to_time_t(now);
-    // std::cout << std::ctime(&end_time) << std::endl;
-    // int64_t microsecondsUTC = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-    // std::cout << microsecondsUTC << std::endl;
-    // std::time_t t = std::time(nullptr);
-    // std::cout << t << std::endl;
-    // std::cout << std::asctime(std::localtime(&t)) << std::endl;
-    // return EXIT_SUCCESS;
 
+public:
     // [TODO: Read from calib] *************************************************
     const int W = 848;
     const int H = 480;
     const int BPP = 2;
+    const float depth_unit = 0.0010000000474974513f;
 
-    int frame_number = 0;
-    rs2_time_t timestamp = (rs2_time_t)16 * frame_number;
-    auto domain = RS2_TIMESTAMP_DOMAIN_HARDWARE_CLOCK;
+    rs2_timestamp_domain domain = RS2_TIMESTAMP_DOMAIN_HARDWARE_CLOCK;
 
     rs2_intrinsics depth_intrinsics = {
-        848,
-        480,
-        421.801,
-        238.788,
-        421.251,
-        421.251,
+        W,
+        H,
+        421.801025390625,
+        238.7880401611328,
+        421.2511291503906,
+        421.2511291503906,
         RS2_DISTORTION_BROWN_CONRADY,
         {0, 0, 0, 0, 0}};
     rs2_video_stream depth_video_stream = {
@@ -295,84 +111,214 @@ int main(int argc, char *argv[])
         0,
         W,
         H,
-        6,
+        30,
         BPP,
         RS2_FORMAT_Z16,
         depth_intrinsics};
     // ************************************************* [TODO: Read from calib]
 
-    std::string path = "/code/realsense-simple-wrapper/output/testing_cpp/001622070408/1660659930/depth/000210127864.bin";
-    std::ifstream input(path, std::ios::in | std::ios::binary);
-    char buffer[W * H * BPP];
-    input.read(buffer, W * H * BPP);
-
-    rs2::software_device dev; // Create software-only device
-
-    auto depth_sensor = dev.add_sensor("Depth"); // Define single sensor
-
-    auto depth_stream = depth_sensor.add_video_stream(depth_video_stream);
-
-    depth_sensor.add_read_only_option(RS2_OPTION_DEPTH_UNITS, 0.001f);
-    depth_sensor.add_read_only_option(RS2_OPTION_STEREO_BASELINE, 50.1609f);
+    // Declare filters
+    rs2::decimation_filter dec_filter = rs2::decimation_filter(2);        // Decimation - reduces depth frame density
+    rs2::threshold_filter thr_filter = rs2::threshold_filter(0.5, 5.0);   // Threshold  - removes values outside recommended range
+    rs2::spatial_filter spat_filter = rs2::spatial_filter(0.5, 20, 2, 2); // Spatial    - spatial smoothing (alpha, delta, #filters)
+    rs2::temporal_filter temp_filter = rs2::temporal_filter(0.4, 20, 3);  // Temporal   - reduces temporal noise
+    rs2::disparity_transform depth_to_disparity = rs2::disparity_transform(true);
+    rs2::disparity_transform disparity_to_depth = rs2::disparity_transform(false);
 
     rs2::syncer sync;
-    depth_sensor.open(depth_stream);
-    depth_sensor.start(sync);
+    std::vector<rs2::software_sensor> depth_sensors;
+    // rs2::software_sensor depth_sensor;
+    rs2::stream_profile depth_stream_profile;
+    rs2::frameset fset;
+    rs2::frame depth;
 
-    depth_sensor.on_video_frame({buffer,        // Frame pixels from capture API
-                                 [](void *) {}, // Custom deleter (if required)
-                                 W * BPP,       // Stride
-                                 BPP,
-                                 timestamp,
-                                 domain,
-                                 frame_number,
-                                 depth_stream});
+    LocalDepthSensor(){};
+    ~LocalDepthSensor(){
+        // for (auto ds : depth_sensors)
+        //     ds.close();
+    };
 
-    rs2::frameset fset = sync.wait_for_frames();
-    rs2::frame depth = fset.first_or_default(RS2_STREAM_DEPTH);
+    void initialize()
+    {
+        rs2::software_device dev;                                    // Create software-only device
+        rs2::software_sensor depth_sensor = dev.add_sensor("Depth"); // Define single sensor
+        depth_stream_profile = depth_sensor.add_video_stream(depth_video_stream);
+        depth_sensor.add_read_only_option(RS2_OPTION_DEPTH_UNITS, depth_unit);
+        depth_sensor.add_read_only_option(RS2_OPTION_STEREO_BASELINE, 50.16090393066406f);
 
-    auto orig = dynamic_cast<librealsense::depth_frame *>((librealsense::frame_interface *)depth.get());
-    auto ad = orig->additional_data;
-    ad.depth_units = 0.001;
-    orig->additional_data = ad;
+        // dev.create_matcher(RS2_MATCHER_DLR_C);
+        // sync = rs2::syncer();
 
-    // Declare filters
-    rs2::decimation_filter dec_filter;                // Decimation - reduces depth frame density
-    rs2::threshold_filter thr_filter(0.1, 5.0);       // Threshold  - removes values outside recommended range
-    rs2::spatial_filter spat_filter(0.5, 25, 3.0, 2); // Spatial    - edge-preserving spatial smoothing
-    rs2::temporal_filter temp_filter;                 // Temporal   - reduces temporal noise
-    const std::string disparity_filter_name = "Disparity";
-    rs2::disparity_transform depth_to_disparity(true);
-    rs2::disparity_transform disparity_to_depth(false);
+        depth_sensor.open(depth_stream_profile);
+        depth_sensor.start(sync);
+        depth_sensors.push_back(depth_sensor);
+    };
 
-    // // Apply filters.
-    // The implemented flow of the filters pipeline is in the following order:
-    // 1. apply decimation filter
-    // 2. apply threshold filter
-    // 3. transform the scene into disparity domain
-    // 4. apply spatial filter
-    // 5. apply temporal filter
-    // 6. revert the results back (if step Disparity filter was applied
-    // to depth domain (each post processing block is optional and can be applied independantly).
+    void add_pixels(void *pixels, int frame_number)
+    {
+        // int frame_number = 0;
+        rs2_time_t timestamp = (rs2_time_t)frame_number / 30;
+        depth_sensors[0].on_video_frame({pixels,        // Frame pixels from capture API
+                                         [](void *) {}, // Custom deleter (if required)
+                                         W * BPP,       // Stride
+                                         BPP,
+                                         timestamp,
+                                         domain,
+                                         frame_number,
+                                         depth_stream_profile,
+                                         depth_unit});
+        fset = sync.wait_for_frames();
+        // printf("fset size : %ld\n", fset.size());
+    };
 
-    depth = dec_filter.process(depth);
-    depth = thr_filter.process(depth);
-    depth = depth_to_disparity.process(depth);
-    depth = spat_filter.process(depth);
-    depth = temp_filter.process(depth);
-    depth = disparity_to_depth.process(depth);
+    void get_depth_data()
+    {
+        depth = fset.first_or_default(RS2_STREAM_DEPTH);
+        auto orig = dynamic_cast<librealsense::depth_frame *>((librealsense::frame_interface *)depth.get());
+        auto ad = orig->additional_data;
+        ad.depth_units = 0.0010000000474974513;
+        orig->additional_data = ad;
+    };
 
-    auto vf = depth.as<rs2::video_frame>();
-    rs2::colorizer color_map;
-    vf = color_map.process(depth);
+    rs2::frame filter_depth_data(rs2::frame depth_frame,
+                                 bool decimation = false,
+                                 bool threshold = true,
+                                 bool spatial = true,
+                                 bool temporal = true)
+    {
+        // // Apply filters.
+        // The implemented flow of the filters pipeline is in the following order:
+        // 1. apply decimation filter (downsample)
+        // 2. apply threshold filter
+        // 3. transform the scene into disparity domain
+        // 4. apply spatial filter
+        // 5. apply temporal filter
+        // 6. revert the results back (if step Disparity filter was applied
+        // to depth domain (each post processing block is optional and can be applied independantly).
+        if (decimation)
+            depth_frame = dec_filter.process(depth_frame);
+        if (threshold)
+            depth_frame = thr_filter.process(depth_frame);
+        if (spatial || temporal)
+            depth_frame = depth_to_disparity.process(depth_frame);
+        if (spatial)
+            depth_frame = spat_filter.process(depth_frame);
+        if (temporal)
+            depth_frame = temp_filter.process(depth_frame);
+        if (spatial || temporal)
+            depth_frame = disparity_to_depth.process(depth_frame);
+        return depth_frame;
+    };
 
-    std::stringstream png_file;
-    png_file << "rs-save-to-disk-output-" << vf.get_profile().stream_name() << ".png";
-    stbi_write_png(png_file.str().c_str(),
-                   vf.get_width(),
-                   vf.get_height(),
-                   vf.get_bytes_per_pixel(),
-                   vf.get_data(),
-                   vf.get_stride_in_bytes());
-    std::cout << "Saved " << png_file.str() << std::endl;
+    void filter_depth_data(bool decimation = false,
+                           bool threshold = true,
+                           bool spatial = true,
+                           bool temporal = true)
+    {
+        depth = filter_depth_data(depth, decimation, threshold, spatial, temporal);
+    };
+
+    int view_colormap(rs2::frame depth_frame, const std::string &win_name, int interval)
+    {
+        rs2::video_frame vf = depth_frame.as<rs2::video_frame>();
+        rs2::colorizer color_map;
+        vf = color_map.process(depth_frame);
+        // rs2::colorizer color_map;
+        // rs2::frame depth_c = depth_frame.apply_filter(color_map);
+        const int w = vf.get_width();
+        const int h = vf.get_height();
+        cv::Mat depth_image(cv::Size(w, h), CV_8UC3, (void *)vf.get_data(), cv::Mat::AUTO_STEP);
+        cv::imshow(win_name, depth_image);
+        return (cv::waitKey(interval) & 0xFF);
+    };
+
+    int view_colormap(const std::string &win_name, int interval)
+    {
+        return view_colormap(depth, win_name, interval);
+    };
+
+    void save_data_to_file(const rs2::video_frame &videoframe,
+                           const std::string &filepath)
+    {
+        stbi_write_png(filepath.c_str(),
+                       videoframe.get_width(),
+                       videoframe.get_height(),
+                       videoframe.get_bytes_per_pixel(),
+                       videoframe.get_data(),
+                       videoframe.get_stride_in_bytes());
+        printf("Saved : %s\n", filepath.c_str());
+    };
+};
+
+int main(int argc, char *argv[])
+{
+
+    const auto depth_window_name1 = "Display Depth Image";
+    cv::namedWindow(depth_window_name1, cv::WINDOW_AUTOSIZE);
+    const auto depth_window_name2 = "Display Depth Image Filtered";
+    cv::namedWindow(depth_window_name2, cv::WINDOW_AUTOSIZE);
+    const auto depth_window_name3 = "Display Depth Image All Filtered";
+    cv::namedWindow(depth_window_name3, cv::WINDOW_AUTOSIZE);
+    int key1, key2, key3;
+
+    std::string path = "/data/tmp/depth";
+    // std::string path = "/data/tmp/depth_16.bin";
+    // std::string path = "/code/realsense-simple-wrapper/output/testing_cpp/001622070408/1660659930/depth/000210127864.bin";
+    // std::string path = "/code/realsense-simple-wrapper/data/local/realsense-15fps/001622070408/1681746140/depth/00000000000027746044.bin";
+
+    LocalDepthSensor LDS;
+    LDS.initialize();
+
+    // Taken from: https://stackoverflow.com/questions/612097/how-can-i-get-the-list-of-files-in-a-directory-using-c-or-c
+    std::vector<std::string> file_names;
+    DIR *dir;
+    struct dirent *ent;
+    if ((dir = opendir(path.c_str())) != NULL)
+    {
+        /* print all the files and directories within directory */
+        while ((ent = readdir(dir)) != NULL)
+        {
+            if (strcmp(".", ent->d_name) == 0)
+                continue;
+            if (strcmp("..", ent->d_name) == 0)
+                continue;
+            file_names.push_back(std::string(ent->d_name));
+        }
+        closedir(dir);
+    }
+    else
+    {
+        /* could not open directory */
+        perror("");
+        return EXIT_FAILURE;
+    }
+    std::sort(file_names.begin(), file_names.end());
+
+    int frame_number = 0;
+    for (const std::string &file_name : file_names)
+    {
+        printf("%s\n", file_name.c_str());
+        frame_number++;
+        std::string input_path = path + "/" + file_name;
+        std::ifstream input(input_path, std::ios::binary);
+        char buffer[LDS.W * LDS.H * 2];
+        input.read(buffer, LDS.W * LDS.H * 2);
+        LDS.add_pixels(buffer, frame_number);
+        LDS.get_depth_data();
+
+        // LDS.filter_depth_data();
+        key1 = LDS.view_colormap(depth_window_name1, 1);
+
+        auto df2 = LDS.filter_depth_data(rs2::frame(LDS.depth), false, true, true, false);
+        key2 = LDS.view_colormap(df2, depth_window_name2, 1);
+
+        auto df3 = LDS.filter_depth_data(rs2::frame(LDS.depth), false, true, true, true);
+        key3 = LDS.view_colormap(df3, depth_window_name3, 100);
+
+        if (key1 == 'q' || key2 == 'q' || key3 == 'q')
+            break;
+
+        // printf("%d\n", df2 == df3);
+    }
+    // printf("fset size : %ld\n", LDS.sync.wait_for_frames().size());
 }
