@@ -94,7 +94,7 @@ void multithreading_function(
     int i_range = rs2_arg.reset_interval() * num_devices;
     while (!stop)
     {
-        std::string i_str = pad_zeros(std::to_string(i), num_zeros_to_pad);
+        std::string i_str = pad_zeros(std::to_string(i + 1), num_zeros_to_pad);
         std::string o_str = "";
 
         // so that files are saved periodically (1hr) in different folders.
@@ -107,7 +107,7 @@ void multithreading_function(
         i++;
 
         if (i % rs2_arg.fps() == 0)
-            print("Step " + i_str + "   " + o_str, 0);
+            print("Step " + i_str + "  " + o_str, 0);
 
         // Occasionally resets the realsense device.
         if ((i + i_offset) % i_range == 0)
@@ -232,7 +232,7 @@ bool run(int argc, char *argv[])
         int i = 0;
         while (!stop)
         {
-            std::string i_str = pad_zeros(std::to_string(i), num_zeros_to_pad);
+            std::string i_str = pad_zeros(std::to_string(i + 1), num_zeros_to_pad);
             std::string o_str = "";
 
             // so that files are saved periodically (1hr) in different folders.
@@ -245,7 +245,7 @@ bool run(int argc, char *argv[])
             i++;
 
             if (i % rs2_arg.fps() == 0)
-                print("Step " + i_str + "   " + o_str, 0);
+                print("Step " + i_str + "  " + o_str, 0);
 
             // Occasionally resets the realsense device.
             if (i % rs2_arg.reset_interval() == 0)

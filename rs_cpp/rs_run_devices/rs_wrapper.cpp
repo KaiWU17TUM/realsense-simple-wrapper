@@ -1,5 +1,6 @@
 #include "rs_wrapper.hpp"
 
+const int num_zeros_to_pad = 16;
 std::mutex reset_mux;
 
 /*******************************************************************************
@@ -301,7 +302,7 @@ void rs2wrapper::step(const std::string &device_sn)
 
                         output_msg =
                             device_sn + "::" +
-                            std::to_string(global_timestamp_diff) + "::" +
+                            pad_zeros(std::to_string(global_timestamp_diff / 1000000000), num_zeros_to_pad) + "::" +
                             std::to_string(query_fps(device_sn, global_timestamp_diff)) + "  ";
                     }
                 }

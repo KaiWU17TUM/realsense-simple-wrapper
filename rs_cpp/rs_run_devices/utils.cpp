@@ -1,5 +1,15 @@
 #include "utils.hpp"
 
+std::string HEADER = "\033[95m";
+std::string OKBLUE = "\033[94m";
+std::string OKCYAN = "\033[96m";
+std::string OKGREEN = "\033[92m";
+std::string WARNING = "\033[93m";
+std::string FAIL = "\033[91m";
+std::string ENDC = "\033[0m";
+std::string BOLD = "\033[1m";
+std::string UNDERLINE = "\033[4m";
+
 bool stob(const std::string &x)
 {
     bool o;
@@ -9,12 +19,15 @@ bool stob(const std::string &x)
 
 void print(const std::string &msg, const int &mode)
 {
+    const std::time_t t_c = std::chrono::system_clock::to_time_t(std::chrono::system_clock::now());
+    std::string ctime = std::ctime(&t_c);
+    ctime.pop_back();
     if (mode == 0)
-        std::cout << "[INFO] : " << msg << std::endl;
+        std::cout << OKGREEN << "[" << ctime << " INFO] : " << msg << std::endl;
     if (mode == 1)
-        std::cout << "[WARN] : " << msg << std::endl;
+        std::cout << WARNING << "[" << ctime << " WARN] : " << msg << std::endl;
     if (mode == 2)
-        std::cerr << "[ERRO] : " << msg << std::endl;
+        std::cerr << FAIL << "[" << ctime << " ERRO] : " << msg << std::endl;
 }
 
 std::string pad_zeros(const std::string &in_str, const int &num_zeros)
