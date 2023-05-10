@@ -13,6 +13,8 @@ from datetime import datetime
 from functools import partial
 from typing import Optional, Tuple, Union, Any
 
+from rs_py.wrapper.rs_args import DEPTH_SENSOR_AE_LIMIT
+
 from rs_py.wrapper.rs_utils import CalibrationConfig
 from rs_py.wrapper.rs_utils import Device
 from rs_py.wrapper.rs_utils import StreamConfig
@@ -493,18 +495,20 @@ class RealsenseWrapper:
                 sensor = _sensor.as_depth_sensor()
                 sensor.set_option(rs.option.enable_auto_exposure, 1.0)
                 # sensor.set_option(rs.option.auto_exposure_limit_toggle, 1.0)
-                try:
-                    time.sleep(1)
-                    sensor.set_option(
-                        rs.option.auto_exposure_limit,
-                        self.arg.rs_depth_sensor_autoexposure_limit
-                    )
-                except RuntimeError as e:
-                    printout("rs error in auto_exposure_limit", 'w')
-                except Exception as e:
-                    printout(e, 'w')
-                else:
-                    raise ValueError("rs error in auto_exposure_limit")
+                ae_limit = sensor.get_option(rs.option.auto_exposure_limit)
+                if ae_limit != DEPTH_SENSOR_AE_LIMIT:
+                    try:
+                        time.sleep(1)
+                        sensor.set_option(
+                            rs.option.auto_exposure_limit,
+                            self.arg.rs_depth_sensor_autoexposure_limit
+                        )
+                    except RuntimeError as e:
+                        printout("rs error in auto_exposure_limit", 'w')
+                    except Exception as e:
+                        printout(e, 'w')
+                    else:
+                        raise ValueError("rs error in auto_exposure_limit")
 
                 self.enabled_devices[device_sn].depth_sensor = sensor
                 if self.verbose:

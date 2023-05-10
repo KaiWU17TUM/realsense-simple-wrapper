@@ -6,6 +6,9 @@ from ..utility import str2bool
 from rs_py import rs
 
 
+DEPTH_SENSOR_AE_LIMIT = 200000.0
+
+
 def str2rsformat(v) -> rs.format:
     _SUPPORTED_FORMATS = {
         'z16': rs.format.z16,
@@ -85,7 +88,7 @@ def get_rs_parser() -> argparse.ArgumentParser:
                         help='Whether to habe autoexposure')
     parser.add_argument('--rs-depth-sensor-autoexposure-limit',
                         type=float,
-                        default=200000.0,
+                        default=DEPTH_SENSOR_AE_LIMIT,
                         help='autoexposure limit for depth sensor')
     parser.add_argument('--rs-enable-ir-emitter',
                         type=str2bool,

@@ -115,7 +115,7 @@ def run_devices(args: argparse.Namespace):
             # so that files are saved periodically (1hr) in different folders.
             if (c % (args.rs_fps * 60 * 60) == 0) and (c > 0):
                 rsw.storage_paths.create()
-            
+
             rsw.step(
                 display=args.rs_display_frame,
                 display_and_save_with_key=args.rs_save_with_key
@@ -137,7 +137,7 @@ def run_devices(args: argparse.Namespace):
                 continue
 
             c += 1
-            if c > args.rs_fps * args.rs_steps or c > max_c:
+            if c > args.rs_steps or c > max_c:
                 break
 
     except Exception as e:
