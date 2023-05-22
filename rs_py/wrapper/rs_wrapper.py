@@ -28,6 +28,7 @@ from rs_py.wrapper.rs_utils import check_if_color_depth_frames_are_valid
 
 from rs_py.wrapper.realsense_device_manager import enumerate_connected_devices
 from rs_py.wrapper.realsense_device_manager import post_process_depth_frame
+from rs_py.wrapper.realsense_device_manager import post_process_depth_filters
 from rs_py.utility import str2bool
 from rs_py.utility import printout
 
@@ -78,6 +79,9 @@ class RealsenseWrapper:
         # # rs align method
         # align depth to color frame
         self._align = rs.align(rs.stream.color)
+        # depth filters
+        self.depth_filters = post_process_depth_filters(
+            decimation_magnitude=2.0)
         # # configurations
         self._rs_cfg = {}
         self.stream_config_color = StreamConfig(
@@ -775,7 +779,8 @@ class RealsenseWrapper:
         """
         frame_dict = {}
         frame = frameset.first_or_default(rs.stream.depth)
-        # frame = post_process_depth_frame(frame)
+        if self.arg.rs_postprocess:
+            frame = post_process_depth_frame(frame, self.depth_filters)
         timestamp = self.query_frame_timestamp(frame)
         frame_dict['depth_timestamp'] = timestamp
         framedata = np.asanyarray(frame.get_data())
@@ -831,7 +836,8 @@ class RealsenseWrapper:
         for device_sn, data_dict in frames.items():
             # Render images
             if data_dict.get('depth_color_framedata', None) is not None:
-                depth_colormap = data_dict['depth_color_framedata']
+                depth_colormap = np.flip(
+                    data_dict['depth_color_framedata'], -1)
             else:
                 depth_colormap = cv2.applyColorMap(
                     cv2.convertScaleAbs(data_dict['depth_framedata'],
@@ -848,9 +854,13 @@ class RealsenseWrapper:
             #         depth_image_3d <= 0), grey_color, color_image)
             # images = np.hstack((bg_removed, depth_colormap))
             # images = np.hstack((color_image, depth_colormap))
+            rgb_image = data_dict['color_framedata']
+            depth_colormap = cv2.resize(depth_colormap,
+                                        (rgb_image.shape[1],
+                                         rgb_image.shape[0]))
             images_overlapped = cv2.addWeighted(
-                data_dict['color_framedata'], 0.3, depth_colormap, 0.5, 0)
-            images = np.hstack((data_dict['color_framedata'],
+                rgb_image, 0.3, depth_colormap, 0.5, 0)
+            images = np.hstack((rgb_image,
                                 depth_colormap,
                                 images_overlapped))
             images = cv2.resize(images, (images.shape[1]//scale,
@@ -905,11 +915,11 @@ class RealsenseWrapper:
                     reset = True
                 else:
                     self.last_timestamps[ds][ts]['count'] += 1
-            else:
-                printout(f"Current color_timestamp is smaller than "
-                         f"previous value : {frame_dict[ts]} < "
-                         f"{self.last_timestamps[ds][ts]['timestamp']}", 'w')
-                reset = True
+            # else:
+            #     printout(f"Current color_timestamp is smaller than "
+            #              f"previous value : {frame_dict[ts]} < "
+            #              f"{self.last_timestamps[ds][ts]['timestamp']}", 'w')
+            #     reset = True
 
         if reset:
             printout("Resetting device with frozen timestamp...", 'w')

@@ -50,7 +50,7 @@ def get_rs_parser() -> argparse.ArgumentParser:
                         help='format of depth stream')
     parser.add_argument('--rs-display-frame',
                         type=int,
-                        default=1,
+                        default=0,
                         help='scale for displaying realsense raw images.')
     parser.add_argument('--rs-save-with-key',
                         type=str2bool,
@@ -85,7 +85,7 @@ def get_rs_parser() -> argparse.ArgumentParser:
     parser.add_argument('--rs-autoexposure',
                         type=str2bool,
                         default=True,
-                        help='Whether to habe autoexposure')
+                        help='Whether to have autoexposure')
     parser.add_argument('--rs-depth-sensor-autoexposure-limit',
                         type=float,
                         default=DEPTH_SENSOR_AE_LIMIT,
@@ -98,4 +98,8 @@ def get_rs_parser() -> argparse.ArgumentParser:
                         type=int,
                         default=300,
                         help='laser power')
+    parser.add_argument('--rs-postprocess',
+                        type=str2bool,
+                        default=False,
+                        help='Whether to postprocess depth image')
     return parser

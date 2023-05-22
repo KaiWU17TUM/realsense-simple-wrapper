@@ -55,13 +55,76 @@ def enumerate_connected_devices(context):
     return connect_device
 
 
+def post_process_depth_filters(decimation_magnitude=1.0,
+                               spatial_magnitude=2.0,
+                               spatial_smooth_alpha=0.5,
+                               spatial_smooth_delta=20,
+                               temporal_smooth_alpha=0.4,
+                               temporal_smooth_delta=20,
+                               threshold_magnitude=8.0):
+    """
+    Filter the depth frame acquired using the Intel RealSense device
+
+    Parameters:
+    -----------
+    decimation_magnitude : double
+                           The magnitude of the decimation filter
+    spatial_magnitude    : double
+                           The magnitude of the spatial filter
+    spatial_smooth_alpha : double
+                           The alpha value for spatial filter based smoothening
+    spatial_smooth_delta : double
+                           The delta value for spatial filter based smoothening
+    temporal_smooth_alpha: double
+                           The alpha value for temporal filter based smoothening
+    temporal_smooth_delta: double
+                           The delta value for temporal filter based smoothening
+
+    Return:
+    ----------
+    filtered_frame : rs.frame()
+                     The post-processed depth frame
+    """
+    # Available filters and control options for the filters
+    decimation_filter = rs.decimation_filter()
+    spatial_filter = rs.spatial_filter()
+    temporal_filter = rs.temporal_filter()
+    threshold_filter = rs.threshold_filter(0.3, threshold_magnitude)
+    hole_filter = rs.hole_filling_filter(2)
+    depth_to_disparity = rs.disparity_transform(True)
+    disparity_to_depth = rs.disparity_transform(False)
+
+    filter_magnitude = rs.option.filter_magnitude
+    filter_smooth_alpha = rs.option.filter_smooth_alpha
+    filter_smooth_delta = rs.option.filter_smooth_delta
+
+    # Apply the control parameters for the filter
+    decimation_filter.set_option(filter_magnitude, decimation_magnitude)
+    spatial_filter.set_option(filter_magnitude, spatial_magnitude)
+    spatial_filter.set_option(filter_smooth_alpha, spatial_smooth_alpha)
+    spatial_filter.set_option(filter_smooth_delta, spatial_smooth_delta)
+    temporal_filter.set_option(filter_smooth_alpha, temporal_smooth_alpha)
+    temporal_filter.set_option(filter_smooth_delta, temporal_smooth_delta)
+
+    return {'decimation_filter': decimation_filter,
+            'spatial_filter': spatial_filter,
+            'temporal_filter': temporal_filter,
+            'threshold_filter': threshold_filter,
+            'hole_filter': hole_filter,
+            'depth_to_disparity': depth_to_disparity,
+            'disparity_to_depth': disparity_to_depth,
+            }
+
+
 def post_process_depth_frame(depth_frame,
+                             depth_filters=None,
                              decimation_magnitude=1.0,
                              spatial_magnitude=2.0,
                              spatial_smooth_alpha=0.5,
                              spatial_smooth_delta=20,
                              temporal_smooth_alpha=0.4,
-                             temporal_smooth_delta=20):
+                             temporal_smooth_delta=20,
+                             threshold_magnitude=8.0):
     """
     Filter the depth frame acquired using the Intel RealSense device
 
@@ -91,27 +154,45 @@ def post_process_depth_frame(depth_frame,
     # Post processing possible only on the depth_frame
     assert (depth_frame.is_depth_frame())
 
-    # Available filters and control options for the filters
-    decimation_filter = rs.decimation_filter()
-    spatial_filter = rs.spatial_filter()
-    temporal_filter = rs.temporal_filter()
+    if depth_filters is None:
+        # Available filters and control options for the filters
+        decimation_filter = rs.decimation_filter()
+        spatial_filter = rs.spatial_filter()
+        temporal_filter = rs.temporal_filter()
+        threshold_filter = rs.threshold_filter(0.3, threshold_magnitude)
+        hole_filter = rs.hole_filling_filter(2)
+        depth_to_disparity = rs.disparity_transform(True)
+        disparity_to_depth = rs.disparity_transform(False)
 
-    filter_magnitude = rs.option.filter_magnitude
-    filter_smooth_alpha = rs.option.filter_smooth_alpha
-    filter_smooth_delta = rs.option.filter_smooth_delta
+        filter_magnitude = rs.option.filter_magnitude
+        filter_smooth_alpha = rs.option.filter_smooth_alpha
+        filter_smooth_delta = rs.option.filter_smooth_delta
 
-    # Apply the control parameters for the filter
-    decimation_filter.set_option(filter_magnitude, decimation_magnitude)
-    spatial_filter.set_option(filter_magnitude, spatial_magnitude)
-    spatial_filter.set_option(filter_smooth_alpha, spatial_smooth_alpha)
-    spatial_filter.set_option(filter_smooth_delta, spatial_smooth_delta)
-    temporal_filter.set_option(filter_smooth_alpha, temporal_smooth_alpha)
-    temporal_filter.set_option(filter_smooth_delta, temporal_smooth_delta)
+        # Apply the control parameters for the filter
+        decimation_filter.set_option(filter_magnitude, decimation_magnitude)
+        spatial_filter.set_option(filter_magnitude, spatial_magnitude)
+        spatial_filter.set_option(filter_smooth_alpha, spatial_smooth_alpha)
+        spatial_filter.set_option(filter_smooth_delta, spatial_smooth_delta)
+        temporal_filter.set_option(filter_smooth_alpha, temporal_smooth_alpha)
+        temporal_filter.set_option(filter_smooth_delta, temporal_smooth_delta)
+
+    else:
+        decimation_filter = depth_filters['decimation_filter']
+        spatial_filter = depth_filters['spatial_filter']
+        temporal_filter = depth_filters['temporal_filter']
+        threshold_filter = depth_filters['threshold_filter']
+        hole_filter = depth_filters['hole_filter']
+        depth_to_disparity = depth_filters['depth_to_disparity']
+        disparity_to_depth = depth_filters['disparity_to_depth']
 
     # Apply the filters
     filtered_frame = decimation_filter.process(depth_frame)
-    filtered_frame = spatial_filter.process(filtered_frame)
+    # filtered_frame = threshold_filter.process(depth_frame)
+    filtered_frame = depth_to_disparity.process(filtered_frame)
+    # filtered_frame = hole_filter.process(depth_frame)
+    # filtered_frame = spatial_filter.process(filtered_frame)
     filtered_frame = temporal_filter.process(filtered_frame)
+    filtered_frame = disparity_to_depth.process(filtered_frame)
 
     return filtered_frame
 

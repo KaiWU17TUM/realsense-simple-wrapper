@@ -35,16 +35,12 @@ def get_filepaths_with_timestamps(base_path: str) -> Tuple[dict, dict, list]:
                     out.append(trial)
         return out
 
-    trial_list = list(set(_get_trial_list(dev_trial_color_filepaths) +
-                          _get_trial_list(dev_trial_depth_filepaths)))
+    trial_list = sorted(list(set(_get_trial_list(dev_trial_color_filepaths) +
+                                 _get_trial_list(dev_trial_depth_filepaths))))
 
     def _ts_from_filepath(path: str) -> int:
         ts = path.split('/')[-1]
-        try:
-            ts, extension = os.path.splitext(ts)
-            # ts = int(ts.split('.')[0])
-        except:
-            ts = -1
+        ts, extension = os.path.splitext(ts)
         return ts
 
     # trial(as timestamp) > dev > timestamps > [filepath, calib]
@@ -167,7 +163,7 @@ def iterate_over_raw_data(base_path: Optional[str] = None,
                 for idx, files in zip(_depth_ts_idxs, depth_files):
                     if idx >= len(files):
                         next_trial = False
-                
+
                 if not next_trial:
                     continue
 
