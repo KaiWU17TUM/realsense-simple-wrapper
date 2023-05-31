@@ -67,6 +67,8 @@ class RealsenseWrapper:
         self.arg = arg
         self.verbose = arg.rs_verbose
 
+        self.vertical = self.arg.rs_vertical
+
         self.ctx = ctx if ctx is not None else rs.context()
         # if given, we assume only 1 device is being used.
         self.single_device_sn = device_sn
@@ -92,9 +94,9 @@ class RealsenseWrapper:
             rs.stream.depth, arg.rs_image_width, arg.rs_image_height,
             arg.rs_depth_format, arg.rs_fps
         )
-        # # get list of connected realsense
+        # get list of connected realsense
         self.query_available_devices()
-        # # Save paths
+        # Save paths
         if arg.rs_save_data:
             self.storage_paths = StoragePaths(
                 [device_sn for device_sn, _ in self.available_devices],
@@ -110,7 +112,7 @@ class RealsenseWrapper:
         # for display and save option
         self.key = -1
 
-        # # internal variables
+        # # internal variables -------
         self.empty_frame_received_timers = {}
         self.internal_timestamp = {sn: 0 for sn, _ in self.available_devices}
         self.temperature_log_interval = 300
@@ -860,9 +862,15 @@ class RealsenseWrapper:
                                          rgb_image.shape[0]))
             images_overlapped = cv2.addWeighted(
                 rgb_image, 0.3, depth_colormap, 0.5, 0)
-            images = np.hstack((rgb_image,
-                                depth_colormap,
-                                images_overlapped))
+            if self.vertical:
+                images = np.vstack((images_overlapped,
+                                    depth_colormap,
+                                    rgb_image))
+                images = np.rot90(images, -1)
+            else:
+                images = np.hstack((rgb_image,
+                                    depth_colormap,
+                                    images_overlapped))
             images = cv2.resize(images, (images.shape[1]//scale,
                                          images.shape[0]//scale))
             cv2.namedWindow(f'{device_sn}', cv2.WINDOW_AUTOSIZE)

@@ -102,4 +102,8 @@ def get_rs_parser() -> argparse.ArgumentParser:
                         type=str2bool,
                         default=False,
                         help='Whether to postprocess depth image')
+    parser.add_argument('--rs-vertical',
+                        type=str2bool,
+                        default=False,
+                        help='Whether to camera is mounter vertically')
     return parser
