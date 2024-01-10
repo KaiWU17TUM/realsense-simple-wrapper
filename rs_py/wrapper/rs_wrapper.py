@@ -913,7 +913,7 @@ class RealsenseWrapper:
 
         if reset:
             printout("Resetting device with frozen timestamp...", 'w')
-            self.stop(device_sn=device_sn)
+            self.stop_device(device_sn=device_sn)
             time.sleep(5)
             self.initialize_device(device_sn=device_sn)
             for ts in ['color_timestamp', 'depth_timestamp']:
