@@ -50,6 +50,16 @@ def read_depth_file(filename: str) -> np.ndarray:
         depth = np.fromfile(filename, np.uint16)
     return depth
 
+def read_skeleton_file(filename:str) -> np.ndarray:
+    import warnings
+    warnings.filterwarnings("ignore")
+
+    try:
+        skeleton = np.loadtxt(filename, delimiter=',')
+    except:
+        print(filename)
+    return skeleton
+
 
 def read_calib_file(calib_file: str) -> dict:
     calib_data = {}

@@ -39,10 +39,8 @@ def data_process_fn(**kwargs):
 
 
 if __name__ == "__main__":
-
-    # PATH = '/code/realsense-simple-wrapper/output/rs_3dev_sample2'
-
-    PATH = sys.argv[1]
+    # PATH = sys.argv[1]
+    PATH = '/home/dhm/icu_recording/trial-run-11122023/test_skel-15fps'
     SYNC = 0
     FPS = 0
     SCALE = 0

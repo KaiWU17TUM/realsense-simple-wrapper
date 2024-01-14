@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 import sys
 
+
 from rs_py.utility import read_calib_file
 from rs_py.utility import read_depth_file
 from rs_py.utility import read_color_file
@@ -87,9 +88,9 @@ if __name__ == "__main__":
     # FPS = int(sys.argv[3])
     # SCALE = float(sys.argv[4])
 
-    PATH = '/code/realsense-simple-wrapper/data/local/realsense-15fps'
+    PATH = '/home/dhm/DigitalICU/ICU-Suite/test_skeleton-15fps'
     SYNC = 0
-    FPS = 5
+    FPS = 1
     SCALE = 0.75
 
     iterate_over_raw_data(PATH, SYNC, FPS, SCALE,
