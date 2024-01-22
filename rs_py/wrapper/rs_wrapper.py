@@ -875,7 +875,11 @@ class RealsenseWrapper:
             print_no_device_enabled("stop()")
 
     def stop_device(self, device_sn: str) -> None:
-        self.check_if_device_is_enabled(device_sn)
+        print(f'All enabled devices: {self.enabled_devices}')
+        if self.check_if_device_is_enabled(device_sn):
+            print(f'{device_sn} is enabled, stop it now.')
+        else:
+            print(f'{device_sn} is not enabled.')
         self.enabled_devices[device_sn].pipeline.stop()
 
     def reset_device_with_frozen_timestamp(self,
